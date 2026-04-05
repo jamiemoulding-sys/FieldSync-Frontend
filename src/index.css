@@ -1,0 +1,99 @@
+
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===== GLOBAL ===== */
+body {
+  @apply bg-[#0b0b0c] text-white antialiased;
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    'Roboto', 'Helvetica Neue', sans-serif;
+}
+
+/* ===== SCROLLBAR (premium feel) ===== */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.08);
+  border-radius: 10px;
+}
+
+/* ===== BUTTONS ===== */
+.btn-primary {
+  @apply bg-indigo-600 text-white px-5 py-2.5 rounded-lg
+         font-medium hover:bg-indigo-500 transition-all duration-200 shadow;
+}
+
+.btn-secondary {
+  @apply bg-white/[0.04] border border-white/[0.08] text-white px-5 py-2.5 rounded-lg
+         hover:bg-white/[0.08] transition-all duration-200;
+}
+
+.btn-danger {
+  @apply bg-red-600 text-white px-5 py-2.5 rounded-lg
+         hover:bg-red-500 transition-all duration-200;
+}
+
+/* ===== CARDS ===== */
+.card {
+  @apply bg-white/[0.03] backdrop-blur-xl border border-white/[0.06]
+         rounded-2xl p-6 shadow-sm;
+}
+
+.card-muted {
+  @apply bg-white/[0.02] border border-white/[0.05]
+         rounded-2xl p-6;
+}
+
+/* ===== KPI CARD ===== */
+.kpi {
+  @apply bg-white/[0.03] border border-white/[0.06]
+         rounded-xl p-5;
+}
+
+.kpi-title {
+  @apply text-xs text-gray-500;
+}
+
+.kpi-value {
+  @apply text-2xl font-semibold mt-2;
+}
+
+/* ===== INPUT ===== */
+.input-field {
+  @apply w-full px-4 py-3 rounded-xl
+         bg-[#111] border border-white/10
+         text-white placeholder-gray-500
+         focus:outline-none focus:ring-2 focus:ring-indigo-500;
+}
+
+
+/* ===== HEADINGS ===== */
+.heading-1 {
+  @apply text-2xl font-semibold tracking-tight;
+}
+
+.heading-2 {
+  @apply text-lg font-semibold;
+}
+
+.subtle-text {
+  @apply text-sm text-gray-500;
+}
+
+/* ===== BADGES ===== */
+.badge-error {
+  @apply bg-red-500/10 text-red-400 px-3 py-1.5 rounded-lg text-xs;
+}
+
+.badge-success {
+  @apply bg-green-500/10 text-green-400 px-3 py-1.5 rounded-lg text-xs;
+}
+
+/* ===== UTIL ===== */
+.center-screen {
+  @apply min-h-screen flex items-center justify-center;
+}
