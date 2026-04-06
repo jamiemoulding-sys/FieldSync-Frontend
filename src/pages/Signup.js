@@ -38,7 +38,7 @@ function Signup() {
 
     try {
       // ✅ FIX 1: Correct endpoint
-      const res = await api.post('/api/auth/register', {
+      const res = await api.post('/auth/register', {
         email: form.email,
         password: form.password,
       });
@@ -47,7 +47,7 @@ function Signup() {
       localStorage.setItem('token', res.data.token);
 
       // ✅ FIX 2: Correct endpoint for company
-      const companyRes = await api.post('/api/companies/create-company', {
+      const companyRes = await api.post('/companies/create-company', {
         name: form.companyName,
       });
 
