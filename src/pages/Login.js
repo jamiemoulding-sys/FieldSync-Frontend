@@ -16,27 +16,28 @@ function Login() {
     try {
       setLoading(true);
 
-      const res = await authAPI.login({
+      // ✅ CALL API (UNWRAPPED RESPONSE)
+      const data = await authAPI.login({
         email,
         password,
       });
 
-      // 🔥 DEBUG (leave this for now)
-      console.log("LOGIN RESPONSE:", res);
+      console.log("LOGIN DATA:", data);
 
-      // ✅ SAFE ACCESS
-      const token = res?.data?.token;
+      // ✅ CORRECT TOKEN ACCESS
+      const token = data?.token;
 
       if (!token) {
+        console.error("BAD RESPONSE:", data);
         throw new Error("No token returned from backend");
       }
 
       // ✅ SAVE TOKEN
       localStorage.setItem("token", token);
 
-      // ✅ OPTIONAL: save user (helps later)
-      if (res?.data?.user) {
-        localStorage.setItem("user", JSON.stringify(res.data.user));
+      // ✅ SAVE USER (OPTIONAL BUT USEFUL)
+      if (data?.user) {
+        localStorage.setItem("user", JSON.stringify(data.user));
       }
 
       // ✅ REDIRECT
