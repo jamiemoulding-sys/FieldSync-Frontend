@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import Layout from '../components/Layout';
-import { shiftAPI, analyticsAPI, userAPI, holidayAPI, scheduleAPI } from '../services/api';
+import { shiftAPI, analyticsAPI, userAPI } from '../services/api';
 
 function Dashboard() {
   const navigate = useNavigate();
@@ -10,301 +9,349 @@ function Dashboard() {
 
   const [activeShifts, setActiveShifts] = useState([]);
   const [users, setUsers] = useState([]);
-  const [weeklyHours, setWeeklyHours] = useState(0);
-  const [todayHours, setTodayHours] = useState(0);
-  const [alerts, setAlerts] = useState([]);
-  const [now, setNow] = useState(Date.now());
+  const [analytics, setAnalytics] = useState([]);
 
-  // 🔥 LOGOUT
   const handleLogout = () => {
     localStorage.removeItem('token');
     navigate('/');
   };
 
-  // ⏱ LIVE CLOCK
   useEffect(() => {
-    const interval = setInterval(() => {
-      setNow(Date.now());
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // 🔄 LOAD DATA
-  useEffect(() => {
-    const interval = setInterval(loadData, 15000);
     loadData();
-    return () => clearInterval(interval);
   }, []);
 
   const loadData = async () => {
     try {
-      const [activeRes, analyticsRes, usersRes, holidayRes, scheduleRes] = await Promise.all([
-        shiftAPI.getAllActive().catch(() => ({ data: [] })),
-        analyticsAPI.getShifts().catch(() => ({ data: [] })),
-        userAPI.getAll().catch(() => ({ data: [] })),
-        holidayAPI.getAll().catch(() => ({ data: [] })),
-        scheduleAPI.getAll().catch(() => ({ data: [] }))
+      const [activeRes, analyticsRes, usersRes] = await Promise.all([
+        shiftAPI.getAllActive(),
+        analyticsAPI.getShifts(),
+        userAPI.getAll()
       ]);
 
-      const active = activeRes.data || [];
-      const analytics = analyticsRes.data || [];
-      const usersData = usersRes.data || [];
-      const holidays = holidayRes.data || [];
-      const schedules = scheduleRes.data || [];
-
-      setActiveShifts(active);
-      setUsers(usersData);
-
-      const weekly = analytics.reduce((sum, d) => sum + Number(d.hours || 0), 0);
-      setWeeklyHours(weekly);
-
-      const todayStr = new Date().toDateString();
-      const todayTotal = analytics
-        .filter(d => new Date(d.date).toDateString() === todayStr)
-        .reduce((sum, d) => sum + Number(d.hours || 0), 0);
-
-      setTodayHours(todayTotal);
-
-      buildAlerts(active, todayTotal, holidays, schedules);
+      setActiveShifts(activeRes.data || []);
+      setUsers(usersRes.data || []);
+      setAnalytics(analyticsRes.data || []);
 
     } catch (err) {
       console.error(err);
     }
   };
 
-  const buildAlerts = (active, todayHours, holidays, schedules) => {
-    const a = [];
-    const now = new Date();
-    const todayStr = now.toDateString();
+  const todayStr = new Date().toDateString();
 
-    if (active.length === 0) {
-      a.push('⚠️ No staff currently clocked in');
-    }
+  const todayHours = analytics
+    .filter(d => new Date(d.date).toDateString() === todayStr)
+    .reduce((sum, d) => sum + Number(d.hours || 0), 0);
 
-    if (active.length === 1) {
-      a.push('⚠️ Only 1 staff member working');
-    }
+  const weeklyHours = analytics.reduce((sum, d) => sum + Number(d.hours || 0), 0);
 
-    if (todayHours > 20) {
-      a.push('⚠️ High total hours today');
-    }
+  const onlinePercent = users.length
+    ? Math.round((activeShifts.length / users.length) * 100)
+    : 0;
 
-    if (holidays.length > 0) {
-      a.push(`📅 ${holidays.length} holiday requests pending`);
-    }
-
-    schedules.forEach(s => {
-      const scheduleDate = new Date(s.date).toDateString();
-      if (scheduleDate !== todayStr) return;
-
-      const shift = active.find(sh => sh.user_id === s.user_id);
-
-      if (shift) {
-        const clockIn = new Date(shift.clock_in_time);
-        const start = new Date(s.start_time);
-
-        if (clockIn > start) {
-          const minsLate = Math.floor((clockIn - start) / 60000);
-          a.push(`⏰ ${s.name || 'Employee'} is ${minsLate} mins late`);
-        }
-      }
-    });
-
-    schedules.forEach(s => {
-      const scheduleDate = new Date(s.date).toDateString();
-      if (scheduleDate !== todayStr) return;
-
-      const shift = active.find(sh => sh.user_id === s.user_id);
-      const start = new Date(s.start_time);
-
-      if (!shift && now > start) {
-        a.push(`❌ ${s.name || 'Employee'} missed shift`);
-      }
-    });
-
-    active.forEach(s => {
-      const duration = (Date.now() - new Date(s.clock_in_time)) / 1000 / 60 / 60;
-      if (duration > 8) {
-        a.push(`⚠️ ${s.name || 'Employee'} nearing overtime`);
-      }
-    });
-
-    setAlerts(a);
-  };
+  const productivityScore = Math.min(Math.round((weeklyHours / (users.length * 40 || 1)) * 100), 100);
 
   return (
-    <Layout>
-      <div style={{ padding: 10 }}>
+    <div style={wrapper}>
+
+      {/* SIDEBAR */}
+      <div style={sidebar}>
+        <div>
+          <h2 style={logo}>⚡ FieldSync</h2>
+
+          <nav style={nav}>
+            <NavItem label="Dashboard" active />
+            <NavItem label="Schedule" onClick={() => navigate('/schedule')} />
+            <NavItem label="Reports" onClick={() => navigate('/reports')} />
+            <NavItem label="Performance" onClick={() => navigate('/performance')} />
+            <NavItem label="Billing" onClick={() => navigate('/billing')} />
+          </nav>
+        </div>
+
+        <button onClick={handleLogout} style={logoutBtn}>
+          Logout
+        </button>
+      </div>
+
+      {/* MAIN */}
+      <div style={main}>
 
         {/* HEADER */}
-        <div style={{ marginBottom: 25, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h1 style={{ fontSize: 26 }}>
-            Welcome back, {user?.name || 'Team'} 👋
-          </h1>
-
-          <button onClick={handleLogout} style={logoutBtn}>
-            🚪 Logout
-          </button>
-        </div>
-
-        {/* STATS */}
-        <div style={grid}>
-          <Stat title="Active Staff" value={activeShifts.length} />
-          <Stat title="Today Hours" value={todayHours} />
-          <Stat title="Weekly Hours" value={weeklyHours} />
-        </div>
-
-        {/* ALERTS */}
-        {alerts.length > 0 && (
-          <div style={alertBox}>
-            {alerts.map((a, i) => (
-              <p key={i}>{a}</p>
-            ))}
+        <div style={header}>
+          <div>
+            <h1 style={title}>Dashboard</h1>
+            <p style={subtitle}>Welcome back, {user?.name || 'Team'}</p>
           </div>
-        )}
-
-        {/* TEAM STATUS */}
-        <div style={card}>
-          <h3 style={{ marginBottom: 15 }}>Team Status</h3>
-
-          {users.map((u) => {
-            const active = activeShifts.find(s => s.user_id === u.id);
-
-            return (
-              <div key={u.id} style={row}>
-                <div>
-                  <span style={{ marginRight: 8 }}>
-                    {active ? '🟢' : '⚪'}
-                  </span>
-                  {u.name}
-                </div>
-
-                <div style={{ color: '#9ca3af' }}>
-                  {active
-                    ? formatDuration(now - new Date(active.clock_in_time))
-                    : 'Off shift'}
-                </div>
-              </div>
-            );
-          })}
         </div>
 
-        {/* ACTIONS */}
-        <div style={actions}>
-          <button onClick={() => navigate('/work-session')} style={primaryBtn}>
-            ⏰ Start Work
-          </button>
+        {/* KPI GRID */}
+        <div style={kpiGrid}>
+          <KPI title="Active Staff" value={activeShifts.length} sub={`${onlinePercent}% online`} />
+          <KPI title="Today Hours" value={Math.round(todayHours)} sub="Today" />
+          <KPI title="Weekly Hours" value={Math.round(weeklyHours)} sub="Last 7 days" />
+          <KPI title="Productivity" value={`${productivityScore}%`} sub="Efficiency" />
+        </div>
 
-          <button onClick={() => navigate('/schedule')} style={secondaryBtn}>
-            📅 Schedule
-          </button>
+        {/* INSIGHTS STRIP */}
+        <div style={insightGrid}>
+          <Insight title="Staff Online" value={`${onlinePercent}%`} bar={onlinePercent} />
+          <Insight title="Daily Load" value={`${Math.round(todayHours)}h`} bar={(todayHours / 50) * 100} />
+          <Insight title="Weekly Load" value={`${Math.round(weeklyHours)}h`} bar={(weeklyHours / 200) * 100} />
+        </div>
 
-          <button onClick={() => navigate('/reports')} style={secondaryBtn}>
-            📊 Reports
-          </button>
+        {/* MAIN GRID */}
+        <div style={contentGrid}>
 
-          <button onClick={() => navigate('/performance')} style={secondaryBtn}>
-            📊 Performance
-          </button>
+          {/* TEAM */}
+          <div style={card}>
+            <h3 style={cardTitle}>Team Status</h3>
 
-          <button onClick={() => navigate('/billing')} style={upgradeBtn}>
-            💳 Upgrade
-          </button>
+            {users.map((u) => {
+              const active = activeShifts.find(s => s.user_id === u.id);
+
+              return (
+                <div key={u.id} style={row}>
+                  <div style={userLeft}>
+                    <div style={{
+                      ...statusDot,
+                      background: active ? '#10b981' : '#374151'
+                    }} />
+                    <span>{u.name}</span>
+                  </div>
+
+                  <span style={statusText}>
+                    {active ? 'Working' : 'Offline'}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* ACTIVITY */}
+          <div style={card}>
+            <h3 style={cardTitle}>Live Activity</h3>
+
+            {activeShifts.map((s, i) => (
+              <div key={i} style={activityItem}>
+                🟢 {s.name || 'Employee'} started shift
+              </div>
+            ))}
+
+            {activeShifts.length === 0 && (
+              <p style={{ color: '#9ca3af' }}>No activity</p>
+            )}
+          </div>
+
+          {/* AI INSIGHTS 🔥 */}
+          <div style={card}>
+            <h3 style={cardTitle}>Insights</h3>
+
+            {activeShifts.length === 0 && <p>⚠️ No staff working</p>}
+            {activeShifts.length === 1 && <p>⚠️ Only 1 staff active</p>}
+            {todayHours > 20 && <p>⚠️ High workload today</p>}
+
+            <p>📊 {onlinePercent}% workforce active</p>
+
+            {productivityScore < 60 && (
+              <p>📉 Productivity is below optimal</p>
+            )}
+
+            {productivityScore > 80 && (
+              <p>🚀 Team performing at high efficiency</p>
+            )}
+          </div>
+
         </div>
 
       </div>
-    </Layout>
+    </div>
   );
 }
 
-// ⏱ FORMAT
-function formatDuration(ms) {
-  const s = Math.floor(ms / 1000);
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = s % 60;
-  return `${h}h ${m}m ${sec}s`;
+// KPI
+function KPI({ title, value, sub }) {
+  return (
+    <div style={kpiCard}>
+      <p style={kpiTitle}>{title}</p>
+      <h2 style={kpiValue}>{value}</h2>
+      <span style={kpiSub}>{sub}</span>
+    </div>
+  );
 }
 
-// COMPONENT
-function Stat({ title, value }) {
+// INSIGHT BAR
+function Insight({ title, value, bar }) {
   return (
-    <div style={card}>
-      <p style={{ color: '#9ca3af' }}>{title}</p>
-      <h2>{value}</h2>
+    <div style={insightCard}>
+      <div style={insightTop}>
+        <span>{title}</span>
+        <span>{value}</span>
+      </div>
+
+      <div style={barBg}>
+        <div style={{ ...barFill, width: `${Math.min(bar, 100)}%` }} />
+      </div>
+    </div>
+  );
+}
+
+// NAV ITEM
+function NavItem({ label, onClick, active }) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        padding: '10px 14px',
+        borderRadius: 8,
+        cursor: 'pointer',
+        background: active ? '#1f2937' : 'transparent'
+      }}
+    >
+      {label}
     </div>
   );
 }
 
 // STYLES
-const grid = {
+
+const wrapper = {
+  display: 'flex',
+  height: '100vh',
+  background: '#0a0a0b',
+  color: 'white'
+};
+
+const sidebar = {
+  width: 220,
+  background: '#111827',
+  padding: 20,
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'space-between'
+};
+
+const logo = { marginBottom: 30 };
+
+const nav = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 10
+};
+
+const logoutBtn = {
+  background: '#ef4444',
+  border: 'none',
+  padding: 10,
+  borderRadius: 8,
+  color: 'white',
+  cursor: 'pointer'
+};
+
+const main = {
+  flex: 1,
+  padding: 30,
+  overflowY: 'auto'
+};
+
+const header = { marginBottom: 25 };
+
+const title = { fontSize: 28 };
+
+const subtitle = { color: '#9ca3af' };
+
+const kpiGrid = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+  gridTemplateColumns: 'repeat(4, 1fr)',
   gap: 15,
   marginBottom: 20
 };
 
-const card = {
+const kpiCard = {
   background: '#111827',
-  padding: 15,
-  borderRadius: 10
+  padding: 20,
+  borderRadius: 12
 };
 
-const alertBox = {
-  background: '#1f2937',
-  padding: 15,
-  borderRadius: 10,
-  marginBottom: 20,
-  color: '#f87171'
+const kpiTitle = { color: '#9ca3af' };
+
+const kpiValue = { fontSize: 26 };
+
+const kpiSub = {
+  fontSize: 12,
+  color: '#6b7280'
 };
+
+const insightGrid = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(3, 1fr)',
+  gap: 15,
+  marginBottom: 20
+};
+
+const insightCard = {
+  background: '#111827',
+  padding: 15,
+  borderRadius: 12
+};
+
+const insightTop = {
+  display: 'flex',
+  justifyContent: 'space-between'
+};
+
+const barBg = {
+  height: 6,
+  background: '#1f2937',
+  marginTop: 10,
+  borderRadius: 6
+};
+
+const barFill = {
+  height: 6,
+  background: '#6366f1',
+  borderRadius: 6
+};
+
+const contentGrid = {
+  display: 'grid',
+  gridTemplateColumns: '2fr 1fr 1fr',
+  gap: 20
+};
+
+const card = {
+  background: '#111827',
+  padding: 20,
+  borderRadius: 12
+};
+
+const cardTitle = { marginBottom: 10 };
 
 const row = {
   display: 'flex',
   justifyContent: 'space-between',
-  marginBottom: 10
+  padding: '10px 0',
+  borderBottom: '1px solid rgba(255,255,255,0.05)'
 };
 
-const actions = {
+const userLeft = {
   display: 'flex',
-  flexWrap: 'wrap',
   gap: 10,
-  marginTop: 20
+  alignItems: 'center'
 };
 
-const primaryBtn = {
-  padding: 14,
-  background: '#6366f1',
-  border: 'none',
-  borderRadius: 8,
-  color: 'white',
-  cursor: 'pointer'
+const statusDot = {
+  width: 8,
+  height: 8,
+  borderRadius: '50%'
 };
 
-const secondaryBtn = {
-  padding: 14,
-  background: '#1f2937',
-  border: 'none',
-  borderRadius: 8,
-  color: 'white',
-  cursor: 'pointer'
+const statusText = {
+  color: '#9ca3af'
 };
 
-const upgradeBtn = {
-  padding: 14,
-  background: '#10b981',
-  border: 'none',
-  borderRadius: 8,
-  color: 'white',
-  cursor: 'pointer'
-};
-
-const logoutBtn = {
-  padding: 10,
-  background: '#ef4444',
-  border: 'none',
-  borderRadius: 8,
-  color: 'white',
-  cursor: 'pointer'
+const activityItem = {
+  marginBottom: 8,
+  color: '#9ca3af'
 };
 
 export default Dashboard;
