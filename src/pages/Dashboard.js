@@ -15,6 +15,12 @@ function Dashboard() {
   const [alerts, setAlerts] = useState([]);
   const [now, setNow] = useState(Date.now());
 
+  // 🔥 LOGOUT
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    navigate('/');
+  };
+
   // ⏱ LIVE CLOCK
   useEffect(() => {
     const interval = setInterval(() => {
@@ -49,7 +55,6 @@ function Dashboard() {
       setActiveShifts(active);
       setUsers(usersData);
 
-      // HOURS
       const weekly = analytics.reduce((sum, d) => sum + Number(d.hours || 0), 0);
       setWeeklyHours(weekly);
 
@@ -67,13 +72,11 @@ function Dashboard() {
     }
   };
 
-  // 🚨 ALERT SYSTEM (UPGRADED)
   const buildAlerts = (active, todayHours, holidays, schedules) => {
     const a = [];
     const now = new Date();
     const todayStr = now.toDateString();
 
-    // BASIC
     if (active.length === 0) {
       a.push('⚠️ No staff currently clocked in');
     }
@@ -90,7 +93,6 @@ function Dashboard() {
       a.push(`📅 ${holidays.length} holiday requests pending`);
     }
 
-    // ⏰ LATENESS
     schedules.forEach(s => {
       const scheduleDate = new Date(s.date).toDateString();
       if (scheduleDate !== todayStr) return;
@@ -108,7 +110,6 @@ function Dashboard() {
       }
     });
 
-    // ❌ ABSENCE
     schedules.forEach(s => {
       const scheduleDate = new Date(s.date).toDateString();
       if (scheduleDate !== todayStr) return;
@@ -121,7 +122,6 @@ function Dashboard() {
       }
     });
 
-    // ⏱ OVERTIME
     active.forEach(s => {
       const duration = (Date.now() - new Date(s.clock_in_time)) / 1000 / 60 / 60;
       if (duration > 8) {
@@ -137,10 +137,14 @@ function Dashboard() {
       <div style={{ padding: 10 }}>
 
         {/* HEADER */}
-        <div style={{ marginBottom: 25 }}>
+        <div style={{ marginBottom: 25, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1 style={{ fontSize: 26 }}>
             Welcome back, {user?.name || 'Team'} 👋
           </h1>
+
+          <button onClick={handleLogout} style={logoutBtn}>
+            🚪 Logout
+          </button>
         </div>
 
         {/* STATS */}
@@ -288,6 +292,15 @@ const secondaryBtn = {
 const upgradeBtn = {
   padding: 14,
   background: '#10b981',
+  border: 'none',
+  borderRadius: 8,
+  color: 'white',
+  cursor: 'pointer'
+};
+
+const logoutBtn = {
+  padding: 10,
+  background: '#ef4444',
   border: 'none',
   borderRadius: 8,
   color: 'white',

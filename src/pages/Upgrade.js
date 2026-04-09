@@ -8,6 +8,16 @@ function Upgrade() {
 
       <div className="max-w-lg w-full bg-white/[0.03] border border-white/[0.08] rounded-2xl p-8 text-center backdrop-blur">
 
+        {/* TOP BACK BUTTON (NEW 🔥) */}
+        <div className="flex justify-start mb-4">
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="text-sm text-gray-400 hover:text-white"
+          >
+            ← Back
+          </button>
+        </div>
+
         {/* HEADER */}
         <h1 className="text-2xl font-semibold mb-2">
           Upgrade your workspace
@@ -40,12 +50,12 @@ function Upgrade() {
           Start Subscription
         </button>
 
-        {/* BACK */}
+        {/* BACK TO DASHBOARD (STRONG EXIT 🔥) */}
         <button
           onClick={() => navigate('/dashboard')}
-          className="mt-4 text-sm text-gray-500 hover:text-white"
+          className="mt-6 w-full bg-[#1f2937] hover:bg-[#374151] py-3 rounded-xl font-medium transition"
         >
-          Back to dashboard
+          ← Return to Dashboard
         </button>
 
       </div>
