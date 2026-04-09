@@ -16,7 +16,7 @@ function Login() {
     try {
       setLoading(true);
 
-      // ✅ CALL API (UNWRAPPED RESPONSE)
+      // ✅ THIS NOW RETURNS CLEAN DATA (NOT res.data)
       const data = await authAPI.login({
         email,
         password,
@@ -24,7 +24,7 @@ function Login() {
 
       console.log("LOGIN DATA:", data);
 
-      // ✅ CORRECT TOKEN ACCESS
+      // ✅ FIX: read token directly
       const token = data?.token;
 
       if (!token) {
@@ -35,7 +35,7 @@ function Login() {
       // ✅ SAVE TOKEN
       localStorage.setItem("token", token);
 
-      // ✅ SAVE USER (OPTIONAL BUT USEFUL)
+      // ✅ SAVE USER (optional but useful)
       if (data?.user) {
         localStorage.setItem("user", JSON.stringify(data.user));
       }
