@@ -47,7 +47,7 @@ function Dashboard() {
         <div>
           <h2 style={brand}>FieldSync</h2>
 
-          <Nav label="Dashboard" active onClick={() => navigate('/dashboard')} />
+          <Nav label="Dashboard" active />
           <Nav label="Employees" onClick={() => navigate('/employees')} />
           <Nav label="Schedule" onClick={() => navigate('/schedule')} />
           <Nav label="Work Session" onClick={() => navigate('/work-session')} />
@@ -60,22 +60,28 @@ function Dashboard() {
           <Nav label="Profile" onClick={() => navigate('/profile')} />
         </div>
 
-        <button style={logoutBtn} onClick={() => {
-          localStorage.removeItem('token');
-          window.location.href = '/login';
-        }}>
-          Logout
-        </button>
+        <div>
+          <button onClick={() => {
+            localStorage.removeItem('token');
+            window.location.href = '/login';
+          }} style={logoutBtn}>
+            Logout
+          </button>
+        </div>
       </div>
 
       {/* MAIN */}
       <div style={main}>
 
-        {/* HEADER */}
-        <div style={header}>
+        {/* TOP BAR */}
+        <div style={topbar}>
           <div>
             <h1 style={title}>Dashboard</h1>
-            <p style={subtitle}>Welcome back {user?.name || ''}</p>
+            <p style={subtitle}>Real-time overview</p>
+          </div>
+
+          <div style={userBox}>
+            {user?.name || user?.email}
           </div>
         </div>
 
@@ -87,7 +93,7 @@ function Dashboard() {
           <KPI title="Completed" value={stats.completedTasks || 0} />
         </div>
 
-        {/* CHARTS ROW (50/50) */}
+        {/* CHARTS */}
         <div style={chartGrid}>
 
           {/* HOURS */}
@@ -96,8 +102,8 @@ function Dashboard() {
 
             <ResponsiveContainer width="100%" height={250}>
               <LineChart data={hours}>
-                <XAxis dataKey="date" stroke="#9ca3af" />
-                <YAxis stroke="#9ca3af" />
+                <XAxis dataKey="date" stroke="#6b7280" />
+                <YAxis stroke="#6b7280" />
                 <Tooltip />
                 <Line
                   type="monotone"
@@ -115,8 +121,8 @@ function Dashboard() {
 
             <ResponsiveContainer width="100%" height={250}>
               <BarChart data={activity}>
-                <XAxis dataKey="name" stroke="#9ca3af" />
-                <YAxis stroke="#9ca3af" />
+                <XAxis dataKey="name" stroke="#6b7280" />
+                <YAxis stroke="#6b7280" />
                 <Tooltip />
                 <Bar dataKey="action" fill="#10b981" />
               </BarChart>
@@ -125,7 +131,7 @@ function Dashboard() {
 
         </div>
 
-        {/* ACTIVITY */}
+        {/* ACTIVITY FEED */}
         <div style={card}>
           <h3 style={cardTitle}>Live Activity</h3>
 
@@ -134,8 +140,8 @@ function Dashboard() {
           )}
 
           {activity.map((a, i) => (
-            <div key={i} style={row}>
-              <strong>{a.name}</strong> — {formatAction(a)}
+            <div key={i} style={activityRow}>
+              <strong>{a.name}</strong> {formatAction(a)}
             </div>
           ))}
         </div>
@@ -161,14 +167,8 @@ function Nav({ label, onClick, active }) {
     <button
       onClick={onClick}
       style={{
-        width: '100%',
-        padding: '10px 12px',
-        marginBottom: 6,
-        borderRadius: 8,
-        border: 'none',
-        textAlign: 'left',
-        cursor: 'pointer',
-        background: active ? '#6366f1' : 'transparent',
+        ...nav,
+        background: active ? '#1f2937' : 'transparent',
         color: active ? 'white' : '#9ca3af'
       }}
     >
@@ -185,7 +185,7 @@ const formatAction = (a) => {
     case 'clock_out': return 'clocked out';
     case 'task_completed': return 'completed a task';
     case 'task_created': return 'created a task';
-    default: return a?.action;
+    default: return a?.action || '';
   }
 };
 
@@ -193,14 +193,14 @@ const formatAction = (a) => {
 
 const layout = {
   display: 'flex',
-  minHeight: '100vh',
+  height: '100vh',
   background: '#0b0f14',
   color: 'white'
 };
 
 const sidebar = {
-  width: 240,
-  background: '#020617',
+  width: 230,
+  background: '#0f172a',
   padding: 20,
   display: 'flex',
   flexDirection: 'column',
@@ -210,13 +210,31 @@ const sidebar = {
 
 const brand = { marginBottom: 25 };
 
+const nav = {
+  width: '100%',
+  padding: 10,
+  borderRadius: 8,
+  border: 'none',
+  textAlign: 'left',
+  cursor: 'pointer',
+  marginBottom: 4
+};
+
 const main = {
   flex: 1,
   padding: 30
 };
 
-const header = {
-  marginBottom: 20
+const topbar = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  marginBottom: 25
+};
+
+const userBox = {
+  background: '#111827',
+  padding: '6px 10px',
+  borderRadius: 8
 };
 
 const title = { margin: 0 };
@@ -250,27 +268,21 @@ const card = {
   border: '1px solid #1f2937'
 };
 
-const cardTitle = {
-  marginBottom: 15
+const cardTitle = { marginBottom: 15 };
+
+const activityRow = {
+  marginBottom: 10
 };
 
-const row = {
-  marginBottom: 8
-};
-
-const muted = {
-  color: '#6b7280'
-};
+const muted = { color: '#6b7280' };
 
 const logoutBtn = {
-  marginTop: 10,
   padding: 10,
   width: '100%',
   background: '#111827',
   border: '1px solid #1f2937',
   borderRadius: 8,
-  color: '#9ca3af',
-  cursor: 'pointer'
+  color: '#9ca3af'
 };
 
 export default Dashboard;
