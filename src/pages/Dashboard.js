@@ -1,145 +1,150 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
-import api from '../services/api';
+import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import {
+  Home, Users, Calendar, BarChart2, User, CreditCard
+} from "lucide-react";
+
+import api from "../services/api";
+import { useAuth } from "../hooks/useAuth";
 
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar
-} from 'recharts';
+  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  BarChart, Bar
+} from "recharts";
 
-function Dashboard() {
-  const navigate = useNavigate();
+export default function Dashboard() {
   const { user } = useAuth() || {};
 
   const [stats, setStats] = useState({});
-  const [activity, setActivity] = useState([]);
   const [hours, setHours] = useState([]);
+  const [topUsers, setTopUsers] = useState([]);
+  const [activity, setActivity] = useState([]);
 
   useEffect(() => {
     load();
   }, []);
 
   const load = async () => {
-    try {
-      const res = await api.get('/dashboard');
-      const data = res?.data || {};
+    const res = await api.get("/dashboard");
+    const data = res?.data || {};
 
-      setStats(data.stats || {});
-      setActivity(data.activity || []);
-      setHours(data.trends?.hours || []);
-    } catch (err) {
-      console.error(err);
-    }
+    setStats(data.stats || {});
+    setHours(data.trends?.hours || []);
+    setTopUsers(data.topPerformers || []);
+    setActivity(data.activity || []);
   };
 
   return (
-    <div style={layout}>
+    <div className="flex h-screen">
 
       {/* SIDEBAR */}
-      <div style={sidebar}>
-        <h2 style={brand}>FieldSync</h2>
+      <div className="w-64 bg-gradient-to-b from-[#020617] to-[#0f172a] border-r border-border p-5">
 
-        <div>
-          <Nav label="Dashboard" active />
-          <Nav label="Work Session" onClick={() => navigate('/work-session')} />
-          <Nav label="Tasks" onClick={() => navigate('/tasks')} />
+        <h2 className="text-xl font-bold mb-6">FieldSync</h2>
 
-          <Divider />
+        <Nav icon={<Home size={16} />} label="Dashboard" active />
+        <Nav icon={<Users size={16} />} label="Employees" />
+        <Nav icon={<Calendar size={16} />} label="Schedule" />
 
-          <Nav label="Employees" onClick={() => navigate('/employees')} />
-          <Nav label="Schedule" onClick={() => navigate('/schedule')} />
-          <Nav label="Locations" onClick={() => navigate('/locations')} />
-          <Nav label="Holiday Requests" onClick={() => navigate('/holiday-requests')} />
-          <Nav label="Timesheets" onClick={() => navigate('/timesheets')} />
+        <div className="my-4 border-t border-border" />
 
-          <Divider />
-
-          <Nav label="Reports" onClick={() => navigate('/reports')} />
-          <Nav label="Performance" onClick={() => navigate('/performance')} />
-
-          <Divider />
-
-          <Nav label="Profile" onClick={() => navigate('/profile')} />
-          <Nav label="Billing" onClick={() => navigate('/billing')} />
-        </div>
+        <Nav icon={<BarChart2 size={16} />} label="Reports" />
+        <Nav icon={<User size={16} />} label="Profile" />
+        <Nav icon={<CreditCard size={16} />} label="Billing" />
       </div>
 
       {/* MAIN */}
-      <div style={main}>
+      <div className="flex-1 p-6 overflow-y-auto">
 
         {/* HEADER */}
-        <div style={header}>
+        <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 style={title}>Dashboard</h1>
-            <p style={subtitle}>Real-time overview</p>
+            <h1 className="text-2xl font-semibold">
+              Good morning, {user?.name || "there"} 👋
+            </h1>
+            <p className="text-gray-400">Here’s your overview</p>
           </div>
 
-          <div style={userBox}>
+          <div className="bg-card px-3 py-2 rounded-lg border border-border">
             {user?.email}
           </div>
         </div>
 
-        {/* KPI ROW */}
-        <div style={kpiGrid}>
-          <KPI title="Users" value={stats.users || 0} />
-          <KPI title="Active Staff" value={stats.activeShifts || 0} />
-          <KPI title="Tasks" value={stats.tasks || 0} />
-          <KPI title="Completed" value={stats.completedTasks || 0} />
+        {/* QUICK ACTIONS */}
+        <div className="flex gap-3 mb-6">
+          <ActionBtn text="Add Employee" />
+          <ActionBtn text="Start Shift" />
+          <ActionBtn text="Create Task" />
         </div>
 
-        {/* 🔥 CHARTS AT TOP (SHORTER HEIGHT) */}
-        <div style={chartGrid}>
+        {/* KPI */}
+        <div className="grid grid-cols-4 gap-4 mb-6">
+          <KPI title="Users" value={stats.users} />
+          <KPI title="Active" value={stats.activeShifts} />
+          <KPI title="Tasks" value={stats.tasks} />
+          <KPI title="Completed" value={stats.completedTasks} />
+        </div>
 
-          <div style={card}>
-            <h3 style={cardTitle}>Weekly Hours</h3>
+        {/* CHARTS */}
+        <div className="grid grid-cols-[1.5fr_1fr] gap-4 mb-6">
+
+          <Card>
+            <h3 className="mb-3">Weekly Hours</h3>
 
             <ResponsiveContainer width="100%" height={180}>
               <LineChart data={hours}>
-                <XAxis dataKey="date" stroke="#64748b" />
-                <YAxis stroke="#64748b" />
+                <XAxis dataKey="date" stroke="#6b7280" />
+                <YAxis stroke="#6b7280" />
                 <Tooltip />
                 <Line
-                  type="monotone"
                   dataKey="hours"
                   stroke="#3b82f6"
-                  strokeWidth={2}
+                  strokeWidth={3}
+                  dot={false}
                 />
               </LineChart>
             </ResponsiveContainer>
-          </div>
+          </Card>
 
-          <div style={card}>
-            <h3 style={cardTitle}>Top Performers</h3>
+          <Card>
+            <h3 className="mb-3">Top Performers</h3>
 
             <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={activity}>
-                <XAxis dataKey="name" stroke="#64748b" />
-                <YAxis stroke="#64748b" />
+              <BarChart data={topUsers}>
+                <XAxis dataKey="name" stroke="#6b7280" />
+                <YAxis stroke="#6b7280" />
                 <Tooltip />
-                <Bar dataKey="action" fill="#10b981" />
+                <Bar dataKey="completed" fill="#10b981" />
               </BarChart>
             </ResponsiveContainer>
-          </div>
+          </Card>
 
         </div>
 
         {/* ACTIVITY */}
-        <div style={card}>
-          <h3 style={cardTitle}>Live Activity</h3>
+        <Card>
+          <h3 className="mb-4">Live Activity</h3>
 
           {activity.map((a, i) => (
-            <div key={i} style={activityRow}>
-              <strong>{a.name}</strong> — {a.action}
-            </div>
+            <motion.div
+              key={i}
+              whileHover={{ scale: 1.02 }}
+              className="flex items-center gap-3 p-3 border-b border-border"
+            >
+              <img
+                src={`https://ui-avatars.com/api/?name=${a.name}`}
+                className="w-8 h-8 rounded-full"
+              />
+
+              <div>
+                <p className="font-medium">{a.name}</p>
+                <p className="text-sm text-gray-400">{a.action}</p>
+              </div>
+
+              <div className="ml-auto w-2 h-2 bg-green-500 rounded-full" />
+            </motion.div>
           ))}
-        </div>
+        </Card>
 
       </div>
     </div>
@@ -148,129 +153,46 @@ function Dashboard() {
 
 /* COMPONENTS */
 
-function Nav({ label, onClick, active }) {
+function Nav({ icon, label, active }) {
   return (
     <button
-      onClick={onClick}
-      style={{
-        ...nav,
-        background: active ? '#1e293b' : 'transparent',
-        color: active ? '#fff' : '#94a3b8'
-      }}
+      className={`flex items-center gap-2 w-full px-3 py-2 rounded-lg mb-1 transition
+        ${active ? "bg-indigo-600 text-white" : "text-gray-400 hover:bg-card"}
+      `}
     >
+      {icon}
       {label}
     </button>
   );
 }
 
-function Divider() {
-  return <div style={divider} />;
-}
-
 function KPI({ title, value }) {
   return (
-    <div style={kpi}>
-      <p style={muted}>{title}</p>
-      <h2>{value}</h2>
-    </div>
+    <motion.div
+      whileHover={{ y: -4 }}
+      className="bg-card p-4 rounded-xl border border-border"
+    >
+      <p className="text-gray-400 text-sm">{title}</p>
+      <h2 className="text-xl font-semibold">{value || 0}</h2>
+    </motion.div>
   );
 }
 
-/* STYLES */
+function Card({ children }) {
+  return (
+    <motion.div
+      whileHover={{ y: -3 }}
+      className="bg-card p-4 rounded-xl border border-border shadow-lg"
+    >
+      {children}
+    </motion.div>
+  );
+}
 
-const layout = {
-  display: 'flex',
-  height: '100vh',
-  background: '#020617',
-  color: 'white'
-};
-
-/* 🔥 SIDEBAR WITH GRADIENT SHADING */
-const sidebar = {
-  width: 240,
-  padding: 20,
-  background: 'linear-gradient(180deg, #020617 0%, #020617 60%, #0f172a 100%)',
-  borderRight: '1px solid #1f2937'
-};
-
-const brand = {
-  marginBottom: 20
-};
-
-const nav = {
-  width: '100%',
-  padding: 10,
-  borderRadius: 8,
-  border: 'none',
-  textAlign: 'left',
-  cursor: 'pointer',
-  marginBottom: 4
-};
-
-const divider = {
-  height: 1,
-  background: '#1f2937',
-  margin: '12px 0'
-};
-
-const main = {
-  flex: 1,
-  padding: 30
-};
-
-const header = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  marginBottom: 20
-};
-
-const title = { margin: 0 };
-const subtitle = { color: '#94a3b8' };
-
-const userBox = {
-  background: '#020617',
-  border: '1px solid #1f2937',
-  padding: '6px 10px',
-  borderRadius: 8
-};
-
-const kpiGrid = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(4, 1fr)',
-  gap: 20,
-  marginBottom: 20
-};
-
-/* 🔥 FIXED CHART SIZE + SPACING */
-const chartGrid = {
-  display: 'grid',
-  gridTemplateColumns: '1fr 1fr',
-  gap: 20,
-  marginBottom: 20
-};
-
-const kpi = {
-  background: '#0f172a',
-  padding: 20,
-  borderRadius: 12
-};
-
-const card = {
-  background: '#0f172a',
-  padding: 16,
-  borderRadius: 12
-};
-
-const cardTitle = {
-  marginBottom: 10
-};
-
-const activityRow = {
-  marginBottom: 8
-};
-
-const muted = {
-  color: '#94a3b8'
-};
-
-export default Dashboard;
+function ActionBtn({ text }) {
+  return (
+    <button className="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-lg text-sm">
+      {text}
+    </button>
+  );
+}
