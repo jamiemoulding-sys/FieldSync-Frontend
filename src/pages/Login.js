@@ -16,7 +16,7 @@ function Login() {
     try {
       setLoading(true);
 
-      // ✅ THIS NOW RETURNS CLEAN DATA (NOT res.data)
+      // ✅ THIS RETURNS CLEAN DATA (because of unwrap)
       const data = await authAPI.login({
         email,
         password,
@@ -24,7 +24,7 @@ function Login() {
 
       console.log("LOGIN DATA:", data);
 
-      // ✅ FIX: read token directly
+      // ✅ FIX: direct access (NO .data)
       const token = data?.token;
 
       if (!token) {
@@ -35,7 +35,7 @@ function Login() {
       // ✅ SAVE TOKEN
       localStorage.setItem("token", token);
 
-      // ✅ SAVE USER (optional but useful)
+      // ✅ SAVE USER
       if (data?.user) {
         localStorage.setItem("user", JSON.stringify(data.user));
       }

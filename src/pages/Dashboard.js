@@ -21,7 +21,6 @@ function Dashboard() {
   const [stats, setStats] = useState({});
   const [activity, setActivity] = useState([]);
   const [hours, setHours] = useState([]);
-  const [showBilling, setShowBilling] = useState(false);
 
   useEffect(() => {
     load();
@@ -33,7 +32,7 @@ function Dashboard() {
       const data = res?.data || {};
 
       setStats(data.stats || {});
-      setActivity(data.topPerformers || []);
+      setActivity(data.activity || []);
       setHours(data.trends?.hours || []);
     } catch (err) {
       console.error(err);
@@ -45,54 +44,31 @@ function Dashboard() {
 
       {/* SIDEBAR */}
       <div style={sidebar}>
+        <h2 style={brand}>FieldSync</h2>
+
         <div>
-          <h2 style={brand}>FieldSync</h2>
+          <Nav label="Dashboard" active />
+          <Nav label="Work Session" onClick={() => navigate('/work-session')} />
+          <Nav label="Tasks" onClick={() => navigate('/tasks')} />
 
-          <Section title="Core">
-            <Nav label="Dashboard" active />
-            <Nav label="Work Session" onClick={() => navigate('/work-session')} />
-            <Nav label="Tasks" onClick={() => navigate('/tasks')} />
-          </Section>
+          <Divider />
 
-          <Section title="Management">
-            <Nav label="Employees" onClick={() => navigate('/employees')} />
-            <Nav label="Schedule" onClick={() => navigate('/schedule')} />
-            <Nav label="Locations" onClick={() => navigate('/locations')} />
-            <Nav label="Holiday Requests" onClick={() => navigate('/holiday-requests')} />
-            <Nav label="Timesheets" onClick={() => navigate('/timesheets')} />
-          </Section>
+          <Nav label="Employees" onClick={() => navigate('/employees')} />
+          <Nav label="Schedule" onClick={() => navigate('/schedule')} />
+          <Nav label="Locations" onClick={() => navigate('/locations')} />
+          <Nav label="Holiday Requests" onClick={() => navigate('/holiday-requests')} />
+          <Nav label="Timesheets" onClick={() => navigate('/timesheets')} />
 
-          <Section title="Business">
-            <Nav label="Reports" onClick={() => navigate('/reports')} />
-            <Nav label="Performance" onClick={() => navigate('/performance')} />
-          </Section>
+          <Divider />
 
-          <Section title="Account">
-            <Nav label="Profile" onClick={() => navigate('/profile')} />
+          <Nav label="Reports" onClick={() => navigate('/reports')} />
+          <Nav label="Performance" onClick={() => navigate('/performance')} />
 
-            <Nav
-              label="Billing ▾"
-              onClick={() => setShowBilling(!showBilling)}
-            />
+          <Divider />
 
-            {showBilling && (
-              <div style={subMenu}>
-                <Nav label="Plans" onClick={() => navigate('/billing')} />
-                <Nav label="Invoices" onClick={() => navigate('/billing')} />
-              </div>
-            )}
-          </Section>
+          <Nav label="Profile" onClick={() => navigate('/profile')} />
+          <Nav label="Billing" onClick={() => navigate('/billing')} />
         </div>
-
-        <button
-          onClick={() => {
-            localStorage.removeItem('token');
-            window.location.href = '/login';
-          }}
-          style={logoutBtn}
-        >
-          Logout
-        </button>
       </div>
 
       {/* MAIN */}
@@ -110,41 +86,44 @@ function Dashboard() {
           </div>
         </div>
 
-        {/* KPI CARDS */}
+        {/* KPI ROW */}
         <div style={kpiGrid}>
-          <KPI title="Users" value={stats.users || 0} color="#3b82f6" />
-          <KPI title="Active Staff" value={stats.activeShifts || 0} color="#ef4444" />
-          <KPI title="Tasks" value={stats.tasks || 0} color="#f59e0b" />
-          <KPI title="Completed" value={stats.completedTasks || 0} color="#10b981" />
+          <KPI title="Users" value={stats.users || 0} />
+          <KPI title="Active Staff" value={stats.activeShifts || 0} />
+          <KPI title="Tasks" value={stats.tasks || 0} />
+          <KPI title="Completed" value={stats.completedTasks || 0} />
         </div>
 
-        {/* CHARTS */}
+        {/* 🔥 CHARTS AT TOP (SHORTER HEIGHT) */}
         <div style={chartGrid}>
 
-          {/* HOURS */}
-          <div style={glassCard}>
+          <div style={card}>
             <h3 style={cardTitle}>Weekly Hours</h3>
 
-            <ResponsiveContainer width="100%" height={250}>
+            <ResponsiveContainer width="100%" height={180}>
               <LineChart data={hours}>
-                <XAxis dataKey="date" stroke="#94a3b8" />
-                <YAxis stroke="#94a3b8" />
+                <XAxis dataKey="date" stroke="#64748b" />
+                <YAxis stroke="#64748b" />
                 <Tooltip />
-                <Line type="monotone" dataKey="hours" stroke="#60a5fa" strokeWidth={3} />
+                <Line
+                  type="monotone"
+                  dataKey="hours"
+                  stroke="#3b82f6"
+                  strokeWidth={2}
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>
 
-          {/* TOP USERS */}
-          <div style={glassCard}>
+          <div style={card}>
             <h3 style={cardTitle}>Top Performers</h3>
 
-            <ResponsiveContainer width="100%" height={250}>
+            <ResponsiveContainer width="100%" height={180}>
               <BarChart data={activity}>
-                <XAxis dataKey="name" stroke="#94a3b8" />
-                <YAxis stroke="#94a3b8" />
+                <XAxis dataKey="name" stroke="#64748b" />
+                <YAxis stroke="#64748b" />
                 <Tooltip />
-                <Bar dataKey="completed" fill="#34d399" />
+                <Bar dataKey="action" fill="#10b981" />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -152,16 +131,12 @@ function Dashboard() {
         </div>
 
         {/* ACTIVITY */}
-        <div style={glassCard}>
+        <div style={card}>
           <h3 style={cardTitle}>Live Activity</h3>
-
-          {activity.length === 0 && (
-            <p style={muted}>No recent activity</p>
-          )}
 
           {activity.map((a, i) => (
             <div key={i} style={activityRow}>
-              <strong>{a.name}</strong> — {a.completed} tasks
+              <strong>{a.name}</strong> — {a.action}
             </div>
           ))}
         </div>
@@ -179,7 +154,7 @@ function Nav({ label, onClick, active }) {
       onClick={onClick}
       style={{
         ...nav,
-        background: active ? 'rgba(99,102,241,0.2)' : 'transparent',
+        background: active ? '#1e293b' : 'transparent',
         color: active ? '#fff' : '#94a3b8'
       }}
     >
@@ -188,21 +163,13 @@ function Nav({ label, onClick, active }) {
   );
 }
 
-function Section({ title, children }) {
-  return (
-    <div style={{ marginBottom: 20 }}>
-      <p style={sectionTitle}>{title}</p>
-      {children}
-    </div>
-  );
+function Divider() {
+  return <div style={divider} />;
 }
 
-function KPI({ title, value, color }) {
+function KPI({ title, value }) {
   return (
-    <div style={{
-      ...kpi,
-      background: `linear-gradient(135deg, ${color}22, #020617)`
-    }}>
+    <div style={kpi}>
       <p style={muted}>{title}</p>
       <h2>{value}</h2>
     </div>
@@ -214,27 +181,20 @@ function KPI({ title, value, color }) {
 const layout = {
   display: 'flex',
   height: '100vh',
-  background: 'radial-gradient(circle at top, #0f172a, #020617)',
+  background: '#020617',
   color: 'white'
 };
 
+/* 🔥 SIDEBAR WITH GRADIENT SHADING */
 const sidebar = {
   width: 240,
   padding: 20,
-  background: '#020617',
-  borderRight: '1px solid #1f2937',
-  display: 'flex',
-  flexDirection: 'column',
-  justifyContent: 'space-between'
+  background: 'linear-gradient(180deg, #020617 0%, #020617 60%, #0f172a 100%)',
+  borderRight: '1px solid #1f2937'
 };
 
-const brand = { marginBottom: 20 };
-
-const sectionTitle = {
-  fontSize: 11,
-  color: '#64748b',
-  marginBottom: 6,
-  textTransform: 'uppercase'
+const brand = {
+  marginBottom: 20
 };
 
 const nav = {
@@ -247,7 +207,11 @@ const nav = {
   marginBottom: 4
 };
 
-const subMenu = { paddingLeft: 10 };
+const divider = {
+  height: 1,
+  background: '#1f2937',
+  margin: '12px 0'
+};
 
 const main = {
   flex: 1,
@@ -257,7 +221,7 @@ const main = {
 const header = {
   display: 'flex',
   justifyContent: 'space-between',
-  marginBottom: 25
+  marginBottom: 20
 };
 
 const title = { margin: 0 };
@@ -265,9 +229,9 @@ const subtitle = { color: '#94a3b8' };
 
 const userBox = {
   background: '#020617',
-  padding: '8px 12px',
-  borderRadius: 8,
-  border: '1px solid #1f2937'
+  border: '1px solid #1f2937',
+  padding: '6px 10px',
+  borderRadius: 8
 };
 
 const kpiGrid = {
@@ -277,6 +241,7 @@ const kpiGrid = {
   marginBottom: 20
 };
 
+/* 🔥 FIXED CHART SIZE + SPACING */
 const chartGrid = {
   display: 'grid',
   gridTemplateColumns: '1fr 1fr',
@@ -285,31 +250,26 @@ const chartGrid = {
 };
 
 const kpi = {
+  background: '#0f172a',
   padding: 20,
   borderRadius: 12
 };
 
-const glassCard = {
-  background: 'rgba(15,23,42,0.7)',
-  backdropFilter: 'blur(10px)',
-  border: '1px solid rgba(255,255,255,0.05)',
-  padding: 20,
-  borderRadius: 16
+const card = {
+  background: '#0f172a',
+  padding: 16,
+  borderRadius: 12
 };
 
-const cardTitle = { marginBottom: 15 };
+const cardTitle = {
+  marginBottom: 10
+};
 
 const activityRow = {
   marginBottom: 8
 };
 
-const muted = { color: '#94a3b8' };
-
-const logoutBtn = {
-  padding: 10,
-  background: '#020617',
-  border: '1px solid #1f2937',
-  borderRadius: 8,
+const muted = {
   color: '#94a3b8'
 };
 
