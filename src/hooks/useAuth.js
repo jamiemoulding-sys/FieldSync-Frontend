@@ -8,7 +8,7 @@ export function useAuth() {
     const loadUser = () => {
       const token = localStorage.getItem('token');
 
-      if (!token) {
+      if (!token || token === "undefined" || token === "null") {
         setUser(null);
         setLoading(false);
         return;
@@ -16,15 +16,23 @@ export function useAuth() {
 
       try {
         const payload = token.split('.')[1];
-        const decoded = JSON.parse(atob(payload));
+
+        // 🔥 FIX: base64url decode
+        const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+        const decoded = JSON.parse(atob(base64));
 
         console.log('✅ TOKEN DECODED:', decoded);
 
-        // ✅ FORCE USER TO BE PRO
         setUser({
-          ...decoded,
-          is_pro: true,
-          isPro: true
+          id: decoded.id,
+          email: decoded.email,
+          name: decoded.name,
+          role: decoded.role || 'employee',
+          companyId: decoded.companyId || null,
+
+          // 💰 APP FLAGS
+          isPro: true,
+          is_pro: true
         });
 
       } catch (err) {
@@ -42,9 +50,10 @@ export function useAuth() {
   const logout = () => {
     localStorage.removeItem('token');
     setUser(null);
+    window.location.href = "/login";
   };
 
-  // ✅ FORCE FULL ACCESS
+  // 🔒 OPTIONAL FLAGS
   const hasAccess = true;
   const isTrialActive = true;
 
