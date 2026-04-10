@@ -33,7 +33,7 @@ function Dashboard() {
       const data = res?.data || {};
 
       setStats(data.stats || {});
-      setActivity(data.activity || []);
+      setActivity(data.topPerformers || []);
       setHours(data.trends?.hours || []);
     } catch (err) {
       console.error(err);
@@ -46,17 +46,14 @@ function Dashboard() {
       {/* SIDEBAR */}
       <div style={sidebar}>
         <div>
-
           <h2 style={brand}>FieldSync</h2>
 
-          {/* CORE */}
           <Section title="Core">
             <Nav label="Dashboard" active />
             <Nav label="Work Session" onClick={() => navigate('/work-session')} />
             <Nav label="Tasks" onClick={() => navigate('/tasks')} />
           </Section>
 
-          {/* MANAGEMENT */}
           <Section title="Management">
             <Nav label="Employees" onClick={() => navigate('/employees')} />
             <Nav label="Schedule" onClick={() => navigate('/schedule')} />
@@ -65,13 +62,11 @@ function Dashboard() {
             <Nav label="Timesheets" onClick={() => navigate('/timesheets')} />
           </Section>
 
-          {/* BUSINESS */}
           <Section title="Business">
             <Nav label="Reports" onClick={() => navigate('/reports')} />
             <Nav label="Performance" onClick={() => navigate('/performance')} />
           </Section>
 
-          {/* ACCOUNT */}
           <Section title="Account">
             <Nav label="Profile" onClick={() => navigate('/profile')} />
 
@@ -87,10 +82,8 @@ function Dashboard() {
               </div>
             )}
           </Section>
-
         </div>
 
-        {/* LOGOUT */}
         <button
           onClick={() => {
             localStorage.removeItem('token');
@@ -105,49 +98,53 @@ function Dashboard() {
       {/* MAIN */}
       <div style={main}>
 
-        {/* TOP BAR */}
-        <div style={topbar}>
+        {/* HEADER */}
+        <div style={header}>
           <div>
             <h1 style={title}>Dashboard</h1>
             <p style={subtitle}>Real-time overview</p>
           </div>
 
           <div style={userBox}>
-            {user?.name || user?.email}
+            {user?.email}
           </div>
         </div>
 
-        {/* KPIs */}
+        {/* KPI CARDS */}
         <div style={kpiGrid}>
-          <KPI title="Users" value={stats.users || 0} />
-          <KPI title="Active Staff" value={stats.activeShifts || 0} />
-          <KPI title="Tasks" value={stats.tasks || 0} />
-          <KPI title="Completed" value={stats.completedTasks || 0} />
+          <KPI title="Users" value={stats.users || 0} color="#3b82f6" />
+          <KPI title="Active Staff" value={stats.activeShifts || 0} color="#ef4444" />
+          <KPI title="Tasks" value={stats.tasks || 0} color="#f59e0b" />
+          <KPI title="Completed" value={stats.completedTasks || 0} color="#10b981" />
         </div>
 
         {/* CHARTS */}
         <div style={chartGrid}>
 
-          <div style={card}>
+          {/* HOURS */}
+          <div style={glassCard}>
             <h3 style={cardTitle}>Weekly Hours</h3>
+
             <ResponsiveContainer width="100%" height={250}>
               <LineChart data={hours}>
-                <XAxis dataKey="date" stroke="#6b7280" />
-                <YAxis stroke="#6b7280" />
+                <XAxis dataKey="date" stroke="#94a3b8" />
+                <YAxis stroke="#94a3b8" />
                 <Tooltip />
-                <Line type="monotone" dataKey="hours" stroke="#6366f1" />
+                <Line type="monotone" dataKey="hours" stroke="#60a5fa" strokeWidth={3} />
               </LineChart>
             </ResponsiveContainer>
           </div>
 
-          <div style={card}>
+          {/* TOP USERS */}
+          <div style={glassCard}>
             <h3 style={cardTitle}>Top Performers</h3>
+
             <ResponsiveContainer width="100%" height={250}>
               <BarChart data={activity}>
-                <XAxis dataKey="name" stroke="#6b7280" />
-                <YAxis stroke="#6b7280" />
+                <XAxis dataKey="name" stroke="#94a3b8" />
+                <YAxis stroke="#94a3b8" />
                 <Tooltip />
-                <Bar dataKey="action" fill="#10b981" />
+                <Bar dataKey="completed" fill="#34d399" />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -155,7 +152,7 @@ function Dashboard() {
         </div>
 
         {/* ACTIVITY */}
-        <div style={card}>
+        <div style={glassCard}>
           <h3 style={cardTitle}>Live Activity</h3>
 
           {activity.length === 0 && (
@@ -164,7 +161,7 @@ function Dashboard() {
 
           {activity.map((a, i) => (
             <div key={i} style={activityRow}>
-              <strong>{a.name}</strong> — {a.action}
+              <strong>{a.name}</strong> — {a.completed} tasks
             </div>
           ))}
         </div>
@@ -182,8 +179,8 @@ function Nav({ label, onClick, active }) {
       onClick={onClick}
       style={{
         ...nav,
-        background: active ? '#1f2937' : 'transparent',
-        color: active ? 'white' : '#9ca3af'
+        background: active ? 'rgba(99,102,241,0.2)' : 'transparent',
+        color: active ? '#fff' : '#94a3b8'
       }}
     >
       {label}
@@ -200,9 +197,12 @@ function Section({ title, children }) {
   );
 }
 
-function KPI({ title, value }) {
+function KPI({ title, value, color }) {
   return (
-    <div style={kpi}>
+    <div style={{
+      ...kpi,
+      background: `linear-gradient(135deg, ${color}22, #020617)`
+    }}>
       <p style={muted}>{title}</p>
       <h2>{value}</h2>
     </div>
@@ -214,25 +214,25 @@ function KPI({ title, value }) {
 const layout = {
   display: 'flex',
   height: '100vh',
-  background: '#0b0f14',
+  background: 'radial-gradient(circle at top, #0f172a, #020617)',
   color: 'white'
 };
 
 const sidebar = {
   width: 240,
-  background: '#0f172a',
   padding: 20,
+  background: '#020617',
+  borderRight: '1px solid #1f2937',
   display: 'flex',
   flexDirection: 'column',
-  justifyContent: 'space-between',
-  borderRight: '1px solid #1f2937'
+  justifyContent: 'space-between'
 };
 
 const brand = { marginBottom: 20 };
 
 const sectionTitle = {
-  fontSize: 12,
-  color: '#6b7280',
+  fontSize: 11,
+  color: '#64748b',
   marginBottom: 6,
   textTransform: 'uppercase'
 };
@@ -247,29 +247,28 @@ const nav = {
   marginBottom: 4
 };
 
-const subMenu = {
-  paddingLeft: 10
-};
+const subMenu = { paddingLeft: 10 };
 
 const main = {
   flex: 1,
   padding: 30
 };
 
-const topbar = {
+const header = {
   display: 'flex',
   justifyContent: 'space-between',
   marginBottom: 25
 };
 
-const userBox = {
-  background: '#111827',
-  padding: '6px 10px',
-  borderRadius: 8
-};
-
 const title = { margin: 0 };
-const subtitle = { color: '#6b7280' };
+const subtitle = { color: '#94a3b8' };
+
+const userBox = {
+  background: '#020617',
+  padding: '8px 12px',
+  borderRadius: 8,
+  border: '1px solid #1f2937'
+};
 
 const kpiGrid = {
   display: 'grid',
@@ -286,16 +285,16 @@ const chartGrid = {
 };
 
 const kpi = {
-  background: '#111827',
   padding: 20,
-  borderRadius: 10
+  borderRadius: 12
 };
 
-const card = {
-  background: '#111827',
+const glassCard = {
+  background: 'rgba(15,23,42,0.7)',
+  backdropFilter: 'blur(10px)',
+  border: '1px solid rgba(255,255,255,0.05)',
   padding: 20,
-  borderRadius: 10,
-  marginBottom: 20
+  borderRadius: 16
 };
 
 const cardTitle = { marginBottom: 15 };
@@ -304,15 +303,14 @@ const activityRow = {
   marginBottom: 8
 };
 
-const muted = { color: '#6b7280' };
+const muted = { color: '#94a3b8' };
 
 const logoutBtn = {
   padding: 10,
-  width: '100%',
-  background: '#111827',
+  background: '#020617',
   border: '1px solid #1f2937',
   borderRadius: 8,
-  color: '#9ca3af'
+  color: '#94a3b8'
 };
 
 export default Dashboard;
