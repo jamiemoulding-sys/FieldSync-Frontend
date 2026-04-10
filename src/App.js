@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./hooks/useAuth";
 
 // 🌐 PUBLIC
@@ -51,12 +51,21 @@ function ProtectedRoute({ children }) {
 
 //
 // =======================
-// 🔒 ROLE ROUTE
+// 🔒 ROLE ROUTE (🔥 FIXED)
 // =======================
 function RoleRoute({ roles, children }) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
 
-  if (!roles.includes(user?.role)) {
+  // 🔥 WAIT FOR AUTH FIRST
+  if (loading) return null;
+
+  // 🔥 SAFETY CHECK
+  if (!user) {
+    return <Navigate to="/login" />;
+  }
+
+  // 🔥 ONLY CHECK ROLE AFTER USER EXISTS
+  if (!roles.includes(user.role)) {
     return <Navigate to="/dashboard" />;
   }
 
@@ -117,7 +126,7 @@ function App() {
             }
           />
 
-          {/* 🔒 BUSINESS (MANAGER+) */}
+          {/* 🔒 BUSINESS */}
           <Route
             path="/performance"
             element={
