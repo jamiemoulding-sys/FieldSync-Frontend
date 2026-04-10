@@ -26,27 +26,23 @@ export default function Dashboard() {
   }, []);
 
   const load = async () => {
-    try {
-      const res = await api.get("/dashboard");
-      const data = res?.data || {};
+    const res = await api.get("/dashboard");
+    const data = res?.data || {};
 
-      setStats(data.stats || {});
-      setHours(data.trends?.hours || []);
-      setActivity(data.activity || []);
-      setTopUsers(data.topPerformers || []);
-    } catch (err) {
-      console.error(err);
-    }
+    setStats(data.stats || {});
+    setHours(data.trends?.hours || []);
+    setActivity(data.activity || []);
+    setTopUsers(data.topPerformers || []);
   };
 
   return (
     <div className="flex h-screen bg-[#020617] text-white overflow-hidden">
 
       {/* SIDEBAR */}
-      <div className="w-64 bg-gradient-to-b from-[#020617] via-[#020617] to-[#0f172a] border-r border-[#1f2937] p-5 flex flex-col justify-between">
+      <div className="w-64 bg-gradient-to-b from-[#020617] via-[#020617] to-[#0f172a] border-r border-white/5 p-5 flex flex-col justify-between">
 
         <div>
-          <h2 className="text-xl font-semibold mb-6">FieldSync</h2>
+          <h2 className="text-xl font-semibold mb-6 tracking-wide">FieldSync</h2>
 
           <Section title="CORE">
             <Nav label="Dashboard" active />
@@ -73,7 +69,7 @@ export default function Dashboard() {
           </Section>
         </div>
 
-        <button className="bg-[#111827] border border-[#1f2937] rounded-lg p-2 text-gray-400 hover:text-white">
+        <button className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl p-2 text-gray-400 hover:text-white transition">
           Logout
         </button>
       </div>
@@ -81,44 +77,58 @@ export default function Dashboard() {
       {/* MAIN */}
       <div className="flex-1 overflow-y-auto">
 
-        {/* HERO HEADER */}
-        <div className="relative h-52 w-full overflow-hidden">
+        {/* HERO */}
+        <div className="relative h-56 w-full overflow-hidden">
 
-          {/* IMAGE */}
+          {/* BG IMAGE */}
           <div
-            className="absolute inset-0 bg-cover bg-center"
+            className="absolute inset-0 bg-cover bg-center scale-105"
             style={{
               backgroundImage:
-                "url('https://images.unsplash.com/photo-1498050108023-c5249f4df085')",
+                "url('https://images.unsplash.com/photo-1492724441997-5dc865305da7')",
             }}
           />
 
-          {/* DARK OVERLAY */}
+          {/* OVERLAY */}
           <div className="absolute inset-0 bg-gradient-to-b from-[#020617]/90 via-[#020617]/80 to-[#020617]" />
 
           {/* BLUR */}
-          <div className="absolute inset-0 backdrop-blur-[2px]" />
+          <div className="absolute inset-0 backdrop-blur-sm" />
 
           {/* CONTENT */}
-          <div className="relative z-10 flex justify-between items-center h-full px-8">
+          <div className="relative z-10 flex flex-col gap-4 px-8 pt-6">
 
-            <div>
-              <h1 className="text-3xl font-semibold">
-                Good morning, {user?.name || "there"} 👋
-              </h1>
-              <p className="text-gray-400 mt-1">Real-time overview</p>
+            {/* TOP BAR */}
+            <div className="flex justify-between items-center">
+
+              {/* TITLE */}
+              <div>
+                <h1 className="text-3xl font-semibold">
+                  Good morning, {user?.name || "there"} 👋
+                </h1>
+                <p className="text-gray-400 text-sm">Real-time overview</p>
+              </div>
+
+              {/* USER */}
+              <div className="bg-white/5 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 shadow-lg">
+                {user?.email}
+              </div>
             </div>
 
-            <div className="bg-white/5 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 shadow-lg">
-              {user?.email}
+            {/* SEARCH BAR */}
+            <div className="w-full max-w-md">
+              <input
+                placeholder="Search..."
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+              />
             </div>
           </div>
         </div>
 
         {/* CONTENT */}
-        <div className="p-6 -mt-16 relative z-20">
+        <div className="p-6 -mt-20 relative z-20">
 
-          {/* KPIs */}
+          {/* KPI */}
           <div className="grid grid-cols-4 gap-4 mb-6">
             <KPI title="Users" value={stats.users} />
             <KPI title="Active Staff" value={stats.activeShifts} />
@@ -130,15 +140,24 @@ export default function Dashboard() {
           <div className="grid grid-cols-2 gap-4 mb-6">
 
             <Card>
-              <h3 className="mb-2 text-sm text-gray-400">Weekly Hours</h3>
-              <ResponsiveContainer width="100%" height={120}>
+              <div className="flex justify-between mb-2">
+                <h3 className="text-sm text-gray-400">Weekly Hours</h3>
+                <span className="text-xs text-gray-500">
+                  {Math.round(
+                    hours.reduce((a, b) => a + Number(b.hours || 0), 0)
+                  )} hrs
+                </span>
+              </div>
+
+              <ResponsiveContainer width="100%" height={110}>
                 <LineChart data={hours}>
                   <XAxis dataKey="date" stroke="#6b7280" />
                   <YAxis stroke="#6b7280" />
                   <Tooltip />
                   <Line
+                    type="monotone"
                     dataKey="hours"
-                    stroke="#6366f1"
+                    stroke="#60a5fa"
                     strokeWidth={2}
                     dot={false}
                   />
@@ -147,13 +166,16 @@ export default function Dashboard() {
             </Card>
 
             <Card>
-              <h3 className="mb-2 text-sm text-gray-400">Top Performers</h3>
-              <ResponsiveContainer width="100%" height={120}>
+              <div className="flex justify-between mb-2">
+                <h3 className="text-sm text-gray-400">Top Performers</h3>
+              </div>
+
+              <ResponsiveContainer width="100%" height={110}>
                 <BarChart data={topUsers}>
                   <XAxis dataKey="name" stroke="#6b7280" />
                   <YAxis stroke="#6b7280" />
                   <Tooltip />
-                  <Bar dataKey="completed" fill="#10b981" />
+                  <Bar dataKey="completed" fill="#34d399" />
                 </BarChart>
               </ResponsiveContainer>
             </Card>
@@ -162,28 +184,24 @@ export default function Dashboard() {
 
           {/* ACTIVITY */}
           <Card>
-            <h3 className="mb-4">Live Activity</h3>
-
-            {activity.length === 0 && (
-              <p className="text-gray-400">No recent activity</p>
-            )}
+            <h3 className="mb-4 text-sm text-gray-300">Live Activity</h3>
 
             {activity.map((a, i) => (
               <div
                 key={i}
-                className="flex items-center gap-3 p-3 border-b border-[#1f2937]"
+                className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition mb-2"
               >
                 <img
                   src={`https://ui-avatars.com/api/?name=${a.name}`}
-                  className="w-8 h-8 rounded-full"
+                  className="w-9 h-9 rounded-full"
                 />
 
                 <div>
-                  <p className="font-medium">{a.name}</p>
-                  <p className="text-sm text-gray-400">{a.action}</p>
+                  <p className="text-sm font-medium">{a.name}</p>
+                  <p className="text-xs text-gray-400">{a.action}</p>
                 </div>
 
-                <div className="ml-auto w-2 h-2 bg-green-500 rounded-full" />
+                <div className="ml-auto w-2 h-2 bg-green-400 rounded-full" />
               </div>
             ))}
           </Card>
@@ -199,10 +217,10 @@ export default function Dashboard() {
 function Nav({ label, active }) {
   return (
     <button
-      className={`w-full text-left px-3 py-2 rounded-lg mb-1 transition
+      className={`w-full text-left px-3 py-2 rounded-lg mb-1 transition text-sm
         ${
           active
-            ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20"
+            ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/30"
             : "text-gray-400 hover:bg-white/5"
         }
       `}
@@ -215,7 +233,9 @@ function Nav({ label, active }) {
 function Section({ title, children }) {
   return (
     <div className="mb-5">
-      <p className="text-xs text-gray-500 mb-2">{title}</p>
+      <p className="text-[11px] text-gray-500 mb-2 tracking-wider">
+        {title}
+      </p>
       {children}
     </div>
   );
@@ -224,10 +244,15 @@ function Section({ title, children }) {
 function KPI({ title, value }) {
   return (
     <div className="bg-gradient-to-br from-[#0f172a] to-[#020617] border border-white/10 p-4 rounded-xl shadow-md">
-      <p className="text-gray-400 text-sm">{title}</p>
+
+      <p className="text-gray-400 text-xs">{title}</p>
+
       <h2 className="text-2xl font-semibold mt-1">
         {value || 0}
       </h2>
+
+      {/* subtle glow */}
+      <div className="h-1 mt-2 bg-gradient-to-r from-indigo-500/40 to-transparent rounded-full" />
     </div>
   );
 }
@@ -235,9 +260,11 @@ function KPI({ title, value }) {
 function Card({ children }) {
   return (
     <div className="relative rounded-2xl p-[1px] bg-gradient-to-b from-white/10 to-transparent">
+
       <div className="bg-[#0f172a]/80 backdrop-blur-xl rounded-2xl p-4 border border-white/10 shadow-[0_0_30px_rgba(0,0,0,0.5)]">
         {children}
       </div>
+
     </div>
   );
 }
