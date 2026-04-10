@@ -7,8 +7,10 @@ export default function Schedule() {
   const [schedules, setSchedules] = useState([]);
   const [view, setView] = useState("grid");
 
-  const [selectedUser, setSelectedUser] = useState("");
-  const [date, setDate] = useState("");
+  // ✅ NEW (MULTI USER + RANGE)
+  const [selectedUsers, setSelectedUsers] = useState([]);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
 
@@ -35,27 +37,48 @@ export default function Schedule() {
     }
   };
 
+  // 🚀 BULK CREATE
   const createSchedule = async () => {
-    if (!selectedUser || !date || !start || !end) {
+    if (!selectedUsers.length || !startDate || !endDate || !start || !end) {
       return alert("Fill all fields");
     }
 
     try {
-      await scheduleAPI.create({
-        user_id: selectedUser,
-        date,
-        start_time: `${date}T${start}`,
-        end_time: `${date}T${end}`,
-      });
+      let current = new Date(startDate);
+      const endD = new Date(endDate);
 
-      setSelectedUser("");
-      setDate("");
+      const promises = [];
+
+      while (current <= endD) {
+        const dateStr = current.toISOString().split("T")[0];
+
+        selectedUsers.forEach((userId) => {
+          promises.push(
+            scheduleAPI.create({
+              user_id: userId,
+              date: dateStr,
+              start_time: `${dateStr}T${start}`,
+              end_time: `${dateStr}T${end}`,
+            })
+          );
+        });
+
+        current.setDate(current.getDate() + 1);
+      }
+
+      await Promise.all(promises);
+
+      // reset
+      setSelectedUsers([]);
+      setStartDate("");
+      setEndDate("");
       setStart("");
       setEnd("");
 
       loadData();
     } catch (err) {
-      alert("Failed to create schedule");
+      console.error(err);
+      alert("Bulk create failed");
     }
   };
 
@@ -128,22 +151,27 @@ export default function Schedule() {
         </div>
       </div>
 
-      {/* CREATE */}
+      {/* 🔥 BULK CREATE */}
       <div className="rounded-2xl p-[1px] bg-gradient-to-b from-white/10 to-transparent">
         <div className="bg-[#020617] border border-white/10 rounded-2xl p-5">
 
           <h3 className="text-sm text-gray-400 mb-3">
-            Assign Shift
+            Bulk Assign Shifts
           </h3>
 
           <div className="grid md:grid-cols-5 gap-3">
 
+            {/* MULTI SELECT */}
             <select
-              value={selectedUser}
-              onChange={(e) => setSelectedUser(e.target.value)}
-              className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm"
+              multiple
+              value={selectedUsers}
+              onChange={(e) =>
+                setSelectedUsers(
+                  Array.from(e.target.selectedOptions, (o) => o.value)
+                )
+              }
+              className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm h-32"
             >
-              <option value="">Employee</option>
               {users.map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.name}
@@ -153,8 +181,15 @@ export default function Schedule() {
 
             <input
               type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm"
+            />
+
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
               className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm"
             />
 
@@ -172,13 +207,14 @@ export default function Schedule() {
               className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm"
             />
 
-            <button
-              onClick={createSchedule}
-              className="bg-indigo-600 hover:bg-indigo-500 rounded-xl text-sm"
-            >
-              Create
-            </button>
           </div>
+
+          <button
+            onClick={createSchedule}
+            className="mt-4 w-full bg-indigo-600 hover:bg-indigo-500 rounded-xl py-2 text-sm"
+          >
+            Create Bulk Shifts
+          </button>
         </div>
       </div>
 
@@ -190,7 +226,7 @@ export default function Schedule() {
               key={s.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05 }}
+              transition={{ delay: i * 0.03 }}
               className="rounded-2xl p-[1px] bg-gradient-to-b from-white/10 to-transparent"
             >
               <div className="bg-[#020617] border border-white/10 rounded-2xl p-4 flex justify-between">
@@ -204,8 +240,7 @@ export default function Schedule() {
                     {new Date(s.start_time).toLocaleTimeString([], {
                       hour: "2-digit",
                       minute: "2-digit",
-                    })}{" "}
-                    →
+                    })} →
                     {new Date(s.end_time).toLocaleTimeString([], {
                       hour: "2-digit",
                       minute: "2-digit",
@@ -225,7 +260,7 @@ export default function Schedule() {
         </div>
       )}
 
-      {/* CALENDAR VIEW */}
+      {/* CALENDAR */}
       {view === "calendar" && (
         <div>
 

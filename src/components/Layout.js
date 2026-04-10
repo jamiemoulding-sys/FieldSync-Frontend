@@ -1,94 +1,142 @@
-import React from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from "react-router-dom";
+import {
+  LayoutDashboard,
+  Calendar,
+  FileText,
+  CheckSquare,
+  Users,
+  MapPin,
+  BarChart3,
+  CreditCard,
+  User
+} from "lucide-react";
 
-function Layout({ children }) {
+export default function Layout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
 
   const menu = [
-    { section: 'Core', items: [
-      { name: 'Dashboard', path: '/dashboard' },
-      { name: 'Schedule', path: '/schedule' },
-      { name: 'Holiday Requests', path: '/holiday-requests' },
-      { name: 'Tasks', path: '/tasks' },
-    ]},
-    { section: 'Management', items: [
-      { name: 'Employees', path: '/employees' },
-      { name: 'Locations', path: '/locations' },
-    ]},
-    { section: 'Business', items: [
-      { name: 'Reports', path: '/reports' },
-      { name: 'Performance', path: '/performance' },
-      { name: 'Billing', path: '/billing' },
-    ]},
-    { section: 'Account', items: [
-      { name: 'Profile', path: '/profile' },
-    ]}
+    {
+      section: "CORE",
+      items: [
+        { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
+        { name: "Schedule", path: "/schedule", icon: Calendar },
+        { name: "Holiday Requests", path: "/holiday-requests", icon: FileText },
+        { name: "Tasks", path: "/tasks", icon: CheckSquare },
+      ],
+    },
+    {
+      section: "MANAGEMENT",
+      items: [
+        { name: "Employees", path: "/employees", icon: Users },
+        { name: "Locations", path: "/locations", icon: MapPin },
+      ],
+    },
+    {
+      section: "BUSINESS",
+      items: [
+        { name: "Reports", path: "/reports", icon: BarChart3 },
+        { name: "Performance", path: "/performance", icon: BarChart3 },
+        { name: "Billing", path: "/billing", icon: CreditCard },
+      ],
+    },
+    {
+      section: "ACCOUNT",
+      items: [
+        { name: "Profile", path: "/profile", icon: User },
+      ],
+    },
   ];
 
   return (
-    <div style={layout}>
+    <div className="flex min-h-screen bg-[#020617] text-white">
 
       {/* SIDEBAR */}
-      <div style={sidebar}>
-        <div>
+      <div className="w-64 relative border-r border-white/5 p-5 flex flex-col justify-between">
 
-          <h2 style={brand}>FieldSync</h2>
+        {/* glow strip */}
+        <div className="absolute right-0 top-0 h-full w-[2px] bg-gradient-to-b from-indigo-500 via-transparent to-transparent opacity-40" />
+
+        <div>
+          <h2 className="text-xl font-semibold mb-6 tracking-tight">
+            FieldSync
+          </h2>
 
           {menu.map((group, i) => (
-            <div key={i} style={{ marginBottom: 20 }}>
-              
-              <p style={sectionTitle}>{group.section}</p>
+            <div key={i} className="mb-6">
 
-              {group.items.map(item => {
+              <p className="text-[11px] text-gray-500 mb-2 tracking-wider">
+                {group.section}
+              </p>
+
+              {group.items.map((item) => {
                 const active = location.pathname === item.path;
+                const Icon = item.icon;
 
                 return (
                   <button
                     key={item.path}
                     onClick={() => navigate(item.path)}
-                    style={{
-                      ...nav,
-                      background: active ? '#1f2937' : 'transparent',
-                      color: active ? 'white' : '#9ca3af'
-                    }}
+                    className={`flex items-center gap-3 w-full px-3 py-2 rounded-lg mb-1 text-sm transition-all duration-200
+                      ${
+                        active
+                          ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/30"
+                          : "text-gray-400 hover:bg-white/5 hover:text-white"
+                      }
+                    `}
                   >
+                    <Icon size={16} />
                     {item.name}
                   </button>
                 );
               })}
             </div>
           ))}
-
         </div>
 
         {/* BOTTOM */}
-        <div>
+        <div className="space-y-2">
+
           <button
-            onClick={() => navigate('/billing')}
-            style={upgradeBtn}
+            onClick={() => navigate("/billing")}
+            className="w-full bg-indigo-600 hover:bg-indigo-500 transition rounded-xl py-2 text-sm shadow-lg shadow-indigo-500/20"
           >
             Upgrade Plan
           </button>
+
+          <button
+            onClick={() => {
+              localStorage.removeItem("token");
+              window.location.href = "/login";
+            }}
+            className="w-full bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl py-2 text-sm text-gray-400 hover:text-white transition"
+          >
+            Logout
+          </button>
+
         </div>
       </div>
 
       {/* MAIN */}
-      <div style={main}>
+      <div className="flex-1 flex flex-col">
 
         {/* TOP BAR */}
-        <div style={topbar}>
-          <div>
-            <p style={welcome}>Welcome back</p>
+        <div className="h-14 border-b border-white/5 flex items-center justify-between px-6 backdrop-blur-md bg-[#020617]/80">
+
+          <p className="text-sm text-gray-400">
+            Welcome back 👋
+          </p>
+
+          <div className="flex items-center gap-3">
+            <div className="px-3 py-1 rounded-lg bg-white/5 border border-white/10 text-xs">
+              PRO
+            </div>
           </div>
 
-          <div style={topRight}>
-            <div style={badge}>PRO</div>
-          </div>
         </div>
 
         {/* CONTENT */}
-        <div style={content}>
+        <div className="p-6">
           {children}
         </div>
 
@@ -96,97 +144,3 @@ function Layout({ children }) {
     </div>
   );
 }
-
-/* STYLES */
-
-const layout = {
-  display: 'flex',
-  minHeight: '100vh',
-  background: '#0b0f14',
-  color: 'white',
-  fontFamily: 'system-ui'
-};
-
-const sidebar = {
-  width: 250,
-  background: '#0f172a',
-  borderRight: '1px solid #1f2937',
-  padding: 20,
-  display: 'flex',
-  flexDirection: 'column',
-  justifyContent: 'space-between'
-};
-
-const brand = {
-  marginBottom: 30,
-  fontSize: 18,
-  fontWeight: 600
-};
-
-const sectionTitle = {
-  fontSize: 11,
-  color: '#6b7280',
-  marginBottom: 6,
-  textTransform: 'uppercase'
-};
-
-const nav = {
-  width: '100%',
-  padding: '10px 12px',
-  borderRadius: 8,
-  border: 'none',
-  textAlign: 'left',
-  cursor: 'pointer',
-  marginBottom: 4,
-  fontSize: 14
-};
-
-const upgradeBtn = {
-  width: '100%',
-  padding: 10,
-  borderRadius: 8,
-  background: '#6366f1',
-  border: 'none',
-  color: 'white',
-  cursor: 'pointer'
-};
-
-const main = {
-  flex: 1,
-  display: 'flex',
-  flexDirection: 'column'
-};
-
-const topbar = {
-  height: 60,
-  borderBottom: '1px solid #1f2937',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  padding: '0 30px'
-};
-
-const welcome = {
-  color: '#9ca3af',
-  fontSize: 14
-};
-
-const topRight = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 10
-};
-
-const badge = {
-  background: '#111827',
-  padding: '6px 12px',
-  borderRadius: 6,
-  fontSize: 12
-};
-
-const content = {
-  padding: 30,
-  flex: 1
-};
-
-export default Layout;
