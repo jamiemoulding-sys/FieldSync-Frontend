@@ -3,8 +3,14 @@ import api from "../services/api";
 import { useAuth } from "../hooks/useAuth";
 
 import {
-  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  BarChart, Bar
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
 } from "recharts";
 
 export default function Dashboard() {
@@ -20,13 +26,17 @@ export default function Dashboard() {
   }, []);
 
   const load = async () => {
-    const res = await api.get("/dashboard");
-    const data = res?.data || {};
+    try {
+      const res = await api.get("/dashboard");
+      const data = res?.data || {};
 
-    setStats(data.stats || {});
-    setHours(data.trends?.hours || []);
-    setActivity(data.activity || []);
-    setTopUsers(data.topPerformers || []);
+      setStats(data.stats || {});
+      setHours(data.trends?.hours || []);
+      setActivity(data.activity || []);
+      setTopUsers(data.topPerformers || []);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   return (
@@ -71,41 +81,44 @@ export default function Dashboard() {
       {/* MAIN */}
       <div className="flex-1 overflow-y-auto">
 
-        {/* 🔥 HERO HEADER (THIS WAS MISSING) */}
-        <div className="relative h-48 w-full overflow-hidden">
+        {/* HERO HEADER */}
+        <div className="relative h-52 w-full overflow-hidden">
 
-          {/* BACKGROUND IMAGE */}
+          {/* IMAGE */}
           <div
-            className="absolute inset-0 bg-cover bg-center opacity-40"
+            className="absolute inset-0 bg-cover bg-center"
             style={{
               backgroundImage:
-                "url('https://images.unsplash.com/photo-1504384308090-c894fdcc538d')"
+                "url('https://images.unsplash.com/photo-1498050108023-c5249f4df085')",
             }}
           />
 
           {/* DARK OVERLAY */}
-          <div className="absolute inset-0 bg-gradient-to-r from-[#020617] via-[#020617]/80 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#020617]/90 via-[#020617]/80 to-[#020617]" />
+
+          {/* BLUR */}
+          <div className="absolute inset-0 backdrop-blur-[2px]" />
 
           {/* CONTENT */}
           <div className="relative z-10 flex justify-between items-center h-full px-8">
 
             <div>
-              <h1 className="text-2xl font-semibold">
+              <h1 className="text-3xl font-semibold">
                 Good morning, {user?.name || "there"} 👋
               </h1>
-              <p className="text-gray-400">Real-time overview</p>
+              <p className="text-gray-400 mt-1">Real-time overview</p>
             </div>
 
-            <div className="bg-[#0f172a]/80 backdrop-blur px-4 py-2 rounded-lg border border-[#1f2937]">
+            <div className="bg-white/5 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 shadow-lg">
               {user?.email}
             </div>
           </div>
         </div>
 
-        {/* CONTENT AREA */}
-        <div className="p-6 -mt-12 relative z-20">
+        {/* CONTENT */}
+        <div className="p-6 -mt-16 relative z-20">
 
-          {/* KPI CARDS */}
+          {/* KPIs */}
           <div className="grid grid-cols-4 gap-4 mb-6">
             <KPI title="Users" value={stats.users} />
             <KPI title="Active Staff" value={stats.activeShifts} />
@@ -113,12 +126,12 @@ export default function Dashboard() {
             <KPI title="Completed" value={stats.completedTasks} />
           </div>
 
-          {/* 🔥 CHARTS (SMALLER + TOP LIKE YOUR SCREENSHOT) */}
+          {/* CHARTS */}
           <div className="grid grid-cols-2 gap-4 mb-6">
 
             <Card>
               <h3 className="mb-2 text-sm text-gray-400">Weekly Hours</h3>
-              <ResponsiveContainer width="100%" height={140}>
+              <ResponsiveContainer width="100%" height={120}>
                 <LineChart data={hours}>
                   <XAxis dataKey="date" stroke="#6b7280" />
                   <YAxis stroke="#6b7280" />
@@ -135,7 +148,7 @@ export default function Dashboard() {
 
             <Card>
               <h3 className="mb-2 text-sm text-gray-400">Top Performers</h3>
-              <ResponsiveContainer width="100%" height={140}>
+              <ResponsiveContainer width="100%" height={120}>
                 <BarChart data={topUsers}>
                   <XAxis dataKey="name" stroke="#6b7280" />
                   <YAxis stroke="#6b7280" />
@@ -150,6 +163,10 @@ export default function Dashboard() {
           {/* ACTIVITY */}
           <Card>
             <h3 className="mb-4">Live Activity</h3>
+
+            {activity.length === 0 && (
+              <p className="text-gray-400">No recent activity</p>
+            )}
 
             {activity.map((a, i) => (
               <div
@@ -183,7 +200,11 @@ function Nav({ label, active }) {
   return (
     <button
       className={`w-full text-left px-3 py-2 rounded-lg mb-1 transition
-        ${active ? "bg-indigo-600 text-white" : "text-gray-400 hover:bg-[#111827]"}
+        ${
+          active
+            ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20"
+            : "text-gray-400 hover:bg-white/5"
+        }
       `}
     >
       {label}
@@ -202,17 +223,21 @@ function Section({ title, children }) {
 
 function KPI({ title, value }) {
   return (
-    <div className="bg-[#0f172a] border border-[#1f2937] p-4 rounded-xl">
+    <div className="bg-gradient-to-br from-[#0f172a] to-[#020617] border border-white/10 p-4 rounded-xl shadow-md">
       <p className="text-gray-400 text-sm">{title}</p>
-      <h2 className="text-xl font-semibold">{value || 0}</h2>
+      <h2 className="text-2xl font-semibold mt-1">
+        {value || 0}
+      </h2>
     </div>
   );
 }
 
 function Card({ children }) {
   return (
-    <div className="bg-[#0f172a] border border-[#1f2937] p-4 rounded-xl shadow-lg">
-      {children}
+    <div className="relative rounded-2xl p-[1px] bg-gradient-to-b from-white/10 to-transparent">
+      <div className="bg-[#0f172a]/80 backdrop-blur-xl rounded-2xl p-4 border border-white/10 shadow-[0_0_30px_rgba(0,0,0,0.5)]">
+        {children}
+      </div>
     </div>
   );
 }
