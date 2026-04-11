@@ -11,6 +11,7 @@ import { useAuth } from "./hooks/useAuth";
 import Landing from "./pages/Landing";
 import Signup from "./pages/Signup";
 import Login from "./pages/Login";
+import SetPassword from "./pages/SetPassword";
 
 /* 🧠 CORE APP */
 import Dashboard from "./pages/Dashboard";
@@ -44,8 +45,7 @@ import AppLayout from "./layout/AppLayout";
    🔐 PROTECTED ROUTE
 ======================= */
 function ProtectedRoute({ children }) {
-  const { user, loading } =
-    useAuth();
+  const { user, loading } = useAuth();
 
   if (loading) {
     return (
@@ -56,12 +56,7 @@ function ProtectedRoute({ children }) {
   }
 
   if (!user) {
-    return (
-      <Navigate
-        to="/login"
-        replace
-      />
-    );
+    return <Navigate to="/login" replace />;
   }
 
   return children;
@@ -74,18 +69,12 @@ function RoleRoute({
   roles,
   children,
 }) {
-  const { user, loading } =
-    useAuth();
+  const { user, loading } = useAuth();
 
   if (loading) return null;
 
   if (!user) {
-    return (
-      <Navigate
-        to="/login"
-        replace
-      />
-    );
+    return <Navigate to="/login" replace />;
   }
 
   if (
@@ -112,7 +101,10 @@ function App() {
     <Router>
       <Routes>
 
-        {/* PUBLIC */}
+        {/* =====================
+            PUBLIC ROUTES
+        ====================== */}
+
         <Route
           path="/"
           element={<Landing />}
@@ -128,7 +120,16 @@ function App() {
           element={<Login />}
         />
 
-        {/* PRIVATE */}
+        {/* 🔥 INVITED USERS */}
+        <Route
+          path="/set-password"
+          element={<SetPassword />}
+        />
+
+        {/* =====================
+            PRIVATE APP
+        ====================== */}
+
         <Route
           element={
             <ProtectedRoute>
@@ -167,7 +168,7 @@ function App() {
             }
           />
 
-          {/* MANAGER / ADMIN */}
+          {/* MANAGEMENT */}
           <Route
             path="/announcements"
             element={
@@ -266,7 +267,6 @@ function App() {
             }
           />
 
-          {/* upgrade page also billing */}
           <Route
             path="/upgrade"
             element={
@@ -280,7 +280,6 @@ function App() {
             }
           />
 
-          {/* stripe success */}
           <Route
             path="/billing-success"
             element={
@@ -300,7 +299,7 @@ function App() {
             element={<Profile />}
           />
 
-          {/* legacy success */}
+          {/* LEGACY */}
           <Route
             path="/success"
             element={<Success />}
