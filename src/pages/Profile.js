@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { authAPI } from "../services/api";
 import { motion } from "framer-motion";
@@ -17,51 +17,53 @@ import {
 } from "lucide-react";
 
 export default function Profile() {
-  const { user, updateUser, logout } =
-    useAuth();
+  const { user, updateUser, logout } = useAuth();
 
-  const [name, setName] = useState(
-    user?.name || ""
-  );
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [company, setCompany] = useState("");
+  const [jobTitle, setJobTitle] = useState("");
 
-  const [phone, setPhone] = useState(
-    user?.phone || ""
-  );
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState("");
 
-  const [company, setCompany] =
-    useState(
-      user?.companyName || ""
-    );
-
-  const [jobTitle, setJobTitle] =
-    useState(
-      user?.jobTitle || ""
-    );
-
-  const [saving, setSaving] =
-    useState(false);
-
-  const [success, setSuccess] =
-    useState("");
+  /* FIX: sync form when user updates */
+  useEffect(() => {
+    if (user) {
+      setName(user.name || "");
+      setPhone(user.phone || "");
+      setCompany(user.companyName || user.company_name || "");
+      setJobTitle(user.jobTitle || user.job_title || "");
+    }
+  }, [user]);
 
   const saveProfile = async () => {
     try {
       setSaving(true);
       setSuccess("");
 
-      const res =
-        await authAPI.updateMe({
-          name,
-          phone,
-          companyName: company,
-          jobTitle,
-        });
+      const res = await authAPI.updateMe({
+        name,
+        phone,
+        companyName: company,
+        jobTitle,
+      });
 
+      /* FIX: keep auth context updated */
       updateUser({
         ...user,
         ...res,
-        companyName: company,
-        jobTitle,
+        name: res.name,
+        phone: res.phone,
+        role: res.role,
+        companyName:
+          res.companyName ||
+          res.company_name ||
+          company,
+        jobTitle:
+          res.jobTitle ||
+          res.job_title ||
+          jobTitle,
       });
 
       setSuccess(
@@ -84,8 +86,7 @@ export default function Profile() {
         phone,
         company,
         jobTitle,
-      ].filter(Boolean).length *
-      25
+      ].filter(Boolean).length * 25
     );
   }, [
     name,
@@ -121,8 +122,7 @@ export default function Profile() {
 
               <div>
                 <h1 className="text-2xl md:text-3xl font-semibold">
-                  {name ||
-                    "Unnamed User"}
+                  {name || "Unnamed User"}
                 </h1>
 
                 <p className="text-gray-400 mt-1">
@@ -131,9 +131,7 @@ export default function Profile() {
 
                 <div className="flex gap-2 mt-3 flex-wrap">
                   <Badge
-                    icon={
-                      <Shield size={13} />
-                    }
+                    icon={<Shield size={13} />}
                     text={
                       user?.role?.toUpperCase() ||
                       "USER"
@@ -141,9 +139,7 @@ export default function Profile() {
                   />
 
                   <Badge
-                    icon={
-                      <Crown size={13} />
-                    }
+                    icon={<Crown size={13} />}
                     text={
                       user?.isPro
                         ? "PRO"
@@ -176,7 +172,6 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* SUCCESS */}
       {success && (
         <div className="rounded-2xl bg-green-500/10 border border-green-500/30 text-green-300 p-4 text-sm flex items-center gap-2">
           <CheckCircle2 size={16} />
@@ -203,9 +198,7 @@ export default function Profile() {
         />
 
         <Field
-          icon={
-            <Building2 size={16} />
-          }
+          icon={<Building2 size={16} />}
           label="Company Name"
           value={company}
           onChange={setCompany}
@@ -213,9 +206,7 @@ export default function Profile() {
         />
 
         <Field
-          icon={
-            <Briefcase size={16} />
-          }
+          icon={<Briefcase size={16} />}
           label="Job Title"
           value={jobTitle}
           onChange={setJobTitle}
@@ -287,9 +278,7 @@ function Field({
         <input
           value={value}
           onChange={(e) =>
-            onChange(
-              e.target.value
-            )
+            onChange(e.target.value)
           }
           placeholder={placeholder}
           className="w-full bg-[#111827] border border-white/10 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500"
