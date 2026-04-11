@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
-import api from "../services/api";
+import { authAPI } from "../services/api";
 import { motion } from "framer-motion";
 import {
   User,
@@ -23,13 +23,16 @@ export default function Profile() {
   const [name, setName] = useState(
     user?.name || ""
   );
+
   const [phone, setPhone] = useState(
     user?.phone || ""
   );
+
   const [company, setCompany] =
     useState(
       user?.companyName || ""
     );
+
   const [jobTitle, setJobTitle] =
     useState(
       user?.jobTitle || ""
@@ -37,6 +40,7 @@ export default function Profile() {
 
   const [saving, setSaving] =
     useState(false);
+
   const [success, setSuccess] =
     useState("");
 
@@ -45,32 +49,29 @@ export default function Profile() {
       setSaving(true);
       setSuccess("");
 
-      const res = await api.put(
-        "/auth/me",
-        {
+      const res =
+        await authAPI.updateMe({
           name,
           phone,
           companyName: company,
           jobTitle,
-        }
-      );
+        });
 
-      if (updateUser) {
-        updateUser(res.data);
-      }
+      updateUser({
+        ...user,
+        ...res,
+        companyName: company,
+        jobTitle,
+      });
 
       setSuccess(
         "Profile updated successfully"
       );
-
     } catch (err) {
-      console.error(err);
-
       alert(
-        err?.response?.data?.error ||
+        err?.message ||
           "Failed to save profile"
       );
-
     } finally {
       setSaving(false);
     }
@@ -83,7 +84,8 @@ export default function Profile() {
         phone,
         company,
         jobTitle,
-      ].filter(Boolean).length * 25
+      ].filter(Boolean).length *
+      25
     );
   }, [
     name,
@@ -102,28 +104,23 @@ export default function Profile() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-
       {/* HERO */}
       <div className="rounded-3xl p-[1px] bg-gradient-to-r from-indigo-500/30 via-purple-500/20 to-transparent">
-
         <div className="bg-[#020617] border border-white/10 rounded-3xl p-6 md:p-8">
-
           <div className="flex justify-between gap-6 flex-wrap items-center">
-
             <div className="flex items-center gap-5">
-
               <div className="relative">
-                <div className="w-20 h-20 rounded-full bg-indigo-600 flex items-center justify-center text-2xl font-semibold text-white shadow-lg shadow-indigo-500/30">
+                <div className="w-20 h-20 rounded-full bg-indigo-600 flex items-center justify-center text-2xl font-semibold">
                   {initials}
                 </div>
 
-                <button className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-white/10 border border-white/10 flex items-center justify-center hover:bg-white/20 transition">
+                <button className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-white/10 border border-white/10 flex items-center justify-center">
                   <Camera size={14} />
                 </button>
               </div>
 
               <div>
-                <h1 className="text-2xl md:text-3xl font-semibold text-white">
+                <h1 className="text-2xl md:text-3xl font-semibold">
                   {name ||
                     "Unnamed User"}
                 </h1>
@@ -133,7 +130,6 @@ export default function Profile() {
                 </p>
 
                 <div className="flex gap-2 mt-3 flex-wrap">
-
                   <Badge
                     icon={
                       <Shield size={13} />
@@ -154,11 +150,8 @@ export default function Profile() {
                         : "TRIAL"
                     }
                   />
-
                 </div>
-
               </div>
-
             </div>
 
             <div className="min-w-[220px]">
@@ -166,7 +159,7 @@ export default function Profile() {
                 Profile Strength
               </p>
 
-              <h2 className="text-4xl font-bold text-white mt-2">
+              <h2 className="text-4xl font-bold mt-2">
                 {profileScore}%
               </h2>
 
@@ -178,17 +171,9 @@ export default function Profile() {
                   }}
                 />
               </div>
-
-              <p className="text-xs text-gray-500 mt-3">
-                Complete all fields to
-                maximise setup.
-              </p>
             </div>
-
           </div>
-
         </div>
-
       </div>
 
       {/* SUCCESS */}
@@ -201,7 +186,6 @@ export default function Profile() {
 
       {/* FORM */}
       <div className="grid md:grid-cols-2 gap-4">
-
         <Field
           icon={<User size={16} />}
           label="Full Name"
@@ -225,7 +209,7 @@ export default function Profile() {
           label="Company Name"
           value={company}
           onChange={setCompany}
-          placeholder="Your company"
+          placeholder="Company name"
         />
 
         <Field
@@ -253,27 +237,10 @@ export default function Profile() {
               : "Trial"
           }
         />
-
-      </div>
-
-      {/* SECURITY */}
-      <div className="rounded-3xl bg-[#020617] border border-white/10 p-6">
-
-        <h3 className="text-white font-medium">
-          Security & Account
-        </h3>
-
-        <p className="text-sm text-gray-400 mt-2">
-          Password reset, two-factor
-          authentication and activity
-          history can be added next.
-        </p>
-
       </div>
 
       {/* ACTIONS */}
       <div className="flex gap-3 flex-wrap">
-
         <button
           onClick={saveProfile}
           disabled={saving}
@@ -292,9 +259,7 @@ export default function Profile() {
           <LogOut size={16} />
           Sign Out
         </button>
-
       </div>
-
     </div>
   );
 }
@@ -314,7 +279,6 @@ function Field({
       className="rounded-2xl p-[1px] bg-gradient-to-b from-white/10 to-transparent"
     >
       <div className="bg-[#020617] border border-white/10 rounded-2xl p-4">
-
         <div className="flex items-center gap-2 text-gray-400 text-xs mb-2">
           {icon}
           {label}
@@ -330,7 +294,6 @@ function Field({
           placeholder={placeholder}
           className="w-full bg-[#111827] border border-white/10 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500"
         />
-
       </div>
     </motion.div>
   );
@@ -344,7 +307,6 @@ function ReadOnly({
   return (
     <div className="rounded-2xl p-[1px] bg-gradient-to-b from-white/10 to-transparent">
       <div className="bg-[#020617] border border-white/10 rounded-2xl p-4">
-
         <div className="flex items-center gap-2 text-gray-400 text-xs mb-2">
           {icon}
           {label}
@@ -353,7 +315,6 @@ function ReadOnly({
         <p className="text-white text-sm">
           {value || "-"}
         </p>
-
       </div>
     </div>
   );
@@ -364,7 +325,7 @@ function Badge({
   text,
 }) {
   return (
-    <div className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-white flex items-center gap-2">
+    <div className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs flex items-center gap-2">
       {icon}
       {text}
     </div>
