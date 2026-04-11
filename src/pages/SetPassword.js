@@ -1,7 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createClient } from "@supabase/supabase-js";
-import { Lock, CheckCircle2 } from "lucide-react";
 
 const supabase = createClient(
   process.env.REACT_APP_SUPABASE_URL,
@@ -11,37 +10,23 @@ const supabase = createClient(
 export default function SetPassword() {
   const navigate = useNavigate();
 
-  const [password, setPassword] =
-    useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const [confirmPassword,
-    setConfirmPassword] =
-    useState("");
+  /* 🔥 READ INVITE TOKEN */
+  useEffect(() => {
+    const hash = window.location.hash;
 
-  const [loading, setLoading] =
-    useState(false);
+    if (hash) {
+      supabase.auth.getSession();
+    }
+  }, []);
 
-  const handleSubmit = async () => {
+  const submit = async () => {
     try {
-      if (!password || !confirmPassword) {
-        return alert(
-          "Please fill all fields"
-        );
-      }
-
-      if (password.length < 6) {
-        return alert(
-          "Password must be at least 6 characters"
-        );
-      }
-
-      if (
-        password !==
-        confirmPassword
-      ) {
-        return alert(
-          "Passwords do not match"
-        );
+      if (password !== confirm) {
+        return alert("Passwords do not match");
       }
 
       setLoading(true);
@@ -53,9 +38,7 @@ export default function SetPassword() {
 
       if (error) throw error;
 
-      alert(
-        "Account activated successfully"
-      );
+      alert("Account activated");
 
       navigate("/login");
 
@@ -68,66 +51,37 @@ export default function SetPassword() {
 
   return (
     <div className="min-h-screen bg-[#020617] text-white flex items-center justify-center px-6">
+      <div className="w-full max-w-md bg-white/5 border border-white/10 rounded-3xl p-8">
 
-      <div className="w-full max-w-md rounded-3xl p-[1px] bg-gradient-to-b from-indigo-500/40 to-transparent">
+        <h1 className="text-3xl font-semibold text-center mb-6">
+          Set Password
+        </h1>
 
-        <div className="bg-[#020617] border border-white/10 rounded-3xl p-8">
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e)=>setPassword(e.target.value)}
+          className="w-full p-3 rounded-xl bg-white/10 mb-4"
+        />
 
-          <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center mx-auto mb-6">
-            <Lock size={28} />
-          </div>
+        <input
+          type="password"
+          placeholder="Confirm Password"
+          value={confirm}
+          onChange={(e)=>setConfirm(e.target.value)}
+          className="w-full p-3 rounded-xl bg-white/10 mb-6"
+        />
 
-          <h1 className="text-3xl font-semibold text-center">
-            Set Password
-          </h1>
+        <button
+          onClick={submit}
+          disabled={loading}
+          className="w-full py-3 rounded-xl bg-indigo-600"
+        >
+          {loading ? "Saving..." : "Activate Account"}
+        </button>
 
-          <p className="text-gray-400 text-center mt-2 mb-8">
-            Finish activating your account
-          </p>
-
-          <div className="space-y-4">
-
-            <input
-              type="password"
-              placeholder="Set Password"
-              value={password}
-              onChange={(e) =>
-                setPassword(
-                  e.target.value
-                )
-              }
-              className="w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 outline-none"
-            />
-
-            <input
-              type="password"
-              placeholder="Confirm Password"
-              value={confirmPassword}
-              onChange={(e) =>
-                setConfirmPassword(
-                  e.target.value
-                )
-              }
-              className="w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 outline-none"
-            />
-
-            <button
-              onClick={handleSubmit}
-              disabled={loading}
-              className="w-full py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 transition font-medium flex items-center justify-center gap-2"
-            >
-              <CheckCircle2 size={18} />
-
-              {loading
-                ? "Saving..."
-                : "Activate Account"}
-            </button>
-
-          </div>
-
-        </div>
       </div>
-
     </div>
   );
 }
