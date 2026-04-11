@@ -140,9 +140,7 @@ function App() {
           {/* CORE */}
           <Route
             path="/dashboard"
-            element={
-              <Dashboard />
-            }
+            element={<Dashboard />}
           />
 
           <Route
@@ -152,9 +150,7 @@ function App() {
 
           <Route
             path="/schedule"
-            element={
-              <Schedule />
-            }
+            element={<Schedule />}
           />
 
           <Route
@@ -256,7 +252,7 @@ function App() {
             }
           />
 
-          {/* ADMIN ONLY */}
+          {/* BILLING */}
           <Route
             path="/billing"
             element={
@@ -270,26 +266,44 @@ function App() {
             }
           />
 
-          {/* USER */}
-          <Route
-            path="/profile"
-            element={
-              <Profile />
-            }
-          />
-
+          {/* upgrade page also billing */}
           <Route
             path="/upgrade"
             element={
-              <Upgrade />
+              <RoleRoute
+                roles={[
+                  "admin",
+                ]}
+              >
+                <Billing />
+              </RoleRoute>
             }
           />
 
+          {/* stripe success */}
+          <Route
+            path="/billing-success"
+            element={
+              <RoleRoute
+                roles={[
+                  "admin",
+                ]}
+              >
+                <Success />
+              </RoleRoute>
+            }
+          />
+
+          {/* USER */}
+          <Route
+            path="/profile"
+            element={<Profile />}
+          />
+
+          {/* legacy success */}
           <Route
             path="/success"
-            element={
-              <Success />
-            }
+            element={<Success />}
           />
 
         </Route>

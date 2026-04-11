@@ -1,8 +1,18 @@
-import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import {
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
+
+import {
+  useNavigate,
+} from "react-router-dom";
+
+import api from "../services/api";
 
 export function useAuth() {
-  const navigate = useNavigate();
+  const navigate =
+    useNavigate();
 
   const [user, setUser] =
     useState(null);
@@ -10,9 +20,10 @@ export function useAuth() {
   const [loading, setLoading] =
     useState(true);
 
-  /* ------------------ */
-  /* TOKEN DECODE */
-  /* ------------------ */
+  /* =========================
+     TOKEN DECODE
+  ========================= */
+
   const decodeToken = (
     token
   ) => {
@@ -34,134 +45,180 @@ export function useAuth() {
       return JSON.parse(
         atob(base64)
       );
-
     } catch {
       return null;
     }
   };
 
-  /* ------------------ */
-  /* LOAD USER */
-  /* ------------------ */
-  const loadUser =
-    useCallback(() => {
-      try {
-        setLoading(true);
+  /* =========================
+     LOAD USER FROM API
+  ========================= */
 
-        const token =
-          localStorage.getItem(
+  const loadUser =
+    useCallback(
+      async () => {
+        try {
+          setLoading(true);
+
+          const token =
+            localStorage.getItem(
+              "token"
+            );
+
+          if (
+            !token ||
+            token ===
+              "undefined" ||
+            token === "null"
+          ) {
+            setUser(null);
+            return;
+          }
+
+          /* TRY LIVE API FIRST */
+          try {
+            const res =
+              await api.get(
+                "/auth/me"
+              );
+
+            const liveUser =
+              res.data;
+
+            localStorage.setItem(
+              "user",
+              JSON.stringify(
+                liveUser
+              )
+            );
+
+            setUser(
+              liveUser
+            );
+
+            return;
+          } catch {
+            /* fallback below */
+          }
+
+          /* FALLBACK SAVED USER */
+          const savedUser =
+            localStorage.getItem(
+              "user"
+            );
+
+          if (
+            savedUser &&
+            savedUser !==
+              "undefined" &&
+            savedUser !==
+              "null"
+          ) {
+            const parsed =
+              JSON.parse(
+                savedUser
+              );
+
+            setUser(
+              parsed
+            );
+
+            return;
+          }
+
+          /* FALLBACK TOKEN */
+          const decoded =
+            decodeToken(
+              token
+            );
+
+          if (!decoded) {
+            throw new Error(
+              "Invalid token"
+            );
+          }
+
+          const userData = {
+            id:
+              decoded.id,
+            email:
+              decoded.email,
+            name:
+              decoded.name ||
+              "",
+            phone:
+              decoded.phone ||
+              "",
+            companyName:
+              decoded.companyName ||
+              "",
+            jobTitle:
+              decoded.jobTitle ||
+              "",
+            role:
+              decoded.role ||
+              "employee",
+            companyId:
+              decoded.companyId ||
+              null,
+
+            isPro:
+              decoded.isPro ||
+              false,
+
+            is_pro:
+              decoded.is_pro ||
+              false,
+
+            current_plan:
+              decoded.current_plan ||
+              null,
+
+            subscription_status:
+              decoded.subscription_status ||
+              null,
+          };
+
+          localStorage.setItem(
+            "user",
+            JSON.stringify(
+              userData
+            )
+          );
+
+          setUser(
+            userData
+          );
+        } catch (err) {
+          console.error(
+            "AUTH ERROR:",
+            err
+          );
+
+          localStorage.removeItem(
             "token"
           );
 
-        const savedUser =
-          localStorage.getItem(
+          localStorage.removeItem(
             "user"
           );
 
-        if (
-          !token ||
-          token ===
-            "undefined" ||
-          token === "null"
-        ) {
           setUser(null);
-          return;
+        } finally {
+          setLoading(false);
         }
-
-        /* PRIORITY 1 */
-        if (
-          savedUser &&
-          savedUser !==
-            "undefined" &&
-          savedUser !==
-            "null"
-        ) {
-          const parsed =
-            JSON.parse(
-              savedUser
-            );
-
-          setUser(parsed);
-          return;
-        }
-
-        /* PRIORITY 2 */
-        const decoded =
-          decodeToken(
-            token
-          );
-
-        if (!decoded) {
-          throw new Error(
-            "Invalid token"
-          );
-        }
-
-        const userData = {
-          id:
-            decoded.id,
-          email:
-            decoded.email,
-          name:
-            decoded.name ||
-            "",
-          phone:
-            decoded.phone ||
-            "",
-          companyName:
-            decoded.companyName ||
-            "",
-          jobTitle:
-            decoded.jobTitle ||
-            "",
-          role:
-            decoded.role ||
-            "employee",
-          companyId:
-            decoded.companyId ||
-            null,
-          isPro:
-            decoded.isPro ||
-            false,
-        };
-
-        localStorage.setItem(
-          "user",
-          JSON.stringify(
-            userData
-          )
-        );
-
-        setUser(userData);
-
-      } catch (err) {
-        console.error(
-          "AUTH ERROR:",
-          err
-        );
-
-        localStorage.removeItem(
-          "token"
-        );
-
-        localStorage.removeItem(
-          "user"
-        );
-
-        setUser(null);
-
-      } finally {
-        setLoading(false);
-      }
-    }, []);
+      },
+      []
+    );
 
   useEffect(() => {
     loadUser();
   }, [loadUser]);
 
-  /* ------------------ */
-  /* LOGIN */
-  /* ------------------ */
+  /* =========================
+     LOGIN
+  ========================= */
+
   const login = (
     data
   ) => {
@@ -184,7 +241,6 @@ export function useAuth() {
       setUser(
         data.user
       );
-
     } else {
       loadUser();
     }
@@ -194,9 +250,10 @@ export function useAuth() {
     );
   };
 
-  /* ------------------ */
-  /* UPDATE USER */
-  /* ------------------ */
+  /* =========================
+     UPDATE USER
+  ========================= */
+
   const updateUser = (
     data
   ) => {
@@ -220,9 +277,10 @@ export function useAuth() {
     );
   };
 
-  /* ------------------ */
-  /* LOGOUT */
-  /* ------------------ */
+  /* =========================
+     LOGOUT
+  ========================= */
+
   const logout = () => {
     localStorage.removeItem(
       "token"
@@ -247,14 +305,17 @@ export function useAuth() {
     updateUser,
     reloadUser:
       loadUser,
+
     isAdmin:
       user?.role ===
       "admin",
+
     isManager:
       user?.role ===
         "manager" ||
       user?.role ===
         "admin",
+
     isEmployee:
       user?.role ===
       "employee",

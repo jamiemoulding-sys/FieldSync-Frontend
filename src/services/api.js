@@ -16,8 +16,7 @@ const api = axios.create({
   baseURL: BASE_URL,
   timeout: 20000,
   headers: {
-    "Content-Type":
-      "application/json",
+    "Content-Type": "application/json",
   },
 });
 
@@ -27,15 +26,11 @@ const api = axios.create({
 
 api.interceptors.request.use(
   (config) => {
-    const token =
-      localStorage.getItem(
-        "token"
-      );
+    const token = localStorage.getItem("token");
 
     if (
       token &&
-      token !==
-        "undefined" &&
+      token !== "undefined" &&
       token !== "null"
     ) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -43,8 +38,7 @@ api.interceptors.request.use(
 
     return config;
   },
-  (error) =>
-    Promise.reject(error)
+  (error) => Promise.reject(error)
 );
 
 /* ==================================
@@ -56,16 +50,11 @@ api.interceptors.response.use(
 
   (error) => {
     const status =
-      error?.response
-        ?.status;
+      error?.response?.status;
 
     const message =
-      error?.response
-        ?.data
-        ?.error ||
-      error?.response
-        ?.data
-        ?.message ||
+      error?.response?.data?.error ||
+      error?.response?.data?.message ||
       error.message ||
       "Request failed";
 
@@ -75,20 +64,12 @@ api.interceptors.response.use(
     );
 
     /* AUTO LOGOUT */
-    if (
-      status === 401
-    ) {
-      localStorage.removeItem(
-        "token"
-      );
-
-      localStorage.removeItem(
-        "user"
-      );
+    if (status === 401) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
 
       if (
-        window.location
-          .pathname !==
+        window.location.pathname !==
         "/login"
       ) {
         window.location.href =
@@ -107,13 +88,10 @@ api.interceptors.response.use(
    📦 RESPONSE UNWRAP
 ================================== */
 
-const unwrap =
-  async (promise) => {
-    const res =
-      await promise;
-
-    return res?.data;
-  };
+const unwrap = async (promise) => {
+  const res = await promise;
+  return res?.data;
+};
 
 /* ==================================
    🔐 AUTH
@@ -122,10 +100,7 @@ const unwrap =
 export const authAPI = {
   login: (data) =>
     unwrap(
-      api.post(
-        "/auth/login",
-        data
-      )
+      api.post("/auth/login", data)
     ),
 
   register: (data) =>
@@ -137,18 +112,11 @@ export const authAPI = {
     ),
 
   me: () =>
-    unwrap(
-      api.get(
-        "/auth/me"
-      )
-    ),
+    unwrap(api.get("/auth/me")),
 
   updateMe: (data) =>
     unwrap(
-      api.put(
-        "/auth/me",
-        data
-      )
+      api.put("/auth/me", data)
     ),
 };
 
@@ -158,9 +126,7 @@ export const authAPI = {
 
 export const userAPI = {
   getAll: () =>
-    unwrap(
-      api.get("/users")
-    ),
+    unwrap(api.get("/users")),
 
   create: (data) =>
     unwrap(
@@ -170,10 +136,7 @@ export const userAPI = {
       )
     ),
 
-  updateRole: (
-    id,
-    data
-  ) =>
+  updateRole: (id, data) =>
     unwrap(
       api.put(
         `/users/${id}/role`,
@@ -181,22 +144,9 @@ export const userAPI = {
       )
     ),
 
-  setTempRole: (
-    id,
-    data
-  ) =>
-    unwrap(
-      api.put(
-        `/users/${id}/temp-role`,
-        data
-      )
-    ),
-
   delete: (id) =>
     unwrap(
-      api.delete(
-        `/users/${id}`
-      )
+      api.delete(`/users/${id}`)
     ),
 };
 
@@ -207,10 +157,7 @@ export const userAPI = {
 export const inviteAPI = {
   send: (data) =>
     unwrap(
-      api.post(
-        "/invite",
-        data
-      )
+      api.post("/invite", data)
     ),
 };
 
@@ -221,9 +168,7 @@ export const inviteAPI = {
 export const shiftAPI = {
   getActive: () =>
     unwrap(
-      api.get(
-        "/shifts/active"
-      )
+      api.get("/shifts/active")
     ),
 
   getAllActive: () =>
@@ -255,9 +200,7 @@ export const shiftAPI = {
       )
     ),
 
-  updateLocation: (
-    data
-  ) =>
+  updateLocation: (data) =>
     unwrap(
       api.post(
         "/shifts/update-location",
@@ -273,9 +216,7 @@ export const shiftAPI = {
 export const scheduleAPI = {
   getAll: () =>
     unwrap(
-      api.get(
-        "/schedules"
-      )
+      api.get("/schedules")
     ),
 
   getMine: () =>
@@ -293,10 +234,7 @@ export const scheduleAPI = {
       )
     ),
 
-  update: (
-    id,
-    data
-  ) =>
+  update: (id, data) =>
     unwrap(
       api.put(
         `/schedules/${id}`,
@@ -339,10 +277,7 @@ export const holidayAPI = {
       )
     ),
 
-  update: (
-    id,
-    data
-  ) =>
+  update: (id, data) =>
     unwrap(
       api.put(
         `/schedules/holiday-requests/${id}`,
@@ -362,56 +297,46 @@ export const holidayAPI = {
    📈 PERFORMANCE
 ================================== */
 
-export const performanceAPI =
-  {
-    getAll: () =>
-      unwrap(
-        api.get(
-          "/performance"
-        )
-      ),
-  };
+export const performanceAPI = {
+  getAll: () =>
+    unwrap(
+      api.get("/performance")
+    ),
+};
 
 /* ==================================
    📍 LOCATIONS
 ================================== */
 
-export const locationAPI =
-  {
-    getLocations:
-      () =>
-        unwrap(
-          api.get(
-            "/locations"
-          )
-        ),
+export const locationAPI = {
+  getLocations: () =>
+    unwrap(
+      api.get("/locations")
+    ),
 
-    create: (data) =>
-      unwrap(
-        api.post(
-          "/locations",
-          data
-        )
-      ),
+  create: (data) =>
+    unwrap(
+      api.post(
+        "/locations",
+        data
+      )
+    ),
 
-    update: (
-      id,
-      data
-    ) =>
-      unwrap(
-        api.put(
-          `/locations/${id}`,
-          data
-        )
-      ),
+  update: (id, data) =>
+    unwrap(
+      api.put(
+        `/locations/${id}`,
+        data
+      )
+    ),
 
-    delete: (id) =>
-      unwrap(
-        api.delete(
-          `/locations/${id}`
-        )
-      ),
-  };
+  delete: (id) =>
+    unwrap(
+      api.delete(
+        `/locations/${id}`
+      )
+    ),
+};
 
 /* ==================================
    📋 TASKS
@@ -420,120 +345,108 @@ export const locationAPI =
 export const taskAPI = {
   getTasks: () =>
     unwrap(
-      api.get(
-        "/tasks/all"
-      )
+      api.get("/tasks/all")
     ),
 
   create: (data) =>
     unwrap(
-      api.post(
-        "/tasks",
-        data
-      )
+      api.post("/tasks", data)
     ),
 
-  complete: (
-    task_id
-  ) =>
+  complete: (task_id) =>
     unwrap(
       api.post(
         "/tasks/complete",
-        {
-          task_id,
-        }
+        { task_id }
       )
     ),
 
   delete: (id) =>
     unwrap(
-      api.delete(
-        `/tasks/${id}`
-      )
+      api.delete(`/tasks/${id}`)
     ),
 };
 
 /* ==================================
-   📊 REPORTS
+   📊 REPORTS (FIXED)
 ================================== */
 
 export const reportAPI = {
-  getTimesheets:
-    () =>
-      unwrap(
-        api.get(
-          "/reports/timesheets"
-        )
-      ),
+  getSummary: () =>
+    unwrap(api.get("/reports")),
+
+  getTimesheets: () =>
+    unwrap(
+      api.get(
+        "/reports/timesheets"
+      )
+    ),
 };
 
 /* ==================================
    🧠 DASHBOARD
 ================================== */
 
-export const managerAPI =
-  {
-    getDashboard:
-      () =>
-        unwrap(
-          api.get(
-            "/dashboard"
-          )
-        ),
-  };
+export const managerAPI = {
+  getDashboard: () =>
+    unwrap(
+      api.get("/dashboard")
+    ),
+};
 
 /* ==================================
    📢 ANNOUNCEMENTS
 ================================== */
 
-export const announcementAPI =
-  {
-    getAll: () =>
-      unwrap(
-        api.get(
-          "/announcements"
-        )
-      ),
+export const announcementAPI = {
+  getAll: () =>
+    unwrap(
+      api.get(
+        "/announcements"
+      )
+    ),
 
-    create: (data) =>
-      unwrap(
-        api.post(
-          "/announcements",
-          data
-        )
-      ),
+  create: (data) =>
+    unwrap(
+      api.post(
+        "/announcements",
+        data
+      )
+    ),
 
-    delete: (id) =>
-      unwrap(
-        api.delete(
-          `/announcements/${id}`
-        )
-      ),
-  };
+  delete: (id) =>
+    unwrap(
+      api.delete(
+        `/announcements/${id}`
+      )
+    ),
+};
 
 /* ==================================
    💳 BILLING
 ================================== */
 
-export const billingAPI =
-  {
-    checkout:
-      () =>
-        unwrap(
-          api.post(
-            "/billing/create-checkout-session"
-          )
-        ),
-  };
+export const billingAPI = {
+  checkout: (plan) =>
+    unwrap(
+      api.post(
+        "/billing/create-checkout-session",
+        { plan }
+      )
+    ),
+
+  portal: () =>
+    unwrap(
+      api.post("/billing/portal")
+    ),
+};
 
 /* ==================================
    📤 UPLOADS
 ================================== */
 
 export const uploadAPI = {
-  upload: (
-    formData
-  ) =>
+  upload: (formData) =>
     unwrap(
       api.post(
         "/uploads",
