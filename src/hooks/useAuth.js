@@ -51,7 +51,63 @@ export function useAuth() {
   };
 
   /* =========================
-     LOAD USER FROM API
+     NORMALISE USER
+  ========================= */
+
+  const formatUser = (
+    raw = {}
+  ) => {
+    const paid =
+      raw.is_pro ||
+      raw.isPro ||
+      raw.subscription_status ===
+        "active" ||
+      raw.subscription_status ===
+        "trialing" ||
+      !!raw.current_plan;
+
+    return {
+      id: raw.id,
+      email:
+        raw.email || "",
+      name:
+        raw.name || "",
+      phone:
+        raw.phone || "",
+      role:
+        raw.role ||
+        "employee",
+
+      companyId:
+        raw.companyId ||
+        raw.company_id ||
+        null,
+
+      companyName:
+        raw.companyName ||
+        raw.company_name ||
+        "",
+
+      jobTitle:
+        raw.jobTitle ||
+        raw.job_title ||
+        "",
+
+      isPro: paid,
+      is_pro: paid,
+
+      current_plan:
+        raw.current_plan ||
+        null,
+
+      subscription_status:
+        raw.subscription_status ||
+        "free",
+    };
+  };
+
+  /* =========================
+     LOAD USER
   ========================= */
 
   const loadUser =
@@ -69,13 +125,14 @@ export function useAuth() {
             !token ||
             token ===
               "undefined" ||
-            token === "null"
+            token ===
+              "null"
           ) {
             setUser(null);
             return;
           }
 
-          /* TRY LIVE API FIRST */
+          /* LIVE API */
           try {
             const res =
               await api.get(
@@ -83,7 +140,9 @@ export function useAuth() {
               );
 
             const liveUser =
-              res.data;
+              formatUser(
+                res.data
+              );
 
             localStorage.setItem(
               "user",
@@ -98,25 +157,27 @@ export function useAuth() {
 
             return;
           } catch {
-            /* fallback below */
+            /* fallback */
           }
 
-          /* FALLBACK SAVED USER */
-          const savedUser =
+          /* SAVED USER */
+          const saved =
             localStorage.getItem(
               "user"
             );
 
           if (
-            savedUser &&
-            savedUser !==
+            saved &&
+            saved !==
               "undefined" &&
-            savedUser !==
+            saved !==
               "null"
           ) {
             const parsed =
-              JSON.parse(
-                savedUser
+              formatUser(
+                JSON.parse(
+                  saved
+                )
               );
 
             setUser(
@@ -126,7 +187,7 @@ export function useAuth() {
             return;
           }
 
-          /* FALLBACK TOKEN */
+          /* TOKEN FALLBACK */
           const decoded =
             decodeToken(
               token
@@ -138,57 +199,22 @@ export function useAuth() {
             );
           }
 
-          const userData = {
-            id:
-              decoded.id,
-            email:
-              decoded.email,
-            name:
-              decoded.name ||
-              "",
-            phone:
-              decoded.phone ||
-              "",
-            companyName:
-              decoded.companyName ||
-              "",
-            jobTitle:
-              decoded.jobTitle ||
-              "",
-            role:
-              decoded.role ||
-              "employee",
-            companyId:
-              decoded.companyId ||
-              null,
-
-            isPro:
-              decoded.isPro ||
-              false,
-
-            is_pro:
-              decoded.is_pro ||
-              false,
-
-            current_plan:
-              decoded.current_plan ||
-              null,
-
-            subscription_status:
-              decoded.subscription_status ||
-              null,
-          };
+          const tokenUser =
+            formatUser(
+              decoded
+            );
 
           localStorage.setItem(
             "user",
             JSON.stringify(
-              userData
+              tokenUser
             )
           );
 
           setUser(
-            userData
+            tokenUser
           );
+
         } catch (err) {
           console.error(
             "AUTH ERROR:",
@@ -204,6 +230,7 @@ export function useAuth() {
           );
 
           setUser(null);
+
         } finally {
           setLoading(false);
         }
@@ -219,7 +246,7 @@ export function useAuth() {
      LOGIN
   ========================= */
 
-  const login = (
+  const login = async (
     data
   ) => {
     if (!data?.token)
@@ -231,19 +258,22 @@ export function useAuth() {
     );
 
     if (data.user) {
+      const fresh =
+        formatUser(
+          data.user
+        );
+
       localStorage.setItem(
         "user",
         JSON.stringify(
-          data.user
+          fresh
         )
       );
 
-      setUser(
-        data.user
-      );
-    } else {
-      loadUser();
+      setUser(fresh);
     }
+
+    await loadUser();
 
     navigate(
       "/dashboard"
@@ -260,10 +290,10 @@ export function useAuth() {
     setUser(
       (prev) => {
         const updated =
-          {
+          formatUser({
             ...prev,
             ...data,
-          };
+          });
 
         localStorage.setItem(
           "user",
@@ -276,6 +306,15 @@ export function useAuth() {
       }
     );
   };
+
+  /* =========================
+     REFRESH AFTER BILLING
+  ========================= */
+
+  const refreshSubscription =
+    async () => {
+      await loadUser();
+    };
 
   /* =========================
      LOGOUT
@@ -300,11 +339,15 @@ export function useAuth() {
   return {
     user,
     loading,
+
     login,
     logout,
+
     updateUser,
     reloadUser:
       loadUser,
+
+    refreshSubscription,
 
     isAdmin:
       user?.role ===
@@ -319,5 +362,14 @@ export function useAuth() {
     isEmployee:
       user?.role ===
       "employee",
+
+    isPaid:
+      user?.isPro,
+
+    currentPlan:
+      user?.current_plan,
+
+    subscriptionStatus:
+      user?.subscription_status,
   };
 }
