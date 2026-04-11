@@ -1,7 +1,10 @@
 import React, { useState } from "react";
 import { authAPI } from "../services/api";
+import { useAuth } from "../hooks/useAuth";
 
 function Login() {
+  const { login } = useAuth();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -16,7 +19,6 @@ function Login() {
     try {
       setLoading(true);
 
-      // ✅ THIS RETURNS CLEAN DATA (because of unwrap)
       const data = await authAPI.login({
         email,
         password,
@@ -24,24 +26,12 @@ function Login() {
 
       console.log("LOGIN DATA:", data);
 
-      // ✅ FIX: direct access (NO .data)
-      const token = data?.token;
-
-      if (!token) {
-        console.error("BAD RESPONSE:", data);
-        throw new Error("No token returned from backend");
+      if (!data?.token) {
+        throw new Error("No token returned");
       }
 
-      // ✅ SAVE TOKEN
-      localStorage.setItem("token", token);
-
-      // ✅ SAVE USER
-      if (data?.user) {
-        localStorage.setItem("user", JSON.stringify(data.user));
-      }
-
-      // ✅ REDIRECT
-      window.location.href = "/dashboard";
+      // ✅ Uses auth hook now
+      login(data);
 
     } catch (err) {
       console.error("LOGIN ERROR:", err);
@@ -52,6 +42,7 @@ function Login() {
         "Login failed";
 
       alert(message);
+
     } finally {
       setLoading(false);
     }
@@ -60,11 +51,16 @@ function Login() {
   return (
     <div style={container}>
       <form onSubmit={handleLogin} style={card}>
-        <h2 style={{ marginBottom: 20 }}>Login</h2>
+        <h2 style={title}>Welcome Back</h2>
+
+        <p style={subtitle}>
+          Sign in to continue
+        </p>
 
         <input
           type="email"
           placeholder="Email"
+          autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           style={input}
@@ -73,53 +69,76 @@ function Login() {
         <input
           type="password"
           placeholder="Password"
+          autoComplete="current-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           style={input}
         />
 
-        <button type="submit" style={button} disabled={loading}>
+        <button
+          type="submit"
+          style={button}
+          disabled={loading}
+        >
           {loading ? "Logging in..." : "Login"}
         </button>
+
       </form>
     </div>
   );
 }
 
-// 🎨 STYLES
+/* STYLES */
+
 const container = {
   height: "100vh",
   display: "flex",
   justifyContent: "center",
   alignItems: "center",
-  background: "#0f172a",
+  background:
+    "linear-gradient(135deg,#0f172a,#111827,#1e1b4b)",
 };
 
 const card = {
   background: "#111827",
-  padding: 30,
-  borderRadius: 10,
-  width: 300,
+  padding: 35,
+  borderRadius: 16,
+  width: 340,
   display: "flex",
   flexDirection: "column",
+  boxShadow:
+    "0 20px 50px rgba(0,0,0,0.35)",
+};
+
+const title = {
+  marginBottom: 5,
+  color: "white",
+};
+
+const subtitle = {
+  marginBottom: 20,
+  color: "#9ca3af",
+  fontSize: 14,
 };
 
 const input = {
-  marginBottom: 10,
-  padding: 10,
-  borderRadius: 6,
-  border: "none",
+  marginBottom: 12,
+  padding: 12,
+  borderRadius: 8,
+  border: "1px solid #374151",
   background: "#1f2937",
   color: "white",
+  outline: "none",
 };
 
 const button = {
-  padding: 10,
+  padding: 12,
   background: "#6366f1",
   border: "none",
-  borderRadius: 6,
+  borderRadius: 8,
   color: "white",
   cursor: "pointer",
+  fontWeight: "600",
 };
 
 export default Login;

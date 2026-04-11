@@ -1,55 +1,133 @@
+import { useState } from "react";
 import { useAuth } from "../hooks/useAuth";
+import api from "../services/api";
 import { motion } from "framer-motion";
 
 export default function Profile() {
-  const { user } = useAuth();
+  const { user, updateUser, logout } = useAuth();
+
+  const [name, setName] = useState(user?.name || "");
+  const [phone, setPhone] = useState(user?.phone || "");
+  const [saving, setSaving] = useState(false);
+
+  const saveProfile = async () => {
+    try {
+      setSaving(true);
+
+      const res = await api.put("/auth/me", {
+        name,
+        phone,
+      });
+
+      updateUser(res.data);
+
+      alert("Profile updated");
+
+    } catch (err) {
+      console.error(err);
+      alert("Failed to save profile");
+
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
 
       {/* HEADER */}
       <div>
-        <h1 className="text-2xl font-semibold">Profile</h1>
+        <h1 className="text-2xl font-semibold">
+          My Profile
+        </h1>
+
         <p className="text-gray-400 text-sm">
-          Your account information
+          Manage your account settings
         </p>
       </div>
 
       {/* PROFILE CARD */}
       <div className="rounded-2xl p-[1px] bg-gradient-to-b from-indigo-500/20 to-transparent">
-        <div className="bg-[#020617] border border-white/10 rounded-2xl p-6 shadow-[0_0_40px_rgba(99,102,241,0.2)]">
+
+        <div className="bg-[#020617] border border-white/10 rounded-2xl p-6">
 
           <div className="flex items-center gap-4">
 
             {/* AVATAR */}
-            <div className="w-14 h-14 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xl font-semibold">
-              {user?.email?.charAt(0)?.toUpperCase() || "U"}
+            <div className="w-16 h-16 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xl font-semibold">
+              {(name || user?.email || "U")
+                .charAt(0)
+                .toUpperCase()}
             </div>
 
             {/* INFO */}
             <div>
               <p className="text-lg font-medium">
-                {user?.email}
+                {name || "Unnamed User"}
               </p>
+
               <p className="text-sm text-gray-400">
-                {user?.role}
+                {user?.email}
               </p>
             </div>
 
           </div>
 
         </div>
+
       </div>
 
-      {/* STATS */}
-      <div className="grid md:grid-cols-3 gap-4">
+      {/* FORM */}
+      <div className="grid md:grid-cols-2 gap-4">
 
-        <StatCard title="Email" value={user?.email} />
-        <StatCard title="Role" value={user?.role} />
-        <StatCard
-          title="Plan"
+        <Field
+          label="Full Name"
+          value={name}
+          onChange={setName}
+          placeholder="Your full name"
+        />
+
+        <Field
+          label="Phone Number"
+          value={phone}
+          onChange={setPhone}
+          placeholder="Phone number"
+        />
+
+        <ReadOnly
+          label="Email"
+          value={user?.email}
+        />
+
+        <ReadOnly
+          label="Role"
+          value={user?.role}
+        />
+
+        <ReadOnly
+          label="Plan"
           value={user?.isPro ? "Pro" : "Trial"}
         />
+
+      </div>
+
+      {/* ACTIONS */}
+      <div className="flex gap-3">
+
+        <button
+          onClick={saveProfile}
+          disabled={saving}
+          className="px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 transition"
+        >
+          {saving ? "Saving..." : "Save Changes"}
+        </button>
+
+        <button
+          onClick={logout}
+          className="px-5 py-3 rounded-xl bg-red-500 hover:bg-red-600 transition"
+        >
+          Sign Out
+        </button>
 
       </div>
 
@@ -57,22 +135,53 @@ export default function Profile() {
   );
 }
 
-/* STAT CARD */
+/* COMPONENTS */
 
-function StatCard({ title, value }) {
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+}) {
   return (
     <motion.div
-      whileHover={{ y: -3 }}
+      whileHover={{ y: -2 }}
       className="rounded-2xl p-[1px] bg-gradient-to-b from-white/10 to-transparent"
     >
-      <div className="bg-[#020617] border border-white/10 rounded-2xl p-4 shadow-[0_0_25px_rgba(99,102,241,0.15)]">
+      <div className="bg-[#020617] border border-white/10 rounded-2xl p-4">
 
-        <p className="text-gray-400 text-xs mb-1">{title}</p>
-        <p className="text-sm font-medium text-white">
+        <p className="text-gray-400 text-xs mb-2">
+          {label}
+        </p>
+
+        <input
+          value={value}
+          onChange={(e) =>
+            onChange(e.target.value)
+          }
+          placeholder={placeholder}
+          className="w-full bg-[#111827] border border-white/10 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+
+      </div>
+    </motion.div>
+  );
+}
+
+function ReadOnly({ label, value }) {
+  return (
+    <div className="rounded-2xl p-[1px] bg-gradient-to-b from-white/10 to-transparent">
+      <div className="bg-[#020617] border border-white/10 rounded-2xl p-4">
+
+        <p className="text-gray-400 text-xs mb-2">
+          {label}
+        </p>
+
+        <p className="text-sm">
           {value || "-"}
         </p>
 
       </div>
-    </motion.div>
+    </div>
   );
 }

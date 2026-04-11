@@ -1,67 +1,98 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 
 export function useAuth() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadUser = () => {
-      const token = localStorage.getItem('token');
+    loadUser();
+  }, []);
 
-      if (!token || token === "undefined" || token === "null") {
-        setUser(null);
+  const loadUser = () => {
+    const token = localStorage.getItem("token");
+    const savedUser = localStorage.getItem("user");
+
+    if (!token || token === "undefined" || token === "null") {
+      setUser(null);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      // ✅ PRIORITY = saved user object
+      if (savedUser) {
+        const parsed = JSON.parse(savedUser);
+
+        setUser(parsed);
         setLoading(false);
         return;
       }
 
-      try {
-        const payload = token.split('.')[1];
+      // fallback to token decode
+      const payload = token.split(".")[1];
 
-        // 🔥 FIX: base64url decode
-        const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
-        const decoded = JSON.parse(atob(base64));
+      const base64 = payload
+        .replace(/-/g, "+")
+        .replace(/_/g, "/");
 
-        console.log('✅ TOKEN DECODED:', decoded);
+      const decoded = JSON.parse(atob(base64));
 
-        setUser({
-          id: decoded.id,
-          email: decoded.email,
-          name: decoded.name,
-          role: decoded.role || 'employee',
-          companyId: decoded.companyId || null,
+      setUser({
+        id: decoded.id,
+        email: decoded.email,
+        name: decoded.name || "User",
+        role: decoded.role || "employee",
+        companyId: decoded.companyId || null,
+        isPro: decoded.isPro || false,
+      });
 
-          // 💰 APP FLAGS
-          isPro: true,
-          is_pro: true
-        });
+    } catch (err) {
+      console.error("❌ Auth error:", err);
 
-      } catch (err) {
-        console.error('❌ Token error:', err);
-        localStorage.removeItem('token');
-        setUser(null);
-      }
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
 
-      setLoading(false);
-    };
+      setUser(null);
+    }
 
-    loadUser();
-  }, []);
-
-  const logout = () => {
-    localStorage.removeItem('token');
-    setUser(null);
-    window.location.href = "/login";
+    setLoading(false);
   };
 
-  // 🔒 OPTIONAL FLAGS
-  const hasAccess = true;
-  const isTrialActive = true;
+  const login = (data) => {
+    localStorage.setItem("token", data.token);
+    localStorage.setItem(
+      "user",
+      JSON.stringify(data.user)
+    );
+
+    setUser(data.user);
+
+    window.location.href = "/";
+  };
+
+  const updateUser = (data) => {
+    localStorage.setItem(
+      "user",
+      JSON.stringify(data)
+    );
+
+    setUser(data);
+  };
+
+  const logout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+
+    setUser(null);
+
+    window.location.href = "/login";
+  };
 
   return {
     user,
     loading,
+    login,
     logout,
-    hasAccess,
-    isTrialActive
+    updateUser,
   };
 }

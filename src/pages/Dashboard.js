@@ -21,6 +21,7 @@ export default function Dashboard() {
   const [topUsers, setTopUsers] = useState([]);
   const [activity, setActivity] = useState([]);
   const [aiFeed, setAiFeed] = useState([]);
+  const [announcements, setAnnouncements] = useState([]);
 
   useEffect(() => {
     load();
@@ -28,14 +29,19 @@ export default function Dashboard() {
 
   const load = async () => {
     try {
-      const res = await api.get("/dashboard");
-      const data = res?.data || {};
+      const [dashRes, msgRes] = await Promise.all([
+        api.get("/dashboard"),
+        api.get("/announcements"),
+      ]);
+
+      const data = dashRes?.data || {};
 
       setStats(data.stats || {});
       setHours(data.trends?.hours || []);
       setTopUsers(data.topPerformers || []);
       setActivity(data.activity || []);
       setAiFeed(data.aiFeed || []);
+      setAnnouncements(msgRes?.data || []);
     } catch (err) {
       console.log(err);
     }
@@ -53,6 +59,57 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
 
+      {/* GLOBAL ANNOUNCEMENTS */}
+      {announcements.length > 0 && (
+        <div className="space-y-3">
+          {announcements.map((item) => (
+            <div
+              key={item.id}
+              className={`p-4 rounded-2xl border ${
+                item.priority === "critical"
+                  ? "bg-red-500/10 border-red-500/30"
+                  : item.priority === "warning"
+                  ? "bg-yellow-500/10 border-yellow-500/30"
+                  : "bg-indigo-500/10 border-indigo-500/30"
+              }`}
+            >
+              <div className="flex justify-between items-center gap-3">
+                <div>
+                  <p className="font-semibold text-sm">
+                    📢 {item.title}
+                  </p>
+
+                  <p className="text-sm text-gray-300 mt-1">
+                    {item.message}
+                  </p>
+                </div>
+
+                {(user?.role === "admin" ||
+                  user?.role === "manager") && (
+                  <button
+                    onClick={() => goTo("/announcements")}
+                    className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs"
+                  >
+                    Manage
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* SEND MESSAGE BUTTON */}
+      {(user?.role === "admin" ||
+        user?.role === "manager") && (
+        <button
+          onClick={() => goTo("/announcements")}
+          className="w-full rounded-2xl py-3 bg-indigo-600 hover:bg-indigo-500 transition font-medium"
+        >
+          📢 Send Global Message
+        </button>
+      )}
+
       {/* TOP SECTION */}
       <div className="grid grid-cols-3 gap-4">
 
@@ -64,7 +121,8 @@ export default function Dashboard() {
           </h1>
 
           <p className="text-sm text-gray-400 mt-2">
-            {stats.activeShifts || 0} active • {stats.late || 0} late • {stats.tasks || 0} tasks
+            {stats.activeShifts || 0} active • {stats.late || 0} late •{" "}
+            {stats.tasks || 0} tasks
           </p>
 
           <div className="flex gap-3 mt-5">
@@ -95,9 +153,18 @@ export default function Dashboard() {
 
             <InfoRow label="🟢 Server" value="Online" />
             <InfoRow label="👥 Users" value={stats.users || 0} />
-            <InfoRow label="📅 Shifts Today" value={stats.shiftsToday || 0} />
-            <InfoRow label="⚠️ Late Staff" value={stats.late || 0} />
-            <InfoRow label="📨 Requests" value={stats.pendingHolidays || 0} />
+            <InfoRow
+              label="📅 Shifts Today"
+              value={stats.shiftsToday || 0}
+            />
+            <InfoRow
+              label="⚠️ Late Staff"
+              value={stats.late || 0}
+            />
+            <InfoRow
+              label="📨 Requests"
+              value={stats.pendingHolidays || 0}
+            />
             <InfoRow label="💳 Status" value="Active" />
 
           </div>
@@ -147,7 +214,11 @@ export default function Dashboard() {
 
           <ResponsiveContainer width="100%" height={140}>
             <LineChart data={hours}>
-              <XAxis dataKey="date" stroke="#6b7280" fontSize={10} />
+              <XAxis
+                dataKey="date"
+                stroke="#6b7280"
+                fontSize={10}
+              />
               <YAxis stroke="#6b7280" fontSize={10} />
               <Tooltip />
               <Line
@@ -165,7 +236,11 @@ export default function Dashboard() {
 
           <ResponsiveContainer width="100%" height={140}>
             <BarChart data={topUsers}>
-              <XAxis dataKey="name" stroke="#6b7280" fontSize={10} />
+              <XAxis
+                dataKey="name"
+                stroke="#6b7280"
+                fontSize={10}
+              />
               <YAxis stroke="#6b7280" fontSize={10} />
               <Tooltip />
               <Bar dataKey="shifts" fill="#10b981" />
@@ -200,7 +275,9 @@ export default function Dashboard() {
 
               <div>
                 <p className="text-sm">{a.name}</p>
-                <p className="text-xs text-gray-400">{a.action}</p>
+                <p className="text-xs text-gray-400">
+                  {a.action}
+                </p>
               </div>
 
             </div>

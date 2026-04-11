@@ -1,36 +1,43 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+
 import { useAuth } from "./hooks/useAuth";
 
-// 🌐 PUBLIC
+/* 🌐 PUBLIC */
 import Landing from "./pages/Landing";
 import Signup from "./pages/Signup";
 import Login from "./pages/Login";
 
-// 🧠 CORE APP
+/* 🧠 CORE APP */
 import Dashboard from "./pages/Dashboard";
 import Tasks from "./pages/Tasks";
 import Schedule from "./pages/Schedule";
 import ScheduleCalendar from "./pages/ScheduleCalendar";
 import HolidayRequests from "./pages/HolidayRequests";
+import Announcements from "./pages/Announcements";
 
-// 📊 BUSINESS
+/* 📊 BUSINESS */
 import Performance from "./pages/Performance";
 import Reports from "./pages/Reports";
 import Billing from "./pages/Billing";
 
-// 👥 MANAGEMENT
+/* 👥 MANAGEMENT */
 import Employees from "./pages/Employees";
 import Locations from "./pages/Locations";
 
-// 👤 USER
+/* 👤 USER */
 import Profile from "./pages/Profile";
 
-// 💸 SYSTEM
+/* 💸 SYSTEM */
 import Upgrade from "./pages/Upgrade";
 import Success from "./pages/Success";
 import WorkSession from "./pages/WorkSession";
 
-// 🧱 LAYOUT
+/* 🧱 LAYOUT */
 import AppLayout from "./layout/AppLayout";
 
 //
@@ -51,20 +58,17 @@ function ProtectedRoute({ children }) {
 
 //
 // =======================
-// 🔒 ROLE ROUTE (🔥 FIXED)
+// 🔒 ROLE ROUTE
 // =======================
 function RoleRoute({ roles, children }) {
   const { user, loading } = useAuth();
 
-  // 🔥 WAIT FOR AUTH FIRST
   if (loading) return null;
 
-  // 🔥 SAFETY CHECK
   if (!user) {
     return <Navigate to="/login" />;
   }
 
-  // 🔥 ONLY CHECK ROLE AFTER USER EXISTS
   if (!roles.includes(user.role)) {
     return <Navigate to="/dashboard" />;
   }
@@ -72,6 +76,10 @@ function RoleRoute({ roles, children }) {
   return children;
 }
 
+//
+// =======================
+// 🚀 APP
+// =======================
 function App() {
   return (
     <Router>
@@ -82,7 +90,7 @@ function App() {
         <Route path="/signup" element={<Signup />} />
         <Route path="/login" element={<Login />} />
 
-        {/* ================= APP ================= */}
+        {/* ================= PRIVATE APP ================= */}
         <Route
           element={
             <ProtectedRoute>
@@ -98,7 +106,17 @@ function App() {
           <Route path="/calendar" element={<ScheduleCalendar />} />
           <Route path="/work-session" element={<WorkSession />} />
 
-          {/* 🔒 MANAGER+ */}
+          {/* 🔒 ANNOUNCEMENTS (MANAGER + ADMIN ONLY) */}
+          <Route
+            path="/announcements"
+            element={
+              <RoleRoute roles={["manager", "admin"]}>
+                <Announcements />
+              </RoleRoute>
+            }
+          />
+
+          {/* 🔒 MANAGER + ADMIN */}
           <Route
             path="/holiday-requests"
             element={
@@ -161,6 +179,9 @@ function App() {
           <Route path="/success" element={<Success />} />
 
         </Route>
+
+        {/* FALLBACK */}
+        <Route path="*" element={<Navigate to="/" />} />
 
       </Routes>
     </Router>
