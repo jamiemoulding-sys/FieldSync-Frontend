@@ -284,17 +284,52 @@ export const locationAPI = {
     return data;
   },
 
-  create: async (payload) => {
-    const { data, error } =
-      await supabase
-        .from("locations")
-        .insert(payload)
-        .select()
-        .single();
+create: async (payload) => {
+  const {
+    data: authData,
+    error: authError,
+  } = await supabase.auth.getUser();
 
-    if (error) throw error;
-    return data;
-  },
+  if (authError) throw authError;
+
+  const userId =
+    authData?.user?.id;
+
+  if (!userId) {
+    throw new Error(
+      "No logged in user"
+    );
+  }
+
+  const {
+    data: profile,
+    error: profileError,
+  } = await supabase
+    .from("users")
+    .select("company_id")
+    .eq("id", userId)
+    .single();
+
+  if (profileError)
+    throw profileError;
+
+  const {
+    data,
+    error,
+  } = await supabase
+    .from("locations")
+    .insert({
+      ...payload,
+      company_id:
+        profile.company_id,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return data;
+},
 
   update: async (id, payload) => {
     const { data, error } =
