@@ -41,14 +41,20 @@ export default function WorkSession() {
     }
   };
 
-  /* LIVE TIMER */
+  /* FIXED TIMER */
   useEffect(() => {
     let interval;
 
     if (activeShift?.clock_in_time) {
       const updateTimer = () => {
-        const start = new Date(activeShift.clock_in_time).getTime();
-        const now = Date.now();
+        const raw = activeShift.clock_in_time;
+
+        /* remove timezone conversion issue */
+        const clean = raw.replace("T", " ").replace("Z", "");
+
+        const start = new Date(clean).getTime();
+        const now = new Date().getTime();
+
         const diff = Math.floor((now - start) / 1000);
 
         setTimer(diff > 0 ? diff : 0);
@@ -63,7 +69,7 @@ export default function WorkSession() {
     return () => clearInterval(interval);
   }, [activeShift]);
 
-  /* LIVE GPS TRACKING */
+  /* LIVE GPS */
   useEffect(() => {
     let interval;
 
@@ -76,13 +82,7 @@ export default function WorkSession() {
                 latitude: pos.coords.latitude,
                 longitude: pos.coords.longitude,
               });
-            } catch (err) {
-              console.error(err);
-            }
-          },
-          () => {},
-          {
-            enableHighAccuracy: true,
+            } catch {}
           }
         );
       }, 15000);
@@ -110,7 +110,6 @@ export default function WorkSession() {
 
           setActiveShift(shift);
         } catch (err) {
-          console.error(err);
           alert("Clock in failed");
         } finally {
           setActionLoading(false);
@@ -119,9 +118,6 @@ export default function WorkSession() {
       () => {
         alert("Location denied");
         setActionLoading(false);
-      },
-      {
-        enableHighAccuracy: true,
       }
     );
   };
@@ -129,13 +125,10 @@ export default function WorkSession() {
   const handleClockOut = async () => {
     try {
       setActionLoading(true);
-
       await shiftAPI.clockOut();
-
       setActiveShift(null);
       setTimer(0);
-    } catch (err) {
-      console.error(err);
+    } catch {
       alert("Clock out failed");
     } finally {
       setActionLoading(false);
@@ -153,14 +146,16 @@ export default function WorkSession() {
     )}:${String(s).padStart(2, "0")}`;
   };
 
-  const formatStarted = (value) => {
-    if (!value) return "";
+  const formatStarted = () => {
+    if (!activeShift?.clock_in_time) return "";
 
-    return new Date(value).toLocaleTimeString("en-GB", {
+    const raw = activeShift.clock_in_time;
+    const clean = raw.replace("T", " ").replace("Z", "");
+    const d = new Date(clean);
+
+    return d.toLocaleTimeString("en-GB", {
       hour: "2-digit",
       minute: "2-digit",
-      second: "2-digit",
-      timeZone: "Europe/London",
     });
   };
 
@@ -174,7 +169,6 @@ export default function WorkSession() {
 
   return (
     <div className="space-y-6">
-      {/* HEADER */}
       <div>
         <h1 className="text-2xl font-semibold">
           Work Session
@@ -185,7 +179,6 @@ export default function WorkSession() {
         </p>
       </div>
 
-      {/* KPI */}
       <div className="grid md:grid-cols-3 gap-4">
         <KPI
           icon={<Clock3 size={16} />}
@@ -214,17 +207,10 @@ export default function WorkSession() {
         />
       </div>
 
-      {/* ACTIVE SHIFT */}
       {activeShift ? (
         <motion.div
-          initial={{
-            opacity: 0,
-            y: 20,
-          }}
-          animate={{
-            opacity: 1,
-            y: 0,
-          }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
           className="rounded-3xl p-[1px] bg-gradient-to-r from-green-500/30 to-transparent"
         >
           <div className="bg-[#020617] border border-white/10 rounded-3xl p-8 text-center">
@@ -241,10 +227,7 @@ export default function WorkSession() {
             </h2>
 
             <p className="text-sm text-gray-400 mt-3">
-              Started{" "}
-              {formatStarted(
-                activeShift.clock_in_time
-              )}
+              Started {formatStarted()}
             </p>
 
             <button
@@ -266,16 +249,9 @@ export default function WorkSession() {
           </div>
         </motion.div>
       ) : (
-        /* CLOCK IN CARD */
         <motion.div
-          initial={{
-            opacity: 0,
-            y: 20,
-          }}
-          animate={{
-            opacity: 1,
-            y: 0,
-          }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
           className="rounded-3xl p-[1px] bg-gradient-to-r from-indigo-500/30 to-transparent"
         >
           <div className="bg-[#020617] border border-white/10 rounded-3xl p-8">
@@ -284,8 +260,7 @@ export default function WorkSession() {
             </h3>
 
             <p className="text-sm text-gray-400 mt-2">
-              Select your location before
-              clocking in
+              Select your location before clocking in
             </p>
 
             <div className="relative mt-6">
@@ -297,9 +272,7 @@ export default function WorkSession() {
               <select
                 value={selectedLocation}
                 onChange={(e) =>
-                  setSelectedLocation(
-                    e.target.value
-                  )
+                  setSelectedLocation(e.target.value)
                 }
                 className="w-full bg-white/5 border border-white/10 rounded-2xl pl-11 pr-4 py-4 outline-none"
               >
@@ -341,11 +314,7 @@ export default function WorkSession() {
   );
 }
 
-function KPI({
-  icon,
-  title,
-  value,
-}) {
+function KPI({ icon, title, value }) {
   return (
     <div className="rounded-2xl p-[1px] bg-gradient-to-b from-white/10 to-transparent">
       <div className="bg-[#020617] border border-white/10 rounded-2xl p-5">
