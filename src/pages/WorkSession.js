@@ -9,6 +9,7 @@ import {
   TimerReset,
   Navigation,
   Loader2,
+  Coffee,
 } from "lucide-react";
 
 export default function WorkSession() {
@@ -22,6 +23,9 @@ export default function WorkSession() {
     useState("");
 
   const [timer, setTimer] =
+    useState(0);
+
+  const [breakTimer, setBreakTimer] =
     useState(0);
 
   const [loading, setLoading] =
@@ -60,120 +64,127 @@ export default function WorkSession() {
     }
   };
 
-  /* ========================================
-     FIXED TIME PARSER
-  ======================================== */
-
-  const parseShiftTime = (
-    value
-  ) => {
-    if (!value) return null;
-
-    /* if backend sends ISO */
-    if (
-      value.includes("T") ||
-      value.includes("Z")
-    ) {
-      return new Date(value);
-    }
-
-    /* if backend sends sql datetime */
-    return new Date(
-      value.replace(" ", "T")
-    );
-  };
-
-  /* ========================================
-     TIMER
-  ======================================== */
-
+  /* MAIN TIMER */
   useEffect(() => {
     let interval;
 
-    if (
-      activeShift?.clock_in_time
-    ) {
-      const updateTimer = () => {
+    if (activeShift?.clock_in_time) {
+      const update = () => {
         const start =
-          parseShiftTime(
+          new Date(
             activeShift.clock_in_time
-          );
+          ).getTime();
 
-        if (!start) {
-          setTimer(0);
-          return;
-        }
+        const now =
+          Date.now();
 
-        const diff =
+        const total =
           Math.floor(
-            (Date.now() -
-              start.getTime()) /
-              1000
+            (now - start) / 1000
           );
+
+        const breaks =
+          activeShift.total_break_seconds ||
+          0;
+
+        const liveBreak =
+          activeShift.break_started_at
+            ? Math.floor(
+                (now -
+                  new Date(
+                    activeShift.break_started_at
+                  ).getTime()) /
+                  1000
+              )
+            : 0;
+
+        const worked =
+          total -
+          breaks -
+          liveBreak;
 
         setTimer(
-          diff > 0 ? diff : 0
+          worked > 0
+            ? worked
+            : 0
         );
       };
 
-      updateTimer();
+      update();
 
-      interval =
-        setInterval(
-          updateTimer,
-          1000
-        );
-    } else {
-      setTimer(0);
+      interval = setInterval(
+        update,
+        1000
+      );
     }
 
     return () =>
       clearInterval(interval);
   }, [activeShift]);
 
-  /* ========================================
-     LIVE GPS
-  ======================================== */
+  /* BREAK TIMER */
+  useEffect(() => {
+    let interval;
 
+    if (
+      activeShift?.break_started_at
+    ) {
+      const update = () => {
+        const sec =
+          Math.floor(
+            (Date.now() -
+              new Date(
+                activeShift.break_started_at
+              ).getTime()) /
+              1000
+          );
+
+        setBreakTimer(
+          sec > 0 ? sec : 0
+        );
+      };
+
+      update();
+
+      interval = setInterval(
+        update,
+        1000
+      );
+    } else {
+      setBreakTimer(0);
+    }
+
+    return () =>
+      clearInterval(interval);
+  }, [activeShift]);
+
+  /* LIVE GPS */
   useEffect(() => {
     let interval;
 
     if (activeShift?.id) {
-      interval =
-        setInterval(() => {
-          navigator.geolocation.getCurrentPosition(
-            async (
-              pos
-            ) => {
-              try {
-                await shiftAPI.updateLocation(
-                  {
-                    latitude:
-                      pos.coords
-                        .latitude,
-                    longitude:
-                      pos.coords
-                        .longitude,
-                  }
-                );
-              } catch {}
-            }
-          );
-        }, 15000);
+      interval = setInterval(() => {
+        navigator.geolocation.getCurrentPosition(
+          async (pos) => {
+            try {
+              await shiftAPI.updateLocation({
+                latitude:
+                  pos.coords.latitude,
+                longitude:
+                  pos.coords.longitude,
+              });
+            } catch {}
+          }
+        );
+      }, 15000);
     }
 
     return () =>
       clearInterval(interval);
   }, [activeShift]);
 
-  /* ========================================
-     CLOCK IN
-  ======================================== */
-
   const handleClockIn = () => {
-    if (
-      !selectedLocation
-    ) {
+    if (!selectedLocation) {
       alert(
         "Select a location"
       );
@@ -186,23 +197,19 @@ export default function WorkSession() {
       async (pos) => {
         try {
           const shift =
-            await shiftAPI.clockIn(
-              {
-                location_id:
-                  selectedLocation,
-                latitude:
-                  pos.coords
-                    .latitude,
-                longitude:
-                  pos.coords
-                    .longitude,
-              }
-            );
+            await shiftAPI.clockIn({
+              location_id:
+                selectedLocation,
+              latitude:
+                pos.coords.latitude,
+              longitude:
+                pos.coords.longitude,
+            });
 
           setActiveShift(
             shift
           );
-        } catch (err) {
+        } catch {
           alert(
             "Clock in failed"
           );
@@ -223,10 +230,6 @@ export default function WorkSession() {
       }
     );
   };
-
-  /* ========================================
-     CLOCK OUT
-  ======================================== */
 
   const handleClockOut =
     async () => {
@@ -253,9 +256,32 @@ export default function WorkSession() {
       }
     };
 
-  /* ========================================
-     HELPERS
-  ======================================== */
+  const handleBreak =
+    async () => {
+      try {
+        setActionLoading(
+          true
+        );
+
+        if (
+          activeShift?.break_started_at
+        ) {
+          await shiftAPI.endBreak();
+        } else {
+          await shiftAPI.startBreak();
+        }
+
+        await loadData();
+      } catch {
+        alert(
+          "Break action failed"
+        );
+      } finally {
+        setActionLoading(
+          false
+        );
+      }
+    };
 
   const formatTime = (
     sec
@@ -283,35 +309,22 @@ export default function WorkSession() {
     )}`;
   };
 
-  const formatStarted =
-    () => {
-      if (
-        !activeShift?.clock_in_time
-      )
-        return "";
+  const formatStarted = () => {
+    if (
+      !activeShift?.clock_in_time
+    )
+      return "";
 
-      const d =
-        parseShiftTime(
-          activeShift.clock_in_time
-        );
-
-      if (!d)
-        return "";
-
-      return d.toLocaleTimeString(
-        "en-GB",
-        {
-          hour:
-            "2-digit",
-          minute:
-            "2-digit",
-        }
-      );
-    };
-
-  /* ========================================
-     LOADING
-  ======================================== */
+    return new Date(
+      activeShift.clock_in_time
+    ).toLocaleTimeString(
+      "en-GB",
+      {
+        hour: "2-digit",
+        minute: "2-digit",
+      }
+    );
+  };
 
   if (loading) {
     return (
@@ -321,10 +334,6 @@ export default function WorkSession() {
       </div>
     );
   }
-
-  /* ========================================
-     UI
-  ======================================== */
 
   return (
     <div className="space-y-6">
@@ -360,14 +369,10 @@ export default function WorkSession() {
               size={16}
             />
           }
-          title="Session"
-          value={
-            activeShift
-              ? formatTime(
-                  timer
-                )
-              : "00:00:00"
-          }
+          title="Worked"
+          value={formatTime(
+            timer
+          )}
         />
 
         <KPI
@@ -419,28 +424,57 @@ export default function WorkSession() {
               {formatStarted()}
             </p>
 
-            <button
-              onClick={
-                handleClockOut
-              }
-              disabled={
-                actionLoading
-              }
-              className="mt-8 px-6 py-4 rounded-2xl bg-red-500 hover:bg-red-600 disabled:opacity-60 font-medium flex items-center gap-2 mx-auto"
-            >
-              {actionLoading ? (
-                <Loader2
-                  size={16}
-                  className="animate-spin"
-                />
-              ) : (
-                <Square
-                  size={16}
-                />
-              )}
+            {activeShift.break_started_at && (
+              <p className="text-amber-400 mt-3 text-sm">
+                On Break{" "}
+                {formatTime(
+                  breakTimer
+                )}
+              </p>
+            )}
 
-              Clock Out
-            </button>
+            <div className="flex gap-3 justify-center mt-8 flex-wrap">
+              <button
+                onClick={
+                  handleBreak
+                }
+                disabled={
+                  actionLoading
+                }
+                className="px-6 py-4 rounded-2xl bg-amber-500 hover:bg-amber-600 disabled:opacity-60 font-medium flex items-center gap-2"
+              >
+                <Coffee
+                  size={16}
+                />
+
+                {activeShift.break_started_at
+                  ? "End Break"
+                  : "Start Break"}
+              </button>
+
+              <button
+                onClick={
+                  handleClockOut
+                }
+                disabled={
+                  actionLoading
+                }
+                className="px-6 py-4 rounded-2xl bg-red-500 hover:bg-red-600 disabled:opacity-60 font-medium flex items-center gap-2"
+              >
+                {actionLoading ? (
+                  <Loader2
+                    size={16}
+                    className="animate-spin"
+                  />
+                ) : (
+                  <Square
+                    size={16}
+                  />
+                )}
+
+                Clock Out
+              </button>
+            </div>
           </div>
         </motion.div>
       ) : (
@@ -476,12 +510,9 @@ export default function WorkSession() {
                 value={
                   selectedLocation
                 }
-                onChange={(
-                  e
-                ) =>
+                onChange={(e) =>
                   setSelectedLocation(
-                    e.target
-                      .value
+                    e.target.value
                   )
                 }
                 className="w-full bg-white/5 border border-white/10 rounded-2xl pl-11 pr-4 py-4 outline-none"
@@ -492,9 +523,7 @@ export default function WorkSession() {
                 </option>
 
                 {locations.map(
-                  (
-                    loc
-                  ) => (
+                  (loc) => (
                     <option
                       key={
                         loc.id

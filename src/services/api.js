@@ -29,30 +29,13 @@ export const authAPI = {
         .maybeSingle();
 
     return {
-      token: data.session?.access_token,
+      token:
+        data.session?.access_token,
 
       user: {
         id: authUser.id,
         email: authUser.email,
-        name: profile?.name || "",
-        phone: profile?.phone || "",
-        role: profile?.role || "employee",
-        companyId:
-          profile?.company_id || null,
-        companyName:
-          profile?.company_name || "",
-        jobTitle:
-          profile?.job_title || "",
-        isPro:
-          profile?.is_pro || false,
-        is_pro:
-          profile?.is_pro || false,
-        current_plan:
-          profile?.current_plan ||
-          "free",
-        subscription_status:
-          profile?.subscription_status ||
-          "free",
+        ...profile,
       },
     };
   },
@@ -84,10 +67,6 @@ export const authAPI = {
           role: "admin",
           company_name:
             companyName,
-          is_pro: false,
-          current_plan: "free",
-          subscription_status:
-            "free",
         });
     }
 
@@ -95,10 +74,8 @@ export const authAPI = {
   },
 
   me: async () => {
-    const { data, error } =
+    const { data } =
       await supabase.auth.getUser();
-
-    if (error) throw error;
 
     if (!data.user) return null;
 
@@ -111,7 +88,8 @@ export const authAPI = {
 
     return {
       id: data.user.id,
-      email: data.user.email,
+      email:
+        data.user.email,
       ...profile,
     };
   },
@@ -142,8 +120,6 @@ export const authAPI = {
             payload.companyName,
           job_title:
             payload.jobTitle,
-          updated_at:
-            new Date(),
         })
         .eq(
           "id",
@@ -152,7 +128,7 @@ export const authAPI = {
 
     if (error) throw error;
 
-    return payload;
+    return true;
   },
 };
 
@@ -184,7 +160,9 @@ export const userAPI = {
       id,
       payload
     ) => {
-      const { error } =
+      const {
+        error,
+      } =
         await supabase
           .from("users")
           .update({
@@ -201,7 +179,9 @@ export const userAPI = {
 
   delete:
     async (id) => {
-      const { error } =
+      const {
+        error,
+      } =
         await supabase
           .from("users")
           .delete()
@@ -278,7 +258,9 @@ export const locationAPI = {
     },
 
   create:
-    async (payload) => {
+    async (
+      payload
+    ) => {
       const {
         data: authData,
       } =
@@ -346,7 +328,9 @@ export const locationAPI = {
 
   delete:
     async (id) => {
-      const { error } =
+      const {
+        error,
+      } =
         await supabase
           .from(
             "locations"
@@ -408,7 +392,9 @@ export const taskAPI = {
 
   complete:
     async (id) => {
-      const { error } =
+      const {
+        error,
+      } =
         await supabase
           .from("tasks")
           .update({
@@ -424,7 +410,9 @@ export const taskAPI = {
 
   delete:
     async (id) => {
-      const { error } =
+      const {
+        error,
+      } =
         await supabase
           .from("tasks")
           .delete()
@@ -545,9 +533,15 @@ export const shiftAPI = {
             latitude,
             longitude,
 
-            /* FIXED */
+            /* timezone fixed */
             clock_in_time:
-              new Date(),
+              new Date().toISOString(),
+
+            break_started_at:
+              null,
+
+            total_break_seconds:
+              0,
           })
           .select()
           .single();
@@ -566,13 +560,94 @@ export const shiftAPI = {
       if (!active)
         return true;
 
-      const { error } =
+      const {
+        error,
+      } =
         await supabase
           .from("shifts")
           .update({
-            /* FIXED */
             clock_out_time:
-              new Date(),
+              new Date().toISOString(),
+          })
+          .eq(
+            "id",
+            active.id
+          );
+
+      if (error)
+        throw error;
+
+      return true;
+    },
+
+  startBreak:
+    async () => {
+      const active =
+        await shiftAPI.getActive();
+
+      if (!active)
+        return true;
+
+      const {
+        error,
+      } =
+        await supabase
+          .from("shifts")
+          .update({
+            break_started_at:
+              new Date().toISOString(),
+          })
+          .eq(
+            "id",
+            active.id
+          );
+
+      if (error)
+        throw error;
+
+      return true;
+    },
+
+  endBreak:
+    async () => {
+      const active =
+        await shiftAPI.getActive();
+
+      if (
+        !active ||
+        !active.break_started_at
+      )
+        return true;
+
+      const started =
+        new Date(
+          active.break_started_at
+        ).getTime();
+
+      const now =
+        Date.now();
+
+      const seconds =
+        Math.floor(
+          (now -
+            started) /
+            1000
+        );
+
+      const total =
+        (active.total_break_seconds ||
+          0) + seconds;
+
+      const {
+        error,
+      } =
+        await supabase
+          .from("shifts")
+          .update({
+            break_started_at:
+              null,
+            total_break_seconds:
+              total,
           })
           .eq(
             "id",
@@ -596,7 +671,9 @@ export const shiftAPI = {
       if (!active)
         return true;
 
-      const { error } =
+      const {
+        error,
+      } =
         await supabase
           .from("shifts")
           .update({

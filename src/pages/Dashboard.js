@@ -25,6 +25,8 @@ import {
   ArrowUpRight,
   Calendar,
   Timer,
+  Coffee,
+  Briefcase,
 } from "lucide-react";
 
 export default function Dashboard() {
@@ -35,8 +37,11 @@ export default function Dashboard() {
     useState({
       staff: 0,
       active: 0,
+      working: 0,
+      onBreak: 0,
       tasks: 0,
       late: 0,
+      breakMinutes: 0,
     });
 
   const [announcements, setAnnouncements] =
@@ -47,6 +52,15 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadDashboard();
+
+    const interval =
+      setInterval(
+        loadDashboard,
+        30000
+      );
+
+    return () =>
+      clearInterval(interval);
   }, []);
 
   const loadDashboard =
@@ -56,7 +70,7 @@ export default function Dashboard() {
 
         const [
           dashboard,
-          active,
+          activeShifts,
           tasks,
           notes,
         ] =
@@ -67,6 +81,35 @@ export default function Dashboard() {
             announcementAPI.getAll(),
           ]);
 
+        const shifts =
+          Array.isArray(
+            activeShifts
+          )
+            ? activeShifts
+            : [];
+
+        const onBreak =
+          shifts.filter(
+            (s) =>
+              s.break_started_at
+          ).length;
+
+        const working =
+          shifts.length -
+          onBreak;
+
+        const totalBreakSeconds =
+          shifts.reduce(
+            (
+              total,
+              item
+            ) =>
+              total +
+              (item.total_break_seconds ||
+                0),
+            0
+          );
+
         setStats({
           staff:
             dashboard
@@ -76,11 +119,11 @@ export default function Dashboard() {
             0,
 
           active:
-            Array.isArray(
-              active
-            )
-              ? active.length
-              : 0,
+            shifts.length,
+
+          working,
+
+          onBreak,
 
           tasks:
             Array.isArray(
@@ -96,6 +139,12 @@ export default function Dashboard() {
             dashboard
               ?.late ||
             0,
+
+          breakMinutes:
+            Math.floor(
+              totalBreakSeconds /
+                60
+            ),
         });
 
         setAnnouncements(
@@ -108,7 +157,6 @@ export default function Dashboard() {
               )
             : []
         );
-
       } catch {
         console.log(
           "dashboard fallback"
@@ -141,13 +189,37 @@ export default function Dashboard() {
     },
     {
       title:
+        "Working",
+      value:
+        stats.working,
+      icon:
+        <Briefcase
+          size={18}
+        />,
+      color:
+        "from-cyan-500 to-cyan-600",
+    },
+    {
+      title:
+        "On Break",
+      value:
+        stats.onBreak,
+      icon:
+        <Coffee size={18} />,
+      color:
+        "from-amber-500 to-amber-600",
+    },
+    {
+      title:
         "Open Tasks",
       value:
         stats.tasks,
       icon:
-        <CheckCircle2 size={18} />,
+        <CheckCircle2
+          size={18}
+        />,
       color:
-        "from-cyan-500 to-cyan-600",
+        "from-sky-500 to-sky-600",
     },
     {
       title:
@@ -155,18 +227,28 @@ export default function Dashboard() {
       value:
         stats.late,
       icon:
-        <AlertCircle size={18} />,
+        <AlertCircle
+          size={18}
+        />,
       color:
         "from-red-500 to-red-600",
+    },
+    {
+      title:
+        "Break Mins",
+      value:
+        stats.breakMinutes,
+      icon:
+        <Timer size={18} />,
+      color:
+        "from-pink-500 to-pink-600",
     },
   ];
 
   return (
     <div className="space-y-6">
-
       {/* TOP */}
       <div className="flex justify-between items-center flex-wrap gap-4">
-
         <div>
           <p className="text-sm text-gray-400">
             Welcome back
@@ -182,14 +264,14 @@ export default function Dashboard() {
           <Calendar
             size={16}
           />
-          {new Date().toLocaleDateString()}
+          {new Date().toLocaleDateString(
+            "en-GB"
+          )}
         </div>
-
       </div>
 
       {/* STATS */}
       <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
-
         {cards.map(
           (
             item,
@@ -215,18 +297,19 @@ export default function Dashboard() {
               className="rounded-3xl p-[1px] bg-gradient-to-b from-white/10 to-transparent"
             >
               <div className="rounded-3xl border border-white/10 bg-[#020617] p-5">
-
                 <div className="flex justify-between items-center">
-
-                  <div className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${item.color} flex items-center justify-center`}>
-                    {item.icon}
+                  <div
+                    className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${item.color} flex items-center justify-center`}
+                  >
+                    {
+                      item.icon
+                    }
                   </div>
 
                   <ArrowUpRight
                     size={16}
                     className="text-gray-500"
                   />
-
                 </div>
 
                 <h2 className="text-3xl font-semibold mt-5">
@@ -236,22 +319,20 @@ export default function Dashboard() {
                 </h2>
 
                 <p className="text-sm text-gray-400 mt-1">
-                  {item.title}
+                  {
+                    item.title
+                  }
                 </p>
-
               </div>
             </motion.div>
           )
         )}
-
       </div>
 
       {/* LOWER GRID */}
       <div className="grid lg:grid-cols-3 gap-5">
-
-        {/* ACTIVITY */}
+        {/* LIVE */}
         <div className="lg:col-span-2 rounded-3xl border border-white/10 bg-[#020617] p-6">
-
           <h2 className="text-lg font-semibold mb-5 flex items-center gap-2">
             <Timer
               size={18}
@@ -260,10 +341,19 @@ export default function Dashboard() {
           </h2>
 
           <div className="space-y-4">
-
             <Row
               title="Staff clocked in"
               value={`${stats.active}`}
+            />
+
+            <Row
+              title="Currently working"
+              value={`${stats.working}`}
+            />
+
+            <Row
+              title="Currently on break"
+              value={`${stats.onBreak}`}
             />
 
             <Row
@@ -277,17 +367,19 @@ export default function Dashboard() {
             />
 
             <Row
+              title="Break mins today"
+              value={`${stats.breakMinutes}`}
+            />
+
+            <Row
               title="Total users"
               value={`${stats.staff}`}
             />
-
           </div>
-
         </div>
 
         {/* NOTES */}
         <div className="rounded-3xl border border-white/10 bg-[#020617] p-6">
-
           <h2 className="text-lg font-semibold mb-5 flex items-center gap-2">
             <Megaphone
               size={18}
@@ -296,7 +388,6 @@ export default function Dashboard() {
           </h2>
 
           <div className="space-y-3">
-
             {announcements.length >
             0 ? (
               announcements.map(
@@ -323,13 +414,9 @@ export default function Dashboard() {
                 No announcements yet
               </div>
             )}
-
           </div>
-
         </div>
-
       </div>
-
     </div>
   );
 }
