@@ -10,7 +10,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
-  AlertTriangle,
 } from "lucide-react";
 
 export default function Schedule() {
@@ -46,10 +45,8 @@ export default function Schedule() {
 
       setUsers(Array.isArray(usersData) ? usersData : []);
       setSchedules(Array.isArray(scheduleData) ? scheduleData : []);
-
     } catch (err) {
       console.error(err);
-
     } finally {
       setLoading(false);
     }
@@ -98,7 +95,6 @@ export default function Schedule() {
       setEnd("");
 
       loadData();
-
     } catch (err) {
       console.error(err);
       alert("Failed to create shifts");
@@ -109,7 +105,7 @@ export default function Schedule() {
     try {
       await scheduleAPI.delete(id);
       loadData();
-    } catch (err) {
+    } catch {
       alert("Delete failed");
     }
   };
@@ -147,11 +143,14 @@ export default function Schedule() {
   };
 
   const filteredSchedules = schedules.filter((s) =>
-    `${s.name}`.toLowerCase().includes(search.toLowerCase())
+    `${s.name || ""}`
+      .toLowerCase()
+      .includes(search.toLowerCase())
   );
 
   const totalShifts = schedules.length;
   const totalStaff = users.length;
+
   const todayShifts = schedules.filter(
     (s) =>
       new Date(s.date).toDateString() ===
@@ -168,10 +167,8 @@ export default function Schedule() {
 
   return (
     <div className="space-y-6">
-
       {/* HEADER */}
       <div className="flex justify-between items-center flex-wrap gap-4">
-
         <div>
           <h1 className="text-2xl font-semibold">
             Schedule
@@ -183,7 +180,6 @@ export default function Schedule() {
         </div>
 
         <div className="flex gap-2">
-
           <button
             onClick={() => setView("calendar")}
             className={`px-4 py-2 rounded-xl text-sm ${
@@ -205,14 +201,11 @@ export default function Schedule() {
           >
             Grid
           </button>
-
         </div>
-
       </div>
 
       {/* KPI */}
       <div className="grid md:grid-cols-3 gap-4">
-
         <StatCard
           title="Total Staff"
           value={totalStaff}
@@ -230,13 +223,11 @@ export default function Schedule() {
           value={totalShifts}
           icon={<CalendarDays size={16} />}
         />
-
       </div>
 
-      {/* BULK CREATE */}
+      {/* CREATE */}
       <div className="rounded-2xl p-[1px] bg-gradient-to-b from-white/10 to-transparent">
         <div className="bg-[#020617] border border-white/10 rounded-2xl p-5">
-
           <div className="flex items-center gap-2 mb-4">
             <Plus size={16} />
             <h3 className="font-medium">
@@ -245,7 +236,6 @@ export default function Schedule() {
           </div>
 
           <div className="grid md:grid-cols-5 gap-3">
-
             <select
               multiple
               value={selectedUsers}
@@ -304,22 +294,19 @@ export default function Schedule() {
               }
               className="bg-white/5 border border-white/10 rounded-xl px-3 py-2"
             />
-
           </div>
 
           <button
             onClick={createSchedule}
-            className="w-full mt-4 bg-indigo-600 hover:bg-indigo-500 py-3 rounded-xl font-medium transition"
+            className="w-full mt-4 bg-indigo-600 hover:bg-indigo-500 py-3 rounded-xl font-medium"
           >
             Create Bulk Shifts
           </button>
-
         </div>
       </div>
 
       {/* SEARCH */}
       <div className="relative">
-
         <Search
           size={16}
           className="absolute left-4 top-3.5 text-gray-500"
@@ -333,13 +320,11 @@ export default function Schedule() {
           }
           className="w-full bg-[#020617] border border-white/10 rounded-2xl pl-11 pr-4 py-3"
         />
-
       </div>
 
-      {/* GRID VIEW */}
+      {/* GRID */}
       {view === "grid" && (
         <div className="grid md:grid-cols-3 gap-4">
-
           {filteredSchedules.map((s, i) => (
             <motion.div
               key={s.id}
@@ -357,9 +342,7 @@ export default function Schedule() {
               className="rounded-2xl p-[1px] bg-gradient-to-b from-white/10 to-transparent"
             >
               <div className="bg-[#020617] border border-white/10 rounded-2xl p-4">
-
                 <div className="flex justify-between">
-
                   <div>
                     <p className="font-medium">
                       {s.name}
@@ -374,27 +357,17 @@ export default function Schedule() {
                     <p className="text-sm mt-2">
                       {new Date(
                         s.start_time
-                      ).toLocaleTimeString(
-                        [],
-                        {
-                          hour:
-                            "2-digit",
-                          minute:
-                            "2-digit",
-                        }
-                      )}{" "}
+                      ).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}{" "}
                       -{" "}
                       {new Date(
                         s.end_time
-                      ).toLocaleTimeString(
-                        [],
-                        {
-                          hour:
-                            "2-digit",
-                          minute:
-                            "2-digit",
-                        }
-                      )}
+                      ).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
                     </p>
                   </div>
 
@@ -402,43 +375,34 @@ export default function Schedule() {
                     onClick={() =>
                       deleteShift(s.id)
                     }
-                    className="text-red-400 hover:text-red-300"
+                    className="text-red-400"
                   >
                     <Trash2 size={16} />
                   </button>
-
                 </div>
-
               </div>
             </motion.div>
           ))}
-
         </div>
       )}
 
-      {/* CALENDAR VIEW */}
+      {/* CALENDAR */}
       {view === "calendar" && (
         <div>
-
           <div className="flex justify-between items-center mb-4">
-
             <button
               onClick={() =>
                 changeMonth(-1)
               }
               className="p-2 rounded-xl bg-white/5"
             >
-              <ChevronLeft
-                size={18}
-              />
+              <ChevronLeft size={18} />
             </button>
 
             <h3 className="font-medium">
               {currentMonth.toLocaleString(
                 "default",
-                {
-                  month: "long",
-                }
+                { month: "long" }
               )}{" "}
               {currentMonth.getFullYear()}
             </h3>
@@ -449,15 +413,11 @@ export default function Schedule() {
               }
               className="p-2 rounded-xl bg-white/5"
             >
-              <ChevronRight
-                size={18}
-              />
+              <ChevronRight size={18} />
             </button>
-
           </div>
 
           <div className="grid grid-cols-7 gap-2">
-
             {days.map((day, i) => {
               const shifts =
                 getShiftsForDay(day);
@@ -467,38 +427,27 @@ export default function Schedule() {
                   key={i}
                   className="bg-[#020617] border border-white/10 rounded-xl p-2 min-h-[110px]"
                 >
-
                   <div className="text-xs text-gray-500 mb-2">
                     {day.getDate()}
                   </div>
 
-                  {shifts.map(
-                    (s) => (
-                      <div
-                        key={
-                          s.id
-                        }
-                        className="text-xs bg-indigo-500/20 text-indigo-300 px-2 py-1 rounded mb-1"
-                      >
-                        {s.name}
-                      </div>
-                    )
-                  )}
-
+                  {shifts.map((s) => (
+                    <div
+                      key={s.id}
+                      className="text-xs bg-indigo-500/20 text-indigo-300 px-2 py-1 rounded mb-1"
+                    >
+                      {s.name}
+                    </div>
+                  ))}
                 </div>
               );
             })}
-
           </div>
-
         </div>
       )}
-
     </div>
   );
 }
-
-/* COMPONENTS */
 
 function StatCard({
   title,
@@ -508,9 +457,7 @@ function StatCard({
   return (
     <div className="rounded-2xl p-[1px] bg-gradient-to-b from-white/10 to-transparent">
       <div className="bg-[#020617] border border-white/10 rounded-2xl p-4">
-
         <div className="flex justify-between items-center">
-
           <p className="text-xs text-gray-400">
             {title}
           </p>
@@ -518,13 +465,11 @@ function StatCard({
           <div className="text-indigo-400">
             {icon}
           </div>
-
         </div>
 
         <h2 className="text-2xl font-semibold mt-2">
           {value}
         </h2>
-
       </div>
     </div>
   );

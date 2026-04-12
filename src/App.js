@@ -7,14 +7,14 @@ import {
 
 import { useAuth } from "./hooks/useAuth";
 
-/* 🌐 PUBLIC */
+/* PUBLIC */
 import Landing from "./pages/Landing";
 import Signup from "./pages/Signup";
 import Login from "./pages/Login";
 import SetPassword from "./pages/SetPassword";
 import ResetPassword from "./pages/ResetPassword";
 
-/* 🧠 CORE APP */
+/* CORE */
 import Dashboard from "./pages/Dashboard";
 import Tasks from "./pages/Tasks";
 import Schedule from "./pages/Schedule";
@@ -22,30 +22,26 @@ import ScheduleCalendar from "./pages/ScheduleCalendar";
 import HolidayRequests from "./pages/HolidayRequests";
 import Announcements from "./pages/Announcements";
 import TimeSheet from "./pages/TimeSheet";
-
-/* 📊 BUSINESS */
-import Performance from "./pages/Performance";
-import Reports from "./pages/Reports";
-import Billing from "./pages/Billing";
-
-/* 👥 MANAGEMENT */
-import Employees from "./pages/Employees";
-import Locations from "./pages/Locations";
-
-/* 👤 USER */
-import Profile from "./pages/Profile";
-
-/* 💸 SYSTEM */
-import Success from "./pages/Success";
 import WorkSession from "./pages/WorkSession";
 
-/* 🧱 LAYOUT */
+/* EMPLOYEE */
+import MySchedule from "./pages/MySchedule";
+import MyHoliday from "./pages/MyHoliday";
+import MyLocations from "./pages/MyLocations";
+
+/* OTHER */
+import Employees from "./pages/Employees";
+import Locations from "./pages/Locations";
+import Reports from "./pages/Reports";
+import Performance from "./pages/Performance";
+import Billing from "./pages/Billing";
+import Profile from "./pages/Profile";
+import Success from "./pages/Success";
 import AppLayout from "./layout/AppLayout";
 
-/* =======================
-   🔐 PROTECTED ROUTE
-======================= */
-function ProtectedRoute({ children }) {
+function ProtectedRoute({
+  children,
+}) {
   const { user, loading } =
     useAuth();
 
@@ -69,17 +65,18 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
-/* =======================
-   🔒 ROLE ROUTE
-======================= */
 function RoleRoute({
   roles,
   children,
 }) {
-  const { user, loading } =
-    useAuth();
+  const {
+    user,
+    loading,
+  } = useAuth();
 
-  if (loading) return null;
+  if (loading) {
+    return null;
+  }
 
   if (!user) {
     return (
@@ -106,10 +103,7 @@ function RoleRoute({
   return children;
 }
 
-/* =======================
-   🚀 APP
-======================= */
-function App() {
+export default function App() {
   return (
     <Router>
       <Routes>
@@ -163,20 +157,8 @@ function App() {
 
           <Route
             path="/tasks"
-            element={<Tasks />}
-          />
-
-          <Route
-            path="/schedule"
             element={
-              <Schedule />
-            }
-          />
-
-          <Route
-            path="/calendar"
-            element={
-              <ScheduleCalendar />
+              <Tasks />
             }
           />
 
@@ -194,9 +176,31 @@ function App() {
             }
           />
 
+          {/* EMPLOYEE */}
+          <Route
+            path="/my-schedule"
+            element={
+              <MySchedule />
+            }
+          />
+
+          <Route
+            path="/my-holiday"
+            element={
+              <MyHoliday />
+            }
+          />
+
+          <Route
+            path="/my-locations"
+            element={
+              <MyLocations />
+            }
+          />
+
           {/* MANAGEMENT */}
           <Route
-            path="/announcements"
+            path="/schedule"
             element={
               <RoleRoute
                 roles={[
@@ -204,7 +208,21 @@ function App() {
                   "admin",
                 ]}
               >
-                <Announcements />
+                <Schedule />
+              </RoleRoute>
+            }
+          />
+
+          <Route
+            path="/calendar"
+            element={
+              <RoleRoute
+                roles={[
+                  "manager",
+                  "admin",
+                ]}
+              >
+                <ScheduleCalendar />
               </RoleRoute>
             }
           />
@@ -219,6 +237,20 @@ function App() {
                 ]}
               >
                 <HolidayRequests />
+              </RoleRoute>
+            }
+          />
+
+          <Route
+            path="/announcements"
+            element={
+              <RoleRoute
+                roles={[
+                  "manager",
+                  "admin",
+                ]}
+              >
+                <Announcements />
               </RoleRoute>
             }
           />
@@ -252,6 +284,19 @@ function App() {
           />
 
           <Route
+            path="/reports"
+            element={
+              <RoleRoute
+                roles={[
+                  "admin",
+                ]}
+              >
+                <Reports />
+              </RoleRoute>
+            }
+          />
+
+          <Route
             path="/performance"
             element={
               <RoleRoute
@@ -261,20 +306,6 @@ function App() {
                 ]}
               >
                 <Performance />
-              </RoleRoute>
-            }
-          />
-
-          <Route
-            path="/reports"
-            element={
-              <RoleRoute
-                roles={[
-                  "manager",
-                  "admin",
-                ]}
-              >
-                <Reports />
               </RoleRoute>
             }
           />
@@ -293,44 +324,16 @@ function App() {
           />
 
           <Route
-            path="/upgrade"
-            element={
-              <RoleRoute
-                roles={[
-                  "admin",
-                ]}
-              >
-                <Billing />
-              </RoleRoute>
-            }
-          />
-
-          <Route
             path="/billing-success"
             element={
-              <RoleRoute
-                roles={[
-                  "admin",
-                ]}
-              >
-                <Success />
-              </RoleRoute>
+              <Success />
             }
           />
 
-          {/* USER */}
           <Route
             path="/profile"
             element={
               <Profile />
-            }
-          />
-
-          {/* LEGACY */}
-          <Route
-            path="/success"
-            element={
-              <Success />
             }
           />
 
@@ -351,5 +354,3 @@ function App() {
     </Router>
   );
 }
-
-export default App;

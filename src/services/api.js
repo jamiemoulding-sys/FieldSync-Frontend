@@ -19,116 +19,40 @@ export const authAPI = {
 
     if (error) throw error;
 
-    const authUser = data.user;
-
-    const { data: profile } =
-      await supabase
-        .from("users")
-        .select("*")
-        .eq("id", authUser.id)
-        .maybeSingle();
-
-    return {
-      token:
-        data.session?.access_token,
-
-      user: {
-        id: authUser.id,
-        email: authUser.email,
-        ...profile,
-      },
-    };
-  },
-
-  register: async ({
-    email,
-    password,
-    name,
-    companyName,
-  }) => {
-    const { data, error } =
-      await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { name },
-        },
-      });
-
-    if (error) throw error;
-
-    if (data.user) {
-      await supabase
-        .from("users")
-        .insert({
-          id: data.user.id,
-          email,
-          name,
-          role: "admin",
-          company_name:
-            companyName,
-        });
-    }
-
-    return data;
-  },
-
-  me: async () => {
-    const { data } =
-      await supabase.auth.getUser();
-
-    if (!data.user) return null;
-
     const { data: profile } =
       await supabase
         .from("users")
         .select("*")
         .eq("id", data.user.id)
-        .maybeSingle();
+        .single();
 
     return {
-      id: data.user.id,
-      email:
-        data.user.email,
-      ...profile,
+      token: data.session.access_token,
+      user: {
+        ...profile,
+        email: data.user.email,
+      },
     };
   },
 
-  updateMe: async (
-    payload
-  ) => {
-    const { data } =
-      await supabase.auth.getUser();
+  me: async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-    const user =
-      data.user;
+    if (!user) return null;
 
-    if (!user)
-      throw new Error(
-        "No user found"
-      );
-
-    const { error } =
+    const { data: profile } =
       await supabase
         .from("users")
-        .update({
-          name:
-            payload.name,
-          phone:
-            payload.phone,
-          company_name:
-            payload.companyName,
-          job_title:
-            payload.jobTitle,
-        })
-        .eq(
-          "id",
-          user.id
-        );
+        .select("*")
+        .eq("id", user.id)
+        .single();
 
-    if (error) throw error;
-
-    return true;
+    return {
+      ...profile,
+      email: user.email,
+    };
   },
 };
 
@@ -142,88 +66,11 @@ export const userAPI = {
       await supabase
         .from("users")
         .select("*")
-        .order(
-          "created_at",
-          {
-            ascending:
-              false,
-          }
-        );
+        .order("name");
 
     if (error) throw error;
 
     return data || [];
-  },
-
-  updateRole:
-    async (
-      id,
-      payload
-    ) => {
-      const {
-        error,
-      } =
-        await supabase
-          .from("users")
-          .update({
-            role:
-              payload.role,
-          })
-          .eq("id", id);
-
-      if (error)
-        throw error;
-
-      return true;
-    },
-
-  delete:
-    async (id) => {
-      const {
-        error,
-      } =
-        await supabase
-          .from("users")
-          .delete()
-          .eq("id", id);
-
-      if (error)
-        throw error;
-
-      return true;
-    },
-};
-
-/* =========================================================
-INVITES
-========================================================= */
-
-export const inviteAPI = {
-  send: async ({
-    email,
-    role,
-  }) => {
-    const { error } =
-      await supabase.auth.signInWithOtp(
-        {
-          email,
-          options: {
-            emailRedirectTo:
-              "https://app.zorviatech.co.uk/set-password",
-            data: {
-              role:
-                role ||
-                "employee",
-            },
-          },
-        }
-      );
-
-    if (error) throw error;
-
-    return {
-      success: true,
-    };
   },
 };
 
@@ -232,662 +79,221 @@ LOCATIONS
 ========================================================= */
 
 export const locationAPI = {
-  getLocations:
-    async () => {
-      const {
-        data,
-        error,
-      } =
-        await supabase
-          .from(
-            "locations"
-          )
-          .select("*")
-          .order(
-            "created_at",
-            {
-              ascending:
-                false,
-            }
-          );
+  getLocations: async () => {
+    const { data, error } =
+      await supabase
+        .from("locations")
+        .select("*")
+        .order("name");
 
-      if (error)
-        throw error;
+    if (error) throw error;
 
-      return data || [];
-    },
-
-  create:
-    async (
-      payload
-    ) => {
-      const {
-        data: authData,
-      } =
-        await supabase.auth.getUser();
-
-      const userId =
-        authData?.user?.id;
-
-      const {
-        data: profile,
-      } =
-        await supabase
-          .from("users")
-          .select(
-            "company_id"
-          )
-          .eq("id", userId)
-          .single();
-
-      const {
-        data,
-        error,
-      } =
-        await supabase
-          .from(
-            "locations"
-          )
-          .insert({
-            ...payload,
-            company_id:
-              profile.company_id,
-          })
-          .select()
-          .single();
-
-      if (error)
-        throw error;
-
-      return data;
-    },
-
-  update:
-    async (
-      id,
-      payload
-    ) => {
-      const {
-        data,
-        error,
-      } =
-        await supabase
-          .from(
-            "locations"
-          )
-          .update(payload)
-          .eq("id", id)
-          .select()
-          .single();
-
-      if (error)
-        throw error;
-
-      return data;
-    },
-
-  delete:
-    async (id) => {
-      const {
-        error,
-      } =
-        await supabase
-          .from(
-            "locations"
-          )
-          .delete()
-          .eq("id", id);
-
-      if (error)
-        throw error;
-
-      return true;
-    },
+    return data || [];
+  },
 };
 
 /* =========================================================
-TASKS
-========================================================= */
-
-export const taskAPI = {
-  getTasks:
-    async () => {
-      const {
-        data,
-        error,
-      } =
-        await supabase
-          .from("tasks")
-          .select("*")
-          .order(
-            "created_at",
-            {
-              ascending:
-                false,
-            }
-          );
-
-      if (error)
-        throw error;
-
-      return data || [];
-    },
-
-  create:
-    async (task) => {
-      const {
-        data,
-        error,
-      } =
-        await supabase
-          .from("tasks")
-          .insert(task)
-          .select();
-
-      if (error)
-        throw error;
-
-      return data;
-    },
-
-  complete:
-    async (id) => {
-      const {
-        error,
-      } =
-        await supabase
-          .from("tasks")
-          .update({
-            completed: true,
-          })
-          .eq("id", id);
-
-      if (error)
-        throw error;
-
-      return true;
-    },
-
-  delete:
-    async (id) => {
-      const {
-        error,
-      } =
-        await supabase
-          .from("tasks")
-          .delete()
-          .eq("id", id);
-
-      if (error)
-        throw error;
-
-      return true;
-    },
-};
-
-/* =========================================================
-SHIFTS
+SHIFTS / CLOCKING
 ========================================================= */
 
 export const shiftAPI = {
-  getActive:
-    async () => {
-      const {
-        data: authData,
-      } =
-        await supabase.auth.getUser();
+  getActive: async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-      const userId =
-        authData?.user?.id;
+    const { data, error } =
+      await supabase
+        .from("shifts")
+        .select("*")
+        .eq("user_id", user.id)
+        .is("clock_out_time", null)
+        .maybeSingle();
 
-      if (!userId)
-        return null;
+    if (error) throw error;
 
-      const {
-        data,
-        error,
-      } =
-        await supabase
-          .from("shifts")
-          .select("*")
-          .eq(
-            "user_id",
-            userId
-          )
-          .is(
-            "clock_out_time",
-            null
-          )
-          .order(
-            "clock_in_time",
-            {
-              ascending:
-                false,
-            }
-          )
-          .maybeSingle();
+    return data;
+  },
 
-      if (error)
-        throw error;
+  getHistory: async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-      return data || null;
-    },
+    const { data, error } =
+      await supabase
+        .from("shifts")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("clock_in_time", {
+          ascending: false,
+        });
 
-  getAllActive:
-    async () => {
-      const {
-        data,
-        error,
-      } =
-        await supabase
-          .from("shifts")
-          .select("*")
-          .is(
-            "clock_out_time",
-            null
-          );
+    if (error) throw error;
 
-      if (error)
-        throw error;
+    return data || [];
+  },
 
-      return data || [];
-    },
+  clockIn: async ({
+    location_id,
+    latitude,
+    longitude,
+  }) => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  clockIn:
-    async ({
-      location_id,
-      latitude,
-      longitude,
-    }) => {
-      const {
-        data: authData,
-      } =
-        await supabase.auth.getUser();
+    const { data, error } =
+      await supabase
+        .from("shifts")
+        .insert({
+          user_id: user.id,
+          location_id,
+          latitude,
+          longitude,
+          clock_in_time:
+            new Date().toISOString(),
+          total_break_seconds: 0,
+        })
+        .select()
+        .single();
 
-      const userId =
-        authData?.user?.id;
+    if (error) throw error;
 
-      const {
-        data: profile,
-      } =
-        await supabase
-          .from("users")
-          .select(
-            "company_id"
-          )
-          .eq("id", userId)
-          .single();
+    return data;
+  },
 
-      const {
-        data,
-        error,
-      } =
-        await supabase
-          .from("shifts")
-          .insert({
-            user_id:
-              userId,
-            company_id:
-              profile.company_id,
-            location_id,
-            latitude,
-            longitude,
-            clock_in_time:
-              new Date().toISOString(),
-            break_started_at:
-              null,
-            total_break_seconds:
-              0,
-          })
-          .select()
-          .single();
+  clockOut: async () => {
+    const active =
+      await shiftAPI.getActive();
 
-      if (error)
-        throw error;
+    if (!active) return true;
 
-      return data;
-    },
+    const { error } =
+      await supabase
+        .from("shifts")
+        .update({
+          clock_out_time:
+            new Date().toISOString(),
+        })
+        .eq("id", active.id);
 
-  clockOut:
-    async () => {
-      const active =
-        await shiftAPI.getActive();
+    if (error) throw error;
 
-      if (!active)
-        return true;
+    return true;
+  },
 
-      const {
-        error,
-      } =
-        await supabase
-          .from("shifts")
-          .update({
-            clock_out_time:
-              new Date().toISOString(),
-          })
-          .eq(
-            "id",
-            active.id
-          );
+  startBreak: async () => {
+    const active =
+      await shiftAPI.getActive();
 
-      if (error)
-        throw error;
+    const { error } =
+      await supabase
+        .from("shifts")
+        .update({
+          break_started_at:
+            new Date().toISOString(),
+        })
+        .eq("id", active.id);
 
-      return true;
-    },
+    if (error) throw error;
+  },
 
-  startBreak:
-    async () => {
-      const active =
-        await shiftAPI.getActive();
+  endBreak: async () => {
+    const active =
+      await shiftAPI.getActive();
 
-      if (!active)
-        return true;
+    const started =
+      new Date(
+        active.break_started_at
+      ).getTime();
 
-      const {
-        error,
-      } =
-        await supabase
-          .from("shifts")
-          .update({
-            break_started_at:
-              new Date().toISOString(),
-          })
-          .eq(
-            "id",
-            active.id
-          );
+    const seconds = Math.floor(
+      (Date.now() - started) / 1000
+    );
 
-      if (error)
-        throw error;
+    const total =
+      (active.total_break_seconds || 0) +
+      seconds;
 
-      return true;
-    },
+    const { error } =
+      await supabase
+        .from("shifts")
+        .update({
+          break_started_at: null,
+          total_break_seconds: total,
+        })
+        .eq("id", active.id);
 
-  endBreak:
-    async () => {
-      const active =
-        await shiftAPI.getActive();
-
-      if (
-        !active ||
-        !active.break_started_at
-      )
-        return true;
-
-      const started =
-        new Date(
-          active.break_started_at
-        ).getTime();
-
-      const now =
-        Date.now();
-
-      const seconds =
-        Math.floor(
-          (now -
-            started) /
-            1000
-        );
-
-      const total =
-        (active.total_break_seconds ||
-          0) + seconds;
-
-      const {
-        error,
-      } =
-        await supabase
-          .from("shifts")
-          .update({
-            break_started_at:
-              null,
-            total_break_seconds:
-              total,
-          })
-          .eq(
-            "id",
-            active.id
-          );
-
-      if (error)
-        throw error;
-
-      return true;
-    },
-
-  updateLocation:
-    async ({
-      latitude,
-      longitude,
-    }) => {
-      const active =
-        await shiftAPI.getActive();
-
-      if (!active)
-        return true;
-
-      const {
-        error,
-      } =
-        await supabase
-          .from("shifts")
-          .update({
-            latitude,
-            longitude,
-          })
-          .eq(
-            "id",
-            active.id
-          );
-
-      if (error)
-        throw error;
-
-      return true;
-    },
-
-  getHistory:
-    async () => {
-      const {
-        data: authData,
-      } =
-        await supabase.auth.getUser();
-
-      const userId =
-        authData?.user?.id;
-
-      if (!userId)
-        return [];
-
-      const {
-        data,
-        error,
-      } =
-        await supabase
-          .from("shifts")
-          .select("*")
-          .eq(
-            "user_id",
-            userId
-          )
-          .order(
-            "clock_in_time",
-            {
-              ascending:
-                false,
-            }
-          );
-
-      if (error)
-        throw error;
-
-      return data || [];
-    },
+    if (error) throw error;
+  },
 };
 
 /* =========================================================
-REPORTS
-========================================================= */
-
-export const reportAPI = {
-  getSummary:
-    async () => {
-      const {
-        count:
-          totalUsers,
-      } =
-        await supabase
-          .from("users")
-          .select("*", {
-            count:
-              "exact",
-            head: true,
-          });
-
-      const {
-        count:
-          totalTasks,
-      } =
-        await supabase
-          .from("tasks")
-          .select("*", {
-            count:
-              "exact",
-            head: true,
-          });
-
-      const {
-        count:
-          activeUsers,
-      } =
-        await supabase
-          .from("shifts")
-          .select("*", {
-            count:
-              "exact",
-            head: true,
-          })
-          .is(
-            "clock_out_time",
-            null
-          );
-
-      return {
-        users:
-          totalUsers || 0,
-        tasks:
-          totalTasks || 0,
-        activeUsers:
-          activeUsers || 0,
-      };
-    },
-
-  getTimesheets:
-    async () => {
-      const {
-        data,
-        error,
-      } =
-        await supabase
-          .from("shifts")
-          .select(`
-            *,
-            users (
-              name,
-              email
-            ),
-            locations (
-              name
-            )
-          `)
-          .not(
-            "clock_out_time",
-            "is",
-            null
-          )
-          .order(
-            "clock_in_time",
-            {
-              ascending:
-                false,
-            }
-          );
-
-      if (error)
-        throw error;
-
-      return data || [];
-    },
-};
-
-/* =========================================================
-PLACEHOLDERS
+EMPLOYEE SCHEDULE
 ========================================================= */
 
 export const scheduleAPI = {
-  getAll: async () => [],
-  getMine: async () => [],
-  create: async () => true,
-  update: async () => true,
-  delete: async () => true,
-  getLate: async () => [],
-};
+  getMine: async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-export const announcementAPI = {
-  getAll: async () => [],
-  create: async () => true,
-  delete: async () => true,
-};
+    const { data, error } =
+      await supabase
+        .from("schedules")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("date");
 
-export const managerAPI = {
-  getDashboard:
-    async () => ({
-      totalUsers: 0,
-      tasks: 0,
-      liveUsers: 0,
-      late: 0,
-    }),
-};
+    if (error) throw error;
 
-export const holidayAPI = {
-  getAll: async () => [],
-  create: async () => true,
-  update: async () => true,
-  delete: async () => true,
-};
-
-export const performanceAPI = {
-  getAll: async () => [],
-};
-
-export const billingAPI = {
-  checkout:
-    async () => ({
-      success: true,
-    }),
-
-  portal:
-    async () => ({
-      success: true,
-    }),
+    return data || [];
+  },
 };
 
 /* =========================================================
-LOGOUT
+HOLIDAYS
 ========================================================= */
 
-export const logoutAPI =
-  async () => {
-    await supabase.auth.signOut();
+export const holidayAPI = {
+  getMine: async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-    localStorage.removeItem(
-      "token"
-    );
+    const { data, error } =
+      await supabase
+        .from("holiday_requests")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", {
+          ascending: false,
+        });
 
-    localStorage.removeItem(
-      "user"
-    );
-  };
+    if (error) throw error;
+
+    return data || [];
+  },
+
+  create: async (payload) => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const { error } =
+      await supabase
+        .from("holiday_requests")
+        .insert({
+          ...payload,
+          user_id: user.id,
+          status: "pending",
+        });
+
+    if (error) throw error;
+
+    return true;
+  },
+};
 
 export default supabase;
