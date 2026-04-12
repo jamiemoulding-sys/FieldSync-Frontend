@@ -740,6 +740,52 @@ export const announcementAPI = {
 };
 
 /* =========================================================
+MANAGER DASHBOARD
+========================================================= */
+
+export const managerAPI = {
+  getDashboard: async () => {
+    const { count: totalUsers, error: userError } =
+      await supabase
+        .from("users")
+        .select("*", {
+          count: "exact",
+          head: true,
+        });
+
+    if (userError) throw userError;
+
+    const { count: totalTasks, error: taskError } =
+      await supabase
+        .from("tasks")
+        .select("*", {
+          count: "exact",
+          head: true,
+        });
+
+    if (taskError) throw taskError;
+
+    const { count: activeShifts, error: shiftError } =
+      await supabase
+        .from("shifts")
+        .select("*", {
+          count: "exact",
+          head: true,
+        })
+        .is("clock_out_time", null);
+
+    if (shiftError) throw shiftError;
+
+    return {
+      totalUsers: totalUsers || 0,
+      tasks: totalTasks || 0,
+      liveUsers: activeShifts || 0,
+      late: 0,
+    };
+  },
+};
+
+/* =========================================================
    BILLING
 ========================================================= */
 
