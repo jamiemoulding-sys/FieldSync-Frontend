@@ -815,6 +815,68 @@ export const performanceAPI = {
 };
 
 /* =========================================================
+REPORTS
+========================================================= */
+
+export const reportAPI = {
+  getSummary: async () => {
+    const { count: totalUsers } =
+      await supabase
+        .from("users")
+        .select("*", {
+          count: "exact",
+          head: true,
+        });
+
+    const { count: totalTasks } =
+      await supabase
+        .from("tasks")
+        .select("*", {
+          count: "exact",
+          head: true,
+        });
+
+    const { count: activeShifts } =
+      await supabase
+        .from("shifts")
+        .select("*", {
+          count: "exact",
+          head: true,
+        })
+        .is("clock_out_time", null);
+
+    return {
+      users: totalUsers || 0,
+      tasks: totalTasks || 0,
+      activeUsers: activeShifts || 0,
+    };
+  },
+
+  getTimesheets: async () => {
+    const { data, error } =
+      await supabase
+        .from("shifts")
+        .select(`
+          *,
+          users (
+            name,
+            email
+          ),
+          locations (
+            name
+          )
+        `)
+        .order("clock_in_time", {
+          ascending: false,
+        });
+
+    if (error) throw error;
+
+    return data || [];
+  },
+};
+
+/* =========================================================
 BILLING
 ========================================================= */
 
