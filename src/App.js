@@ -26,7 +26,7 @@ import WorkSession from "./pages/WorkSession";
 
 /* EMPLOYEE */
 import MySchedule from "./pages/MySchedule";
-import MyHoliday from "./pages/MyHoliday";
+import MyHolidays from "./pages/MyHolidays";
 import MyLocations from "./pages/MyLocations";
 
 /* OTHER */
@@ -100,7 +100,7 @@ export default function App() {
 
           {/* EMPLOYEE */}
           <Route path="/my-schedule" element={<MySchedule />} />
-          <Route path="/my-holidays" element={<MyHoliday />} />
+          <Route path="/my-holidays" element={<MyHolidays />} />
           <Route path="/my-locations" element={<MyLocations />} />
 
           {/* MANAGEMENT */}
