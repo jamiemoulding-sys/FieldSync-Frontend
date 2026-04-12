@@ -134,7 +134,7 @@ export function useAuth() {
                 "id",
                 authUser.id
               )
-              .single();
+              .maybesingle();
 
           const finalUser =
             formatUser(
