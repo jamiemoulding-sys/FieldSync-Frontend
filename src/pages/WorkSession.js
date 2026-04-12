@@ -30,7 +30,6 @@ export default function WorkSession() {
   const [actionLoading, setActionLoading] =
     useState(false);
 
-  /* LOAD */
   useEffect(() => {
     loadData();
   }, []);
@@ -74,17 +73,19 @@ export default function WorkSession() {
         const start =
           new Date(
             activeShift.clock_in_time
-          );
+          ).getTime();
 
         const now =
-          new Date();
+          Date.now();
 
         const diff =
           Math.floor(
             (now - start) / 1000
           );
 
-        setTimer(diff);
+        setTimer(
+          diff > 0 ? diff : 0
+        );
       }, 1000);
     }
 
@@ -96,35 +97,19 @@ export default function WorkSession() {
   useEffect(() => {
     let interval;
 
-    if (activeShift) {
+    if (activeShift?.id) {
       interval = setInterval(() => {
         navigator.geolocation.getCurrentPosition(
           async (pos) => {
             try {
-              await fetch(
-                `${
-                  process.env
-                    .REACT_APP_API_URL
-                }/api/shifts/update-location`,
-                {
-                  method: "POST",
-                  headers: {
-                    "Content-Type":
-                      "application/json",
-                    Authorization: `Bearer ${localStorage.getItem(
-                      "token"
-                    )}`,
-                  },
-                  body: JSON.stringify({
-                    latitude:
-                      pos.coords
-                        .latitude,
-                    longitude:
-                      pos.coords
-                        .longitude,
-                  }),
-                }
-              );
+              await shiftAPI.updateLocation({
+                latitude:
+                  pos.coords
+                    .latitude,
+                longitude:
+                  pos.coords
+                    .longitude,
+              });
             } catch {}
           }
         );
@@ -138,9 +123,10 @@ export default function WorkSession() {
   /* CLOCK IN */
   const handleClockIn = () => {
     if (!selectedLocation) {
-      return alert(
+      alert(
         "Select a location"
       );
+      return;
     }
 
     setActionLoading(true);
@@ -148,7 +134,7 @@ export default function WorkSession() {
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         try {
-          const res =
+          const shift =
             await shiftAPI.clockIn({
               location_id:
                 selectedLocation,
@@ -161,7 +147,7 @@ export default function WorkSession() {
             });
 
           setActiveShift(
-            res?.shift || res
+            shift
           );
 
         } catch (err) {
@@ -179,6 +165,7 @@ export default function WorkSession() {
         alert(
           "Location denied"
         );
+
         setActionLoading(
           false
         );
@@ -240,10 +227,40 @@ export default function WorkSession() {
     )}`;
   };
 
+  const formatStarted = () => {
+    if (
+      !activeShift?.clock_in_time
+    )
+      return "";
+
+    const d = new Date(
+      activeShift.clock_in_time
+    );
+
+    if (
+      isNaN(
+        d.getTime()
+      )
+    ) {
+      return "";
+    }
+
+    return d.toLocaleTimeString(
+      [],
+      {
+        hour:
+          "2-digit",
+        minute:
+          "2-digit",
+      }
+    );
+  };
+
   if (loading) {
     return (
       <div className="text-gray-400">
-        Loading work session...
+        Loading work
+        session...
       </div>
     );
   }
@@ -251,25 +268,24 @@ export default function WorkSession() {
   return (
     <div className="space-y-6">
 
-      {/* HEADER */}
       <div>
         <h1 className="text-2xl font-semibold">
           Work Session
         </h1>
 
         <p className="text-sm text-gray-400">
-          Clock in, track time
-          and manage today’s
-          shift
+          Clock in and track
+          today's shift
         </p>
       </div>
 
-      {/* STATUS */}
       <div className="grid md:grid-cols-3 gap-4">
 
         <KPI
           icon={
-            <Clock3 size={16} />
+            <Clock3
+              size={16}
+            />
           }
           title="Status"
           value={
@@ -311,7 +327,6 @@ export default function WorkSession() {
 
       </div>
 
-      {/* ACTIVE */}
       {activeShift ? (
         <motion.div
           initial={{
@@ -327,7 +342,9 @@ export default function WorkSession() {
           <div className="bg-[#020617] border border-white/10 rounded-3xl p-8 text-center">
 
             <div className="w-20 h-20 rounded-full bg-green-500/15 text-green-400 mx-auto flex items-center justify-center">
-              <Clock3 size={34} />
+              <Clock3
+                size={34}
+              />
             </div>
 
             <p className="mt-5 text-sm text-green-400">
@@ -342,9 +359,7 @@ export default function WorkSession() {
 
             <p className="text-sm text-gray-400 mt-3">
               Started{" "}
-              {new Date(
-                activeShift.clock_in_time
-              ).toLocaleTimeString()}
+              {formatStarted()}
             </p>
 
             <button
@@ -467,8 +482,6 @@ export default function WorkSession() {
     </div>
   );
 }
-
-/* COMPONENTS */
 
 function KPI({
   icon,
