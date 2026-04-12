@@ -32,6 +32,7 @@ import {
   Crown,
   ShieldCheck,
   Rocket,
+  ClipboardList,
 } from "lucide-react";
 
 export default function AppLayout() {
@@ -96,6 +97,14 @@ export default function AppLayout() {
           icon: Clock,
           path:
             "/work-session",
+        },
+        {
+          label:
+            "Timesheet",
+          icon:
+            ClipboardList,
+          path:
+            "/timesheet",
         },
         {
           label:
@@ -316,13 +325,10 @@ export default function AppLayout() {
   const Sidebar = () => (
     <div className="h-full flex flex-col justify-between">
 
-      {/* TOP */}
       <div className="overflow-y-auto">
 
-        {/* LOGO */}
         <div className="px-5 pt-5 pb-6">
           <div className="rounded-2xl p-[1px] bg-gradient-to-r from-indigo-500/40 to-cyan-500/20">
-
             <div className="rounded-2xl bg-[#0b1120] px-4 py-4">
 
               <div className="flex items-center justify-between">
@@ -348,13 +354,10 @@ export default function AppLayout() {
               </div>
 
             </div>
-
           </div>
         </div>
 
-        {/* PLAN CARD */}
         <div className="px-4 pb-5">
-
           <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
 
             <div className="flex items-center justify-between">
@@ -414,12 +417,9 @@ export default function AppLayout() {
               )}
 
           </div>
-
         </div>
 
-        {/* MENU */}
         <div className="px-4 pb-6">
-
           {filteredMenu.map(
             (group) => (
               <div
@@ -500,11 +500,9 @@ export default function AppLayout() {
               </div>
             )
           )}
-
         </div>
       </div>
 
-      {/* FOOTER */}
       <div className="p-4 border-t border-white/5">
 
         <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
@@ -546,12 +544,10 @@ export default function AppLayout() {
   return (
     <div className="h-screen bg-[#020617] text-white flex overflow-hidden">
 
-      {/* DESKTOP */}
       <aside className="hidden lg:block w-80 border-r border-white/5 bg-[#030712]">
         <Sidebar />
       </aside>
 
-      {/* MOBILE */}
       <AnimatePresence>
         {mobileOpen && (
           <>
@@ -591,7 +587,6 @@ export default function AppLayout() {
         )}
       </AnimatePresence>
 
-      {/* MAIN */}
       <main className="flex-1 flex flex-col min-w-0">
 
         <header className="h-16 border-b border-white/5 px-4 md:px-6 flex items-center justify-between">

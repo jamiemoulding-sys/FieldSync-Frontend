@@ -157,10 +157,8 @@ export default function Dashboard() {
               )
             : []
         );
-      } catch {
-        console.log(
-          "dashboard fallback"
-        );
+      } catch (error) {
+        console.error(error);
       } finally {
         setLoading(false);
       }
@@ -247,7 +245,6 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      {/* TOP */}
       <div className="flex justify-between items-center flex-wrap gap-4">
         <div>
           <p className="text-sm text-gray-400">
@@ -264,13 +261,13 @@ export default function Dashboard() {
           <Calendar
             size={16}
           />
+
           {new Date().toLocaleDateString(
             "en-GB"
           )}
         </div>
       </div>
 
-      {/* STATS */}
       <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
         {cards.map(
           (
@@ -329,9 +326,7 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* LOWER GRID */}
       <div className="grid lg:grid-cols-3 gap-5">
-        {/* LIVE */}
         <div className="lg:col-span-2 rounded-3xl border border-white/10 bg-[#020617] p-6">
           <h2 className="text-lg font-semibold mb-5 flex items-center gap-2">
             <Timer
@@ -378,7 +373,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* NOTES */}
         <div className="rounded-3xl border border-white/10 bg-[#020617] p-6">
           <h2 className="text-lg font-semibold mb-5 flex items-center gap-2">
             <Megaphone

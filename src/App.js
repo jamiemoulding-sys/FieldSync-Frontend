@@ -21,6 +21,7 @@ import Schedule from "./pages/Schedule";
 import ScheduleCalendar from "./pages/ScheduleCalendar";
 import HolidayRequests from "./pages/HolidayRequests";
 import Announcements from "./pages/Announcements";
+import TimeSheet from "./pages/TimeSheet";
 
 /* 📊 BUSINESS */
 import Performance from "./pages/Performance";
@@ -129,7 +130,6 @@ function App() {
           element={<Login />}
         />
 
-        {/* INVITES */}
         <Route
           path="/set-password"
           element={
@@ -137,7 +137,6 @@ function App() {
           }
         />
 
-        {/* RESET PASSWORD */}
         <Route
           path="/reset-password"
           element={
@@ -185,6 +184,13 @@ function App() {
             path="/work-session"
             element={
               <WorkSession />
+            }
+          />
+
+          <Route
+            path="/timesheet"
+            element={
+              <TimeSheet />
             }
           />
 
@@ -273,7 +279,6 @@ function App() {
             }
           />
 
-          {/* BILLING */}
           <Route
             path="/billing"
             element={

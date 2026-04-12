@@ -532,14 +532,10 @@ export const shiftAPI = {
             location_id,
             latitude,
             longitude,
-
-            /* timezone fixed */
             clock_in_time:
               new Date().toISOString(),
-
             break_started_at:
               null,
-
             total_break_seconds:
               0,
           })
@@ -731,47 +727,118 @@ export const shiftAPI = {
 };
 
 /* =========================================================
-SCHEDULE
+REPORTS
+========================================================= */
+
+export const reportAPI = {
+  getSummary:
+    async () => {
+      const {
+        count:
+          totalUsers,
+      } =
+        await supabase
+          .from("users")
+          .select("*", {
+            count:
+              "exact",
+            head: true,
+          });
+
+      const {
+        count:
+          totalTasks,
+      } =
+        await supabase
+          .from("tasks")
+          .select("*", {
+            count:
+              "exact",
+            head: true,
+          });
+
+      const {
+        count:
+          activeUsers,
+      } =
+        await supabase
+          .from("shifts")
+          .select("*", {
+            count:
+              "exact",
+            head: true,
+          })
+          .is(
+            "clock_out_time",
+            null
+          );
+
+      return {
+        users:
+          totalUsers || 0,
+        tasks:
+          totalTasks || 0,
+        activeUsers:
+          activeUsers || 0,
+      };
+    },
+
+  getTimesheets:
+    async () => {
+      const {
+        data,
+        error,
+      } =
+        await supabase
+          .from("shifts")
+          .select(`
+            *,
+            users (
+              name,
+              email
+            ),
+            locations (
+              name
+            )
+          `)
+          .not(
+            "clock_out_time",
+            "is",
+            null
+          )
+          .order(
+            "clock_in_time",
+            {
+              ascending:
+                false,
+            }
+          );
+
+      if (error)
+        throw error;
+
+      return data || [];
+    },
+};
+
+/* =========================================================
+PLACEHOLDERS
 ========================================================= */
 
 export const scheduleAPI = {
-  getAll:
-    async () => [],
-
-  getMine:
-    async () => [],
-
-  create:
-    async () => true,
-
-  update:
-    async () => true,
-
-  delete:
-    async () => true,
-
-  getLate:
-    async () => [],
+  getAll: async () => [],
+  getMine: async () => [],
+  create: async () => true,
+  update: async () => true,
+  delete: async () => true,
+  getLate: async () => [],
 };
-
-/* =========================================================
-ANNOUNCEMENTS
-========================================================= */
 
 export const announcementAPI = {
-  getAll:
-    async () => [],
-
-  create:
-    async () => true,
-
-  delete:
-    async () => true,
+  getAll: async () => [],
+  create: async () => true,
+  delete: async () => true,
 };
-
-/* =========================================================
-MANAGER DASHBOARD
-========================================================= */
 
 export const managerAPI = {
   getDashboard:
@@ -783,52 +850,16 @@ export const managerAPI = {
     }),
 };
 
-/* =========================================================
-HOLIDAYS
-========================================================= */
-
 export const holidayAPI = {
-  getAll:
-    async () => [],
-
-  create:
-    async () => true,
-
-  update:
-    async () => true,
-
-  delete:
-    async () => true,
+  getAll: async () => [],
+  create: async () => true,
+  update: async () => true,
+  delete: async () => true,
 };
-
-/* =========================================================
-PERFORMANCE
-========================================================= */
 
 export const performanceAPI = {
-  getAll:
-    async () => [],
+  getAll: async () => [],
 };
-
-/* =========================================================
-REPORTS
-========================================================= */
-
-export const reportAPI = {
-  getSummary:
-    async () => ({
-      users: 0,
-      tasks: 0,
-      activeUsers: 0,
-    }),
-
-  getTimesheets:
-    async () => [],
-};
-
-/* =========================================================
-BILLING
-========================================================= */
 
 export const billingAPI = {
   checkout:
