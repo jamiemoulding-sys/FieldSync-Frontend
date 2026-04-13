@@ -4,12 +4,9 @@ import {
   useEffect,
 } from "react";
 
-import {
-  createClient,
-} from "@supabase/supabase-js";
-
 import { useAuth } from "../hooks/useAuth";
 import { motion } from "framer-motion";
+import supabase from "../lib/supabase";
 
 import {
   User,
@@ -25,11 +22,6 @@ import {
   Camera,
   Clock3,
 } from "lucide-react";
-
-const supabase = createClient(
-  process.env.REACT_APP_SUPABASE_URL,
-  process.env.REACT_APP_SUPABASE_ANON_KEY
-);
 
 export default function Profile() {
   const {
@@ -60,8 +52,9 @@ export default function Profile() {
     useState("");
 
   /* =====================================
-     LOAD LIVE PROFILE
+     LOAD PROFILE
   ===================================== */
+
   useEffect(() => {
     const loadProfile =
       async () => {
@@ -92,17 +85,13 @@ export default function Profile() {
             error,
           } =
             await supabase
-              .from(
-                "users"
-              )
-              .select(
-                `
+              .from("users")
+              .select(`
                 name,
                 phone,
                 job_title,
                 company_id
-              `
-              )
+              `)
               .eq(
                 "id",
                 authUser.id
@@ -110,7 +99,7 @@ export default function Profile() {
               .single();
 
           if (error)
-            return;
+            throw error;
 
           setName(
             data?.name || ""
@@ -121,8 +110,7 @@ export default function Profile() {
           );
 
           setJobTitle(
-            data?.job_title ||
-              ""
+            data?.job_title || ""
           );
 
           if (
@@ -136,9 +124,7 @@ export default function Profile() {
                 .from(
                   "companies"
                 )
-                .select(
-                  "name"
-                )
+                .select("name")
                 .eq(
                   "id",
                   data.company_id
@@ -150,21 +136,11 @@ export default function Profile() {
                 ""
             );
           }
-
-          updateUser({
-            ...user,
-            name:
-              data?.name ||
-              "",
-            phone:
-              data?.phone ||
-              "",
-            jobTitle:
-              data?.job_title ||
-              "",
-          });
-
-        } catch {}
+        } catch (err) {
+          console.error(
+            err
+          );
+        }
       };
 
     loadProfile();
@@ -173,6 +149,7 @@ export default function Profile() {
   /* =====================================
      SAVE PROFILE
   ===================================== */
+
   const saveProfile =
     async () => {
       try {
@@ -197,9 +174,7 @@ export default function Profile() {
           error,
         } =
           await supabase
-            .from(
-              "users"
-            )
+            .from("users")
             .update({
               name,
               phone,
@@ -231,25 +206,21 @@ export default function Profile() {
             );
         }
 
-        updateUser({
-          ...user,
+        await updateUser({
           name,
           phone,
-          companyName:
-            company,
-          jobTitle,
+          job_title:
+            jobTitle,
         });
 
         setSuccess(
           "Profile updated successfully"
         );
-
       } catch (err) {
         alert(
           err.message ||
             "Failed to save profile"
         );
-
       } finally {
         setSaving(false);
       }

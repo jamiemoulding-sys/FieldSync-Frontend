@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { createClient } from "@supabase/supabase-js";
+import supabase from "../lib/supabase";
 
 import {
   Mail,
@@ -11,11 +11,6 @@ import {
   Loader2,
   ShieldCheck,
 } from "lucide-react";
-
-const supabase = createClient(
-  process.env.REACT_APP_SUPABASE_URL,
-  process.env.REACT_APP_SUPABASE_ANON_KEY
-);
 
 export default function Login() {
   const { login } = useAuth();
@@ -38,6 +33,7 @@ export default function Login() {
   /* =====================================
      LOGIN
   ===================================== */
+
   const handleLogin = async (e) => {
     e.preventDefault();
 
@@ -56,21 +52,20 @@ export default function Login() {
         email.trim(),
         password
       );
-
     } catch (err) {
       setError(
         err.message ||
           "Invalid login details"
       );
-
     } finally {
       setLoading(false);
     }
   };
 
   /* =====================================
-     FORGOT PASSWORD
+     RESET PASSWORD
   ===================================== */
+
   const handleForgotPassword =
     async () => {
       try {
@@ -98,13 +93,11 @@ export default function Login() {
         alert(
           "Password reset email sent"
         );
-
       } catch (err) {
         setError(
           err.message ||
             "Could not send reset email"
         );
-
       } finally {
         setResetLoading(false);
       }
@@ -113,7 +106,7 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-[#020617] text-white flex items-center justify-center px-6 relative overflow-hidden">
 
-      {/* BACKGROUND */}
+      {/* BG */}
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/20 via-transparent to-cyan-500/10" />
 
       <motion.div
@@ -201,7 +194,7 @@ export default function Login() {
               />
             </div>
 
-            {/* FORGOT */}
+            {/* RESET */}
             <div className="text-right">
               <button
                 type="button"

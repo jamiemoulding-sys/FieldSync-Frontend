@@ -1,6 +1,7 @@
 /* =========================================================
    src/hooks/useAuth.js
-   FULL FIX — maybeSingle typo fixed
+   FULL PERMANENT FIX
+   Uses shared Supabase client only
 ========================================================= */
 
 import {
@@ -13,14 +14,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 
-import {
-  createClient,
-} from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.REACT_APP_SUPABASE_URL,
-  process.env.REACT_APP_SUPABASE_ANON_KEY
-);
+import supabase from "../lib/supabase";
 
 export function useAuth() {
   const navigate =
@@ -31,6 +25,10 @@ export function useAuth() {
 
   const [loading, setLoading] =
     useState(true);
+
+  /* =====================================
+     FORMAT USER
+  ===================================== */
 
   const formatUser = (
     authUser,
@@ -56,6 +54,10 @@ export function useAuth() {
         "employee",
 
       companyId:
+        profile.company_id ||
+        null,
+
+      company_id:
         profile.company_id ||
         null,
 
@@ -85,6 +87,10 @@ export function useAuth() {
     };
   };
 
+  /* =====================================
+     LOAD USER
+  ===================================== */
+
   const loadUser =
     useCallback(
       async () => {
@@ -110,6 +116,7 @@ export function useAuth() {
 
           const {
             data: profile,
+            error,
           } =
             await supabase
               .from("users")
@@ -120,6 +127,13 @@ export function useAuth() {
               )
               .maybeSingle();
 
+          if (error) {
+            console.error(
+              "PROFILE ERROR:",
+              error
+            );
+          }
+
           const finalUser =
             formatUser(
               authUser,
@@ -129,7 +143,6 @@ export function useAuth() {
           setUser(
             finalUser
           );
-
         } catch (err) {
           console.error(
             "AUTH LOAD ERROR:",
@@ -137,13 +150,16 @@ export function useAuth() {
           );
 
           setUser(null);
-
         } finally {
           setLoading(false);
         }
       },
       []
     );
+
+  /* =====================================
+     AUTH LISTENER
+  ===================================== */
 
   useEffect(() => {
     loadUser();
@@ -181,6 +197,10 @@ export function useAuth() {
     };
   }, [loadUser]);
 
+  /* =====================================
+     LOGIN
+  ===================================== */
+
   const login =
     async (
       email,
@@ -205,6 +225,10 @@ export function useAuth() {
         "/dashboard"
       );
     };
+
+  /* =====================================
+     SIGNUP
+  ===================================== */
 
   const signup =
     async ({
@@ -235,6 +259,10 @@ export function useAuth() {
       );
     };
 
+  /* =====================================
+     LOGOUT
+  ===================================== */
+
   const logout =
     async () => {
       await supabase.auth.signOut();
@@ -245,6 +273,10 @@ export function useAuth() {
         "/login"
       );
     };
+
+  /* =====================================
+     UPDATE USER
+  ===================================== */
 
   const updateUser =
     async (

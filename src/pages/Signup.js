@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { createClient } from "@supabase/supabase-js";
 import { motion } from "framer-motion";
+import supabase from "../lib/supabase";
 
 import {
   Mail,
@@ -12,21 +12,15 @@ import {
   Sparkles,
 } from "lucide-react";
 
-const supabase = createClient(
-  process.env.REACT_APP_SUPABASE_URL,
-  process.env.REACT_APP_SUPABASE_ANON_KEY
-);
-
 export default function Signup() {
   const navigate = useNavigate();
 
-  const [form, setForm] =
-    useState({
-      email: "",
-      password: "",
-      confirmPassword: "",
-      companyName: "",
-    });
+  const [form, setForm] = useState({
+    email: "",
+    password: "",
+    confirmPassword: "",
+    companyName: "",
+  });
 
   const [loading, setLoading] =
     useState(false);
@@ -43,13 +37,24 @@ export default function Signup() {
   };
 
   /* =====================================
-     SIGNUP
+     FULL SIGNUP FIX
   ===================================== */
   const handleSignup =
     async (e) => {
       e.preventDefault();
 
       setError("");
+
+      if (
+        !form.email ||
+        !form.password ||
+        !form.confirmPassword ||
+        !form.companyName
+      ) {
+        return setError(
+          "Please fill all fields"
+        );
+      }
 
       if (
         form.password.length < 6
@@ -68,34 +73,34 @@ export default function Signup() {
         );
       }
 
-      if (
-        !form.companyName.trim()
-      ) {
-        return setError(
-          "Company name required"
-        );
-      }
-
       try {
         setLoading(true);
 
-        /* CREATE AUTH ACCOUNT */
+        /* CREATE AUTH USER */
         const {
           data,
           error,
         } =
-          await supabase.auth.signUp({
-            email:
-              form.email.trim(),
-            password:
-              form.password,
-          });
+          await supabase.auth.signUp(
+            {
+              email:
+                form.email.trim(),
+              password:
+                form.password,
+              options: {
+                data: {
+                  company_name:
+                    form.companyName.trim(),
+                },
+              },
+            }
+          );
 
         if (error)
           throw error;
 
         const authUser =
-          data.user;
+          data?.user;
 
         if (!authUser) {
           throw new Error(
@@ -110,16 +115,13 @@ export default function Signup() {
             companyError,
         } =
           await supabase
-            .from(
-              "companies"
-            )
+            .from("companies")
             .insert({
               name:
                 form.companyName.trim(),
               owner_id:
                 authUser.id,
-              is_pro:
-                false,
+              is_pro: false,
               current_plan:
                 "free",
               subscription_status:
@@ -128,9 +130,7 @@ export default function Signup() {
             .select()
             .single();
 
-        if (
-          companyError
-        )
+        if (companyError)
           throw companyError;
 
         /* CREATE USER PROFILE */
@@ -139,44 +139,36 @@ export default function Signup() {
             profileError,
         } =
           await supabase
-            .from(
-              "users"
-            )
+            .from("users")
             .insert({
               id: authUser.id,
               email:
                 authUser.email,
-              name: "Owner",
-              phone: "",
+              name:
+                form.companyName.trim(),
               role: "admin",
+              phone: "",
+              job_title:
+                "Owner",
               company_id:
                 company.id,
               company_name:
                 company.name,
-              job_title:
-                "",
-              is_pro:
-                false,
+              is_pro: false,
               current_plan:
                 "free",
               subscription_status:
                 "free",
-              last_sign_in:
-                new Date(),
             });
 
-        if (
-          profileError
-        )
+        if (profileError)
           throw profileError;
 
         alert(
           "Workspace created successfully"
         );
 
-        navigate(
-          "/login"
-        );
+        navigate("/login");
 
       } catch (err) {
         setError(
@@ -192,7 +184,6 @@ export default function Signup() {
   return (
     <div className="min-h-screen bg-[#020617] text-white flex items-center justify-center px-6 relative overflow-hidden">
 
-      {/* BG */}
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/20 via-transparent to-cyan-500/10" />
 
       <motion.div
@@ -208,7 +199,6 @@ export default function Signup() {
       >
         <div className="bg-[#020617]/95 backdrop-blur-xl border border-white/10 rounded-3xl p-8">
 
-          {/* HEADER */}
           <div className="text-center mb-8">
 
             <div className="w-16 h-16 rounded-2xl bg-indigo-600/20 text-indigo-400 flex items-center justify-center mx-auto mb-5">
@@ -225,14 +215,12 @@ export default function Signup() {
 
           </div>
 
-          {/* ERROR */}
           {error && (
             <div className="mb-5 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-300 px-4 py-3 text-sm">
               {error}
             </div>
           )}
 
-          {/* FORM */}
           <form
             onSubmit={
               handleSignup
@@ -323,7 +311,6 @@ export default function Signup() {
 
           </form>
 
-          {/* FOOTER */}
           <div className="mt-6 text-center text-sm text-gray-400">
 
             Already have an account?{" "}

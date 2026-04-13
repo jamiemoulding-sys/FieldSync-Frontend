@@ -1,34 +1,38 @@
 // src/services/api.js
 
 import axios from "axios";
-import { createClient } from "@supabase/supabase-js";
+import supabase from "../lib/supabase";
 
 /* ==================================================
 AXIOS CLIENT
 ================================================== */
 
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || "",
-  withCredentials: true,
-});
-
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-
-  return config;
+  baseURL:
+    process.env.REACT_APP_API_URL || "",
+  withCredentials: false,
 });
 
 /* ==================================================
-SUPABASE
+LIVE TOKEN FIX
+(no stale localStorage token)
 ================================================== */
 
-const supabase = createClient(
-  process.env.REACT_APP_SUPABASE_URL,
-  process.env.REACT_APP_SUPABASE_ANON_KEY
+api.interceptors.request.use(
+  async (config) => {
+    const {
+      data: { session },
+    } =
+      await supabase.auth.getSession();
+
+    if (
+      session?.access_token
+    ) {
+      config.headers.Authorization = `Bearer ${session.access_token}`;
+    }
+
+    return config;
+  }
 );
 
 /* ==================================================
@@ -36,38 +40,49 @@ AUTH
 ================================================== */
 
 export const authAPI = {
-  login: async ({ email, password }) => {
-    const { data, error } =
-      await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+  login: async ({
+    email,
+    password,
+  }) => {
+    const {
+      data,
+      error,
+    } =
+      await supabase.auth.signInWithPassword(
+        {
+          email,
+          password,
+        }
+      );
 
     if (error) throw error;
 
-    localStorage.setItem(
-      "token",
-      data.session.access_token
-    );
-
-    const { data: profile } =
+    const {
+      data: profile,
+    } =
       await supabase
         .from("users")
         .select("*")
-        .eq("id", data.user.id)
-        .single();
+        .eq(
+          "id",
+          data.user.id
+        )
+        .maybeSingle();
 
     return {
-      token: data.session.access_token,
+      token:
+        data.session
+          .access_token,
+
       user: {
         ...profile,
-        email: data.user.email,
+        email:
+          data.user.email,
       },
     };
   },
 
   logout: async () => {
-    localStorage.removeItem("token");
     await supabase.auth.signOut();
     return true;
   },
@@ -75,15 +90,19 @@ export const authAPI = {
   me: async () => {
     const {
       data: { user },
-    } = await supabase.auth.getUser();
+    } =
+      await supabase.auth.getUser();
 
     if (!user) return null;
 
-    const { data } = await supabase
-      .from("users")
-      .select("*")
-      .eq("id", user.id)
-      .single();
+    const {
+      data,
+    } =
+      await supabase
+        .from("users")
+        .select("*")
+        .eq("id", user.id)
+        .maybeSingle();
 
     return {
       ...data,
@@ -98,7 +117,10 @@ USERS
 
 export const userAPI = {
   getAll: async () => {
-    const { data, error } =
+    const {
+      data,
+      error,
+    } =
       await supabase
         .from("users")
         .select("*")
@@ -110,19 +132,25 @@ export const userAPI = {
   },
 
   getById: async (id) => {
-    const { data, error } =
+    const {
+      data,
+      error,
+    } =
       await supabase
         .from("users")
         .select("*")
         .eq("id", id)
-        .single();
+        .maybeSingle();
 
     if (error) throw error;
 
     return data;
   },
 
-  update: async (id, payload) => {
+  update: async (
+    id,
+    payload
+  ) => {
     const { error } =
       await supabase
         .from("users")
@@ -134,7 +162,10 @@ export const userAPI = {
     return true;
   },
 
-  updateRole: async (id, payload) => {
+  updateRole: async (
+    id,
+    payload
+  ) => {
     const { error } =
       await supabase
         .from("users")
@@ -165,23 +196,36 @@ ANNOUNCEMENTS
 
 export const announcementAPI = {
   getAll: async () => {
-    const { data, error } =
+    const {
+      data,
+      error,
+    } =
       await supabase
-        .from("announcements")
+        .from(
+          "announcements"
+        )
         .select("*")
-        .order("created_at", {
-          ascending: false,
-        });
+        .order(
+          "created_at",
+          {
+            ascending:
+              false,
+          }
+        );
 
     if (error) throw error;
 
     return data || [];
   },
 
-  create: async (payload) => {
+  create: async (
+    payload
+  ) => {
     const { error } =
       await supabase
-        .from("announcements")
+        .from(
+          "announcements"
+        )
         .insert(payload);
 
     if (error) throw error;
@@ -192,7 +236,9 @@ export const announcementAPI = {
   delete: async (id) => {
     const { error } =
       await supabase
-        .from("announcements")
+        .from(
+          "announcements"
+        )
         .delete()
         .eq("id", id);
 
@@ -208,7 +254,10 @@ LOCATIONS
 
 export const locationAPI = {
   getAll: async () => {
-    const { data, error } =
+    const {
+      data,
+      error,
+    } =
       await supabase
         .from("locations")
         .select("*")
@@ -219,19 +268,30 @@ export const locationAPI = {
     return data || [];
   },
 
-  getLocations: async () => {
-    const { data, error } =
-      await supabase
-        .from("locations")
-        .select("*")
-        .order("name");
+  getLocations:
+    async () => {
+      const {
+        data,
+        error,
+      } =
+        await supabase
+          .from(
+            "locations"
+          )
+          .select("*")
+          .order(
+            "name"
+          );
 
-    if (error) throw error;
+      if (error)
+        throw error;
 
-    return data || [];
-  },
+      return data || [];
+    },
 
-  create: async (payload) => {
+  create: async (
+    payload
+  ) => {
     const { error } =
       await supabase
         .from("locations")
@@ -242,7 +302,10 @@ export const locationAPI = {
     return true;
   },
 
-  update: async (id, payload) => {
+  update: async (
+    id,
+    payload
+  ) => {
     const { error } =
       await supabase
         .from("locations")
@@ -275,16 +338,26 @@ export const shiftAPI = {
   getActive: async () => {
     const {
       data: { user },
-    } = await supabase.auth.getUser();
+    } =
+      await supabase.auth.getUser();
 
     if (!user) return null;
 
-    const { data, error } =
+    const {
+      data,
+      error,
+    } =
       await supabase
         .from("shifts")
         .select("*")
-        .eq("user_id", user.id)
-        .is("clock_out_time", null)
+        .eq(
+          "user_id",
+          user.id
+        )
+        .is(
+          "clock_out_time",
+          null
+        )
         .maybeSingle();
 
     if (error) throw error;
@@ -293,52 +366,80 @@ export const shiftAPI = {
   },
 
   getAll: async () => {
-    const { data, error } =
+    const {
+      data,
+      error,
+    } =
       await supabase
         .from("shifts")
         .select("*")
-        .order("clock_in_time", {
-          ascending: false,
-        });
+        .order(
+          "clock_in_time",
+          {
+            ascending:
+              false,
+          }
+        );
 
     if (error) throw error;
 
     return data || [];
   },
 
-  getHistory: async () => {
+  getHistory:
+    async () => {
+      const {
+        data: { user },
+      } =
+        await supabase.auth.getUser();
+
+      if (!user)
+        return [];
+
+      const {
+        data,
+        error,
+      } =
+        await supabase
+          .from("shifts")
+          .select("*")
+          .eq(
+            "user_id",
+            user.id
+          )
+          .order(
+            "clock_in_time",
+            {
+              ascending:
+                false,
+            }
+          );
+
+      if (error)
+        throw error;
+
+      return data || [];
+    },
+
+  clockIn: async (
+    payload = {}
+  ) => {
     const {
       data: { user },
-    } = await supabase.auth.getUser();
+    } =
+      await supabase.auth.getUser();
 
-    if (!user) return [];
-
-    const { data, error } =
-      await supabase
-        .from("shifts")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("clock_in_time", {
-          ascending: false,
-        });
-
-    if (error) throw error;
-
-    return data || [];
-  },
-
-  clockIn: async (payload = {}) => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) throw new Error("No user");
+    if (!user)
+      throw new Error(
+        "No user"
+      );
 
     const { error } =
       await supabase
         .from("shifts")
         .insert({
-          user_id: user.id,
+          user_id:
+            user.id,
           ...payload,
           clock_in_time:
             new Date().toISOString(),
@@ -350,84 +451,33 @@ export const shiftAPI = {
     return true;
   },
 
-  clockOut: async () => {
-    const active =
-      await shiftAPI.getActive();
+  clockOut:
+    async () => {
+      const active =
+        await shiftAPI.getActive();
 
-    if (!active) return true;
+      if (!active)
+        return true;
 
-    const { error } =
-      await supabase
-        .from("shifts")
-        .update({
-          clock_out_time:
-            new Date().toISOString(),
-          break_started_at: null,
-        })
-        .eq("id", active.id);
+      const { error } =
+        await supabase
+          .from("shifts")
+          .update({
+            clock_out_time:
+              new Date().toISOString(),
+            break_started_at:
+              null,
+          })
+          .eq(
+            "id",
+            active.id
+          );
 
-    if (error) throw error;
+      if (error)
+        throw error;
 
-    return true;
-  },
-
-  startBreak: async () => {
-    const active =
-      await shiftAPI.getActive();
-
-    if (!active) return true;
-
-    const { error } =
-      await supabase
-        .from("shifts")
-        .update({
-          break_started_at:
-            new Date().toISOString(),
-        })
-        .eq("id", active.id);
-
-    if (error) throw error;
-
-    return true;
-  },
-
-  endBreak: async () => {
-    const active =
-      await shiftAPI.getActive();
-
-    if (
-      !active ||
-      !active.break_started_at
-    )
       return true;
-
-    const started =
-      new Date(
-        active.break_started_at
-      ).getTime();
-
-    const seconds = Math.floor(
-      (Date.now() - started) / 1000
-    );
-
-    const total =
-      (active.total_break_seconds ||
-        0) + seconds;
-
-    const { error } =
-      await supabase
-        .from("shifts")
-        .update({
-          break_started_at: null,
-          total_break_seconds:
-            total,
-        })
-        .eq("id", active.id);
-
-    if (error) throw error;
-
-    return true;
-  },
+    },
 };
 
 /* ==================================================
@@ -435,17 +485,23 @@ INVITES
 ================================================== */
 
 export const inviteAPI = {
-  send: async ({ email, role }) => {
+  send: async ({
+    email,
+    role,
+  }) => {
     const { error } =
-      await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          data: {
-            role:
-              role || "employee",
+      await supabase.auth.signInWithOtp(
+        {
+          email,
+          options: {
+            data: {
+              role:
+                role ||
+                "employee",
+            },
           },
-        },
-      });
+        }
+      );
 
     if (error) throw error;
 
@@ -459,38 +515,57 @@ TASKS
 
 export const taskAPI = {
   getAll: async () => {
-    const { data, error } =
-      await supabase
-        .from("tasks")
-        .select("*")
-        .order("created_at", {
-          ascending: false,
-        });
-
-    if (error) throw error;
-
-    return data || [];
-  },
-
-  getMine: async () => {
     const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) return [];
-
-    const { data, error } =
+      data,
+      error,
+    } =
       await supabase
         .from("tasks")
         .select("*")
-        .eq("user_id", user.id);
+        .order(
+          "created_at",
+          {
+            ascending:
+              false,
+          }
+        );
 
     if (error) throw error;
 
     return data || [];
   },
 
-  create: async (payload) => {
+  getMine:
+    async () => {
+      const {
+        data: { user },
+      } =
+        await supabase.auth.getUser();
+
+      if (!user)
+        return [];
+
+      const {
+        data,
+        error,
+      } =
+        await supabase
+          .from("tasks")
+          .select("*")
+          .eq(
+            "user_id",
+            user.id
+          );
+
+      if (error)
+        throw error;
+
+      return data || [];
+    },
+
+  create: async (
+    payload
+  ) => {
     const { error } =
       await supabase
         .from("tasks")
@@ -501,7 +576,10 @@ export const taskAPI = {
     return true;
   },
 
-  update: async (id, payload) => {
+  update: async (
+    id,
+    payload
+  ) => {
     const { error } =
       await supabase
         .from("tasks")
@@ -527,54 +605,83 @@ export const taskAPI = {
 };
 
 /* ==================================================
-HOLIDAYS
+HOLIDAYS FIXED
+(real table = holidays)
 ================================================== */
 
 export const holidayAPI = {
   getAll: async () => {
-    const { data, error } =
+    const {
+      data,
+      error,
+    } =
       await supabase
-        .from("holiday_requests")
-        .select("*, users(name)")
-        .order("created_at", {
-          ascending: false,
-        });
+        .from("holidays")
+        .select(
+          "*, users(name)"
+        )
+        .order(
+          "created_at",
+          {
+            ascending:
+              false,
+          }
+        );
 
     if (error) throw error;
 
     return (
       data?.map((x) => ({
         ...x,
-        name: x.users?.name,
+        name:
+          x.users?.name,
       })) || []
     );
   },
 
-  getMine: async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+  getMine:
+    async () => {
+      const {
+        data: { user },
+      } =
+        await supabase.auth.getUser();
 
-    if (!user) return [];
+      if (!user)
+        return [];
 
-    const { data, error } =
-      await supabase
-        .from("holiday_requests")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", {
-          ascending: false,
-        });
+      const {
+        data,
+        error,
+      } =
+        await supabase
+          .from(
+            "holidays"
+          )
+          .select("*")
+          .eq(
+            "user_id",
+            user.id
+          )
+          .order(
+            "created_at",
+            {
+              ascending:
+                false,
+            }
+          );
 
-    if (error) throw error;
+      if (error)
+        throw error;
 
-    return data || [];
-  },
+      return data || [];
+    },
 
-  create: async (payload) => {
+  create: async (
+    payload
+  ) => {
     const { error } =
       await supabase
-        .from("holiday_requests")
+        .from("holidays")
         .insert(payload);
 
     if (error) throw error;
@@ -582,10 +689,13 @@ export const holidayAPI = {
     return true;
   },
 
-  update: async (id, payload) => {
+  update: async (
+    id,
+    payload
+  ) => {
     const { error } =
       await supabase
-        .from("holiday_requests")
+        .from("holidays")
         .update(payload)
         .eq("id", id);
 
@@ -593,142 +703,6 @@ export const holidayAPI = {
 
     return true;
   },
-};
-
-/* ==================================================
-SCHEDULE
-================================================== */
-
-export const scheduleAPI = {
-  getAll: async () => {
-    const { data, error } =
-      await supabase
-        .from("schedules")
-        .select("*, users(name)")
-        .order("date");
-
-    if (error) throw error;
-
-    return (
-      data?.map((x) => ({
-        ...x,
-        name: x.users?.name,
-      })) || []
-    );
-  },
-
-  getMine: async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) return [];
-
-    const { data, error } =
-      await supabase
-        .from("schedules")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("date");
-
-    if (error) throw error;
-
-    return data || [];
-  },
-
-  create: async (payload) => {
-    const { error } =
-      await supabase
-        .from("schedules")
-        .insert(payload);
-
-    if (error) throw error;
-
-    return true;
-  },
-
-  delete: async (id) => {
-    const { error } =
-      await supabase
-        .from("schedules")
-        .delete()
-        .eq("id", id);
-
-    if (error) throw error;
-
-    return true;
-  },
-};
-
-/* ==================================================
-REPORTS
-================================================== */
-
-export const reportAPI = {
-  getSummary: async () => {
-    const users =
-      await userAPI.getAll();
-
-    const { data: shifts } =
-      await supabase
-        .from("shifts")
-        .select("*");
-
-    const { data: tasks } =
-      await supabase
-        .from("tasks")
-        .select("*");
-
-    return {
-      totalUsers: users.length,
-      totalShifts:
-        shifts?.length || 0,
-      totalTasks:
-        tasks?.length || 0,
-      completedTasks:
-        tasks?.filter(
-          (x) => x.completed
-        ).length || 0,
-      activeUsers:
-        shifts?.filter(
-          (x) => !x.clock_out_time
-        ).length || 0,
-      hoursWorked: 0,
-    };
-  },
-
-  getTimesheets: async () => {
-    const { data, error } =
-      await supabase
-        .from("shifts")
-        .select(
-          "*, users(name,email)"
-        )
-        .order("clock_in_time", {
-          ascending: false,
-        });
-
-    if (error) throw error;
-
-    return data || [];
-  },
-};
-
-/* ==================================================
-PERFORMANCE
-================================================== */
-
-export const performanceAPI = {
-  getAll: async () => [],
-};
-
-/* ==================================================
-MANAGER
-================================================== */
-
-export const managerAPI = {
-  getDashboard:
-    reportAPI.getSummary,
 };
 
 /* ==================================================
@@ -736,39 +710,47 @@ BILLING
 ================================================== */
 
 export const billingAPI = {
-  checkout: async ({ plan }) => {
-    const res = await api.post(
-      "/billing/create-checkout-session",
-      { plan }
-    );
+  checkout: async ({
+    plan,
+  }) => {
+    const res =
+      await api.post(
+        "/billing/create-checkout-session",
+        { plan }
+      );
 
     return res.data;
   },
 
-  portal: async () => {
-    const res = await api.post(
-      "/billing/portal"
-    );
+  portal:
+    async () => {
+      const res =
+        await api.post(
+          "/billing/portal"
+        );
 
-    return res.data;
-  },
+      return res.data;
+    },
 
-  getStatus: async () => {
-    const user =
-      await authAPI.me();
+  getStatus:
+    async () => {
+      const user =
+        await authAPI.me();
 
-    return {
-      plan:
-        user?.current_plan ||
-        null,
-      status:
-        user?.subscription_status ||
-        null,
-      next_payment:
-        user?.trial_ends_at ||
-        null,
-    };
-  },
+      return {
+        plan:
+          user?.current_plan ||
+          null,
+
+        status:
+          user?.subscription_status ||
+          null,
+
+        next_payment:
+          user?.trial_ends_at ||
+          null,
+      };
+    },
 };
 
 /* ==================================================

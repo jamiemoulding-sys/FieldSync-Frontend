@@ -1,18 +1,14 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { createClient } from "@supabase/supabase-js";
 import { motion } from "framer-motion";
+import supabase from "../lib/supabase";
+
 import {
   Lock,
   ArrowRight,
   Loader2,
   ShieldCheck,
 } from "lucide-react";
-
-const supabase = createClient(
-  process.env.REACT_APP_SUPABASE_URL,
-  process.env.REACT_APP_SUPABASE_ANON_KEY
-);
 
 export default function ResetPassword() {
   const navigate = useNavigate();
@@ -32,6 +28,7 @@ export default function ResetPassword() {
   /* =====================================
      RESTORE SESSION FROM EMAIL LINK
   ===================================== */
+
   useEffect(() => {
     const boot = async () => {
       try {
@@ -76,7 +73,6 @@ export default function ResetPassword() {
         }
 
         setReady(true);
-
       } catch {
         setReady(true);
       }
@@ -88,6 +84,7 @@ export default function ResetPassword() {
   /* =====================================
      RESET PASSWORD
   ===================================== */
+
   const handleReset =
     async () => {
       try {
@@ -139,7 +136,6 @@ export default function ResetPassword() {
         navigate(
           "/login"
         );
-
       } catch (err) {
         alert(
           err.message ||
@@ -153,7 +149,6 @@ export default function ResetPassword() {
   return (
     <div className="min-h-screen bg-[#020617] text-white flex items-center justify-center px-6 relative overflow-hidden">
 
-      {/* BG */}
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/20 via-transparent to-cyan-500/10" />
 
       <motion.div
@@ -169,7 +164,6 @@ export default function ResetPassword() {
       >
         <div className="bg-[#020617]/95 backdrop-blur-xl border border-white/10 rounded-3xl p-8">
 
-          {/* TOP */}
           <div className="text-center mb-8">
 
             <div className="w-16 h-16 rounded-2xl bg-indigo-600/20 text-indigo-400 flex items-center justify-center mx-auto mb-5">
