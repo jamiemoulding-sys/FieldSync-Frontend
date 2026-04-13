@@ -706,6 +706,160 @@ export const holidayAPI = {
 };
 
 /* ==================================================
+REPORTS
+================================================== */
+
+export const reportAPI = {
+  getSummary: async () => {
+    const users =
+      await userAPI.getAll();
+
+    const { data: shifts } =
+      await supabase
+        .from("shifts")
+        .select("*");
+
+    const { data: tasks } =
+      await supabase
+        .from("tasks")
+        .select("*");
+
+    return {
+      totalUsers:
+        users.length,
+
+      totalShifts:
+        shifts?.length || 0,
+
+      totalTasks:
+        tasks?.length || 0,
+
+      completedTasks:
+        tasks?.filter(
+          (x) => x.completed
+        ).length || 0,
+
+      activeUsers:
+        shifts?.filter(
+          (x) =>
+            !x.clock_out_time
+        ).length || 0,
+
+      hoursWorked: 0,
+    };
+  },
+
+  getTimesheets:
+    async () => {
+      const {
+        data,
+        error,
+      } =
+        await supabase
+          .from("shifts")
+          .select(
+            "*, users(name,email)"
+          )
+          .order(
+            "clock_in_time",
+            {
+              ascending:
+                false,
+            }
+          );
+
+      if (error)
+        throw error;
+
+      return data || [];
+    },
+};
+
+/* ==================================================
+PERFORMANCE
+================================================== */
+
+export const performanceAPI = {
+  getAll: async () => {
+    return [];
+  },
+
+  getSummary: async () => {
+    return {
+      topPerformers: [],
+      lowPerformers: [],
+      attendanceScore: 0,
+      productivityScore: 0,
+    };
+  },
+};
+
+/* ==================================================
+SCHEDULE
+================================================== */
+
+export const scheduleAPI = {
+  getAll: async () => {
+    const { data, error } =
+      await supabase
+        .from("schedules")
+        .select("*, users(name)")
+        .order("date");
+
+    if (error) throw error;
+
+    return (
+      data?.map((x) => ({
+        ...x,
+        name: x.users?.name,
+      })) || []
+    );
+  },
+
+  getMine: async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return [];
+
+    const { data, error } =
+      await supabase
+        .from("schedules")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("date");
+
+    if (error) throw error;
+
+    return data || [];
+  },
+
+  create: async (payload) => {
+    const { error } =
+      await supabase
+        .from("schedules")
+        .insert(payload);
+
+    if (error) throw error;
+
+    return true;
+  },
+
+  delete: async (id) => {
+    const { error } =
+      await supabase
+        .from("schedules")
+        .delete()
+        .eq("id", id);
+
+    if (error) throw error;
+
+    return true;
+  },
+};
+
+/* ==================================================
 BILLING
 ================================================== */
 
