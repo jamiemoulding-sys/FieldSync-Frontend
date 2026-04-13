@@ -703,38 +703,40 @@ BILLING (REAL STRIPE)
 ========================================= */
 
 export const billingAPI = {
-  getStatus:
-    async () => {
-      const res =
-        await api.get(
-          "/billing/status"
-        );
+  checkout: async ({ plan }) => {
+    const res = await api.post(
+      "/billing/create-checkout-session",
+      { plan }
+    );
 
-      return res.data;
-    },
+    return res.data;
+  },
 
-  checkout:
-    async ({
-      plan,
-    } = {}) => {
-      const res =
-        await api.post(
-          "/billing/create-checkout-session",
-          { plan }
-        );
+  portal: async () => {
+    const res = await api.post(
+      "/billing/portal"
+    );
 
-      return res.data;
-    },
+    return res.data;
+  },
 
-  portal:
-    async () => {
-      const res =
-        await api.post(
-          "/billing/customer-portal"
-        );
+  getStatus: async () => {
+    const user = await authAPI.me();
 
-      return res.data;
-    },
+    return {
+      plan:
+        user?.current_plan ||
+        null,
+
+      status:
+        user?.subscription_status ||
+        null,
+
+      next_payment:
+        user?.trial_ends_at ||
+        null,
+    };
+  },
 };
 
 /* =========================================
