@@ -156,8 +156,8 @@ export default function Landing() {
             </h1>
 
             <p className="mt-6 text-lg text-gray-400 max-w-xl leading-relaxed">
-              Scheduling, attendance, payroll-ready exports, tasks,
-              staff management and live reporting in one platform.
+              Scheduling, attendance, payroll-ready exports, tasks, staff
+              management and live reporting in one platform.
             </p>
 
             <div className="mt-8 flex gap-4 flex-wrap">
@@ -178,7 +178,7 @@ export default function Landing() {
             </div>
 
             <p className="mt-5 text-sm text-green-400">
-              Businesses using systems like this commonly save 10+ admin hours weekly
+              Businesses commonly save 10+ admin hours every week
             </p>
           </motion.div>
 
@@ -243,7 +243,6 @@ export default function Landing() {
               </div>
 
               <h3 className="font-medium text-lg">{item.title}</h3>
-
               <p className="text-sm text-gray-400 mt-2">{item.text}</p>
             </div>
           ))}
@@ -296,14 +295,15 @@ export default function Landing() {
                     {plan.included}
                   </p>
 
-                  <p className="text-gray-400 text-sm mt-1">
-                    {plan.extra}
-                  </p>
+                  <p className="text-gray-400 text-sm mt-1">{plan.extra}</p>
 
                   <div className="space-y-3 mt-6 text-sm text-gray-300">
                     {plan.items.map((item) => (
                       <p key={item} className="flex gap-2">
-                        <CheckCircle2 size={16} className="text-green-400" />
+                        <CheckCircle2
+                          size={16}
+                          className="text-green-400"
+                        />
                         {item}
                       </p>
                     ))}
@@ -320,14 +320,15 @@ export default function Landing() {
             ))}
           </div>
 
-          {/* VALUE BOOSTER */}
+          {/* VALUE BLOCK */}
           <div className="mt-14 rounded-3xl bg-white/5 border border-white/10 p-8 text-center">
             <Star className="mx-auto text-yellow-400 mb-4" size={24} />
             <h3 className="text-2xl font-semibold">
-              Only 112 customers at £89/mo = £10,000+ MRR
+              Save hours every week with smarter workforce management
             </h3>
             <p className="text-gray-400 mt-3">
-              This page is now built to convert visitors into paying users.
+              Reduce admin, improve attendance, streamline scheduling and grow
+              with confidence.
             </p>
           </div>
         </div>
@@ -335,9 +336,7 @@ export default function Landing() {
 
       {/* CTA */}
       <div className="relative z-10 max-w-4xl mx-auto px-6 pb-24 text-center">
-        <h2 className="text-4xl font-semibold">
-          Ready to grow faster?
-        </h2>
+        <h2 className="text-4xl font-semibold">Ready to grow faster?</h2>
 
         <p className="text-gray-400 mt-4">
           Launch your workspace today and run your team properly.
