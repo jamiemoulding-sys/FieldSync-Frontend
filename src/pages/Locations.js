@@ -1,6 +1,9 @@
 /* =========================================================
 src/pages/Locations.js
 FULL FILE
+- Manual pin movement supported (save exact point)
+- Better UX text
+- Geofence warning note added
 ========================================================= */
 
 import {
@@ -27,6 +30,9 @@ export default function Locations() {
   const [position, setPosition] =
     useState(null);
 
+  const [saving, setSaving] =
+    useState(false);
+
   const [form, setForm] =
     useState({
       name: "",
@@ -36,10 +42,14 @@ export default function Locations() {
 
   const load =
     async () => {
-      const data =
-        await locationAPI.getLocations();
+      try {
+        const data =
+          await locationAPI.getLocations();
 
-      setLocations(data || []);
+        setLocations(data || []);
+      } catch (err) {
+        console.error(err);
+      }
     };
 
   useEffect(() => {
@@ -69,14 +79,18 @@ export default function Locations() {
     setForm({
       name: row.name,
       address:
-        row.address,
+        row.address || "",
       radius:
-        row.radius,
+        row.radius || 100,
     });
 
     setPosition({
-      lat: row.latitude,
-      lng: row.longitude,
+      lat: Number(
+        row.latitude
+      ),
+      lng: Number(
+        row.longitude
+      ),
     });
 
     setShowModal(true);
@@ -86,54 +100,95 @@ export default function Locations() {
     async (e) => {
       e.preventDefault();
 
-      const payload = {
-        ...form,
-        latitude:
-          position.lat,
-        longitude:
-          position.lng,
-      };
-
-      if (editing) {
-        await locationAPI.update(
-          editing.id,
-          payload
-        );
-      } else {
-        await locationAPI.create(
-          payload
+      if (!position) {
+        return alert(
+          "Please choose exact map location"
         );
       }
 
-      setShowModal(false);
-      reset();
-      load();
+      try {
+        setSaving(true);
+
+        const payload = {
+          ...form,
+          radius: Number(
+            form.radius
+          ),
+          latitude:
+            position.lat,
+          longitude:
+            position.lng,
+        };
+
+        if (editing) {
+          await locationAPI.update(
+            editing.id,
+            payload
+          );
+        } else {
+          await locationAPI.create(
+            payload
+          );
+        }
+
+        setShowModal(false);
+        reset();
+        load();
+
+      } catch (err) {
+        console.error(err);
+
+        alert(
+          "Failed to save location"
+        );
+      } finally {
+        setSaving(false);
+      }
     };
 
   const remove =
     async (id) => {
+      if (
+        !window.confirm(
+          "Delete this location?"
+        )
+      ) {
+        return;
+      }
+
       await locationAPI.delete(
         id
       );
+
       load();
     };
 
   return (
     <div className="space-y-6">
 
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-semibold">
-          Locations
-        </h1>
+      <div className="flex justify-between items-center flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">
+            Locations
+          </h1>
+
+          <p className="text-sm text-gray-400 mt-1">
+            Set exact geofence pins and radius for clock in.
+          </p>
+        </div>
 
         <button
           onClick={
             openCreate
           }
-          className="bg-indigo-600 px-4 py-2 rounded-xl"
+          className="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-xl"
         >
           Add Location
         </button>
+      </div>
+
+      <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-4 text-sm text-yellow-200">
+        If staff can still clock in outside the area, your clock-in page needs geofence enforcement logic updating next.
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
@@ -141,7 +196,7 @@ export default function Locations() {
           (loc) => (
             <div
               key={loc.id}
-              className="border border-white/10 rounded-2xl p-5"
+              className="border border-white/10 rounded-2xl p-5 bg-[#020617]"
             >
               <h2 className="font-semibold text-lg">
                 {loc.name}
@@ -161,6 +216,22 @@ export default function Locations() {
                 m
               </p>
 
+              <p className="text-xs text-gray-500 mt-2">
+                Lat:{" "}
+                {
+                  Number(
+                    loc.latitude
+                  ).toFixed(6)
+                }
+                {" | "}
+                Lng:{" "}
+                {
+                  Number(
+                    loc.longitude
+                  ).toFixed(6)
+                }
+              </p>
+
               <div className="flex gap-2 mt-4">
                 <button
                   onClick={() =>
@@ -168,7 +239,7 @@ export default function Locations() {
                       loc
                     )
                   }
-                  className="px-3 py-2 rounded-xl bg-white/5"
+                  className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10"
                 >
                   Edit
                 </button>
@@ -190,7 +261,7 @@ export default function Locations() {
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 overflow-y-auto">
 
           <div className="bg-[#020617] border border-white/10 rounded-2xl w-full max-w-2xl p-6 space-y-4">
 
@@ -238,9 +309,13 @@ export default function Locations() {
                         .value,
                   })
                 }
-                placeholder="Address"
+                placeholder="Address or postcode"
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3"
               />
+
+              <div className="text-sm text-gray-400">
+                Search postcode, then drag / click map pin to exact building entrance.
+              </div>
 
               <LocationPicker
                 position={
@@ -250,7 +325,9 @@ export default function Locations() {
                   setPosition
                 }
                 radius={
-                  form.radius
+                  Number(
+                    form.radius
+                  )
                 }
                 onSelectAddress={(
                   addr
@@ -268,6 +345,19 @@ export default function Locations() {
                 }
               />
 
+              {position && (
+                <div className="text-xs text-indigo-300">
+                  Exact Pin:{" "}
+                  {
+                    position.lat
+                  }
+                  {", "}
+                  {
+                    position.lng
+                  }
+                </div>
+              )}
+
               <input
                 type="number"
                 min="10"
@@ -284,6 +374,7 @@ export default function Locations() {
                         .value,
                   })
                 }
+                placeholder="Radius metres"
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3"
               />
 
@@ -302,9 +393,14 @@ export default function Locations() {
                 </button>
 
                 <button
-                  className="py-3 rounded-xl bg-indigo-600"
+                  disabled={
+                    saving
+                  }
+                  className="py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60"
                 >
-                  Save
+                  {saving
+                    ? "Saving..."
+                    : "Save"}
                 </button>
 
               </div>
