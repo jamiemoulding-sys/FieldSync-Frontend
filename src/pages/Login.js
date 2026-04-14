@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -10,25 +10,36 @@ import {
   ArrowRight,
   Loader2,
   ShieldCheck,
+  Check,
 } from "lucide-react";
 
 export default function Login() {
   const { login } = useAuth();
 
-  const [email, setEmail] =
-    useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(true);
 
-  const [password, setPassword] =
-    useState("");
+  const [loading, setLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const [loading, setLoading] =
-    useState(false);
+  /* =====================================
+     LOAD SAVED LOGIN
+  ===================================== */
 
-  const [resetLoading, setResetLoading] =
-    useState(false);
+  useEffect(() => {
+    const savedEmail =
+      localStorage.getItem("remember_email");
 
-  const [error, setError] =
-    useState("");
+    const savedRemember =
+      localStorage.getItem("remember_me");
+
+    if (savedRemember === "true") {
+      setRemember(true);
+      setEmail(savedEmail || "");
+    }
+  }, []);
 
   /* =====================================
      LOGIN
@@ -47,6 +58,28 @@ export default function Login() {
 
     try {
       setLoading(true);
+
+      /* SAVE REMEMBER ME */
+      if (remember) {
+        localStorage.setItem(
+          "remember_email",
+          email.trim()
+        );
+
+        localStorage.setItem(
+          "remember_me",
+          "true"
+        );
+      } else {
+        localStorage.removeItem(
+          "remember_email"
+        );
+
+        localStorage.setItem(
+          "remember_me",
+          "false"
+        );
+      }
 
       await login(
         email.trim(),
@@ -124,7 +157,6 @@ export default function Login() {
 
           {/* HEADER */}
           <div className="text-center mb-8">
-
             <div className="w-16 h-16 rounded-2xl bg-indigo-600/20 text-indigo-400 flex items-center justify-center mx-auto mb-5">
               <ShieldCheck size={28} />
             </div>
@@ -136,7 +168,6 @@ export default function Login() {
             <p className="text-sm text-gray-400 mt-2">
               Sign in to access your workspace
             </p>
-
           </div>
 
           {/* ERROR */}
@@ -148,12 +179,10 @@ export default function Login() {
 
           {/* FORM */}
           <form
-            onSubmit={
-              handleLogin
-            }
+            onSubmit={handleLogin}
             className="space-y-4"
           >
-
+            {/* EMAIL */}
             <div className="relative">
               <Mail
                 size={16}
@@ -174,6 +203,7 @@ export default function Login() {
               />
             </div>
 
+            {/* PASSWORD */}
             <div className="relative">
               <Lock
                 size={16}
@@ -194,8 +224,33 @@ export default function Login() {
               />
             </div>
 
-            {/* RESET */}
-            <div className="text-right">
+            {/* REMEMBER + RESET */}
+            <div className="flex items-center justify-between gap-4">
+
+              <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer select-none">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setRemember(
+                      !remember
+                    )
+                  }
+                  className={`w-5 h-5 rounded border flex items-center justify-center transition ${
+                    remember
+                      ? "bg-indigo-600 border-indigo-600"
+                      : "border-white/20 bg-white/5"
+                  }`}
+                >
+                  {remember && (
+                    <Check
+                      size={13}
+                    />
+                  )}
+                </button>
+
+                Remember me
+              </label>
+
               <button
                 type="button"
                 onClick={
@@ -212,11 +267,10 @@ export default function Login() {
               </button>
             </div>
 
+            {/* LOGIN */}
             <button
               type="submit"
-              disabled={
-                loading
-              }
+              disabled={loading}
               className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 py-4 rounded-2xl font-medium flex items-center justify-center gap-2 transition"
             >
               {loading ? (
@@ -234,12 +288,10 @@ export default function Login() {
                 ? "Signing In..."
                 : "Login"}
             </button>
-
           </form>
 
           {/* FOOTER */}
           <div className="mt-6 text-center text-sm text-gray-400">
-
             Don’t have an account?{" "}
 
             <Link
@@ -248,12 +300,10 @@ export default function Login() {
             >
               Create one
             </Link>
-
           </div>
 
         </div>
       </motion.div>
-
     </div>
   );
 }

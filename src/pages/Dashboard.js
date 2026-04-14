@@ -1,113 +1,64 @@
-/* =========================================================
-src/pages/Dashboard.js
-VERSION 2 PREMIUM LIVE TRACKER
-FULL COPY / PASTE FILE
+// src/pages/Dashboard.js
+// FINAL 100% REAL DATA VERSION
+// No fake charts / launch ready / copy-paste ready
 
-UPGRADES INCLUDED
-✅ Auto-fit all live pins
-✅ Pulse live markers
-✅ Last updated timer
-✅ Staff count overlay
-✅ Cleaner premium dashboard
-✅ Faster refresh
-✅ Mobile responsive
-✅ Existing dashboards preserved
-========================================================= */
-
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import {
   shiftAPI,
   scheduleAPI,
   holidayAPI,
-  userAPI,
   reportAPI,
   billingAPI,
 } from "../services/api";
 
 import {
-  Clock3,
   Users,
+  Clock3,
   CalendarDays,
-  Plane,
-  Briefcase,
   CreditCard,
   Activity,
+  Briefcase,
+  Plane,
+  CheckCircle2,
   RefreshCw,
+  Loader2,
 } from "lucide-react";
 
 import {
-  MapContainer,
-  TileLayer,
-  Marker,
-  Popup,
-  useMap,
-} from "react-leaflet";
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
-
-/* =========================================================
-LEAFLET FIX
-========================================================= */
-
-delete L.Icon.Default.prototype._getIconUrl;
-
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl:
-    "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  iconUrl:
-    "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  shadowUrl:
-    "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-});
-
-const pulseIcon = L.divIcon({
-  className: "",
-  html: `
-    <div style="position:relative;width:18px;height:18px;">
-      <span style="
-        position:absolute;
-        inset:0;
-        border-radius:9999px;
-        background:#22c55e;
-        animation:pulse 1.8s infinite;
-        opacity:.45;
-      "></span>
-      <span style="
-        position:absolute;
-        inset:4px;
-        border-radius:9999px;
-        background:#22c55e;
-        border:2px solid white;
-      "></span>
-    </div>
-  `,
-  iconSize: [18, 18],
-  iconAnchor: [9, 9],
-});
-
-/* =========================================================
-MAIN
-========================================================= */
+/* ================================================= */
 
 export default function Dashboard() {
   const { user } = useAuth();
 
-  const role = user?.role || "employee";
+  if (!user) return <Loading />;
 
-  if (role === "admin") return <AdminDashboard />;
-  if (role === "manager") return <ManagerDashboard />;
+  if (user.role === "admin") return <AdminDashboard />;
+  if (user.role === "manager") return <ManagerDashboard />;
 
   return <EmployeeDashboard />;
 }
 
-/* =========================================================
-EMPLOYEE
-========================================================= */
+/* ================================================= */
+/* EMPLOYEE */
+/* ================================================= */
 
 function EmployeeDashboard() {
-  const [activeShift, setActiveShift] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [shift, setShift] = useState(null);
   const [schedule, setSchedule] = useState([]);
   const [holidays, setHolidays] = useState([]);
   const [worked, setWorked] = useState(0);
@@ -119,59 +70,77 @@ function EmployeeDashboard() {
   useEffect(() => {
     let timer;
 
-    if (activeShift?.clock_in_time) {
+    if (shift?.clock_in_time) {
       timer = setInterval(() => {
-        const now = Date.now();
         const start = new Date(
-          activeShift.clock_in_time
+          shift.clock_in_time
         ).getTime();
 
-        const total =
-          Math.floor((now - start) / 1000) -
-          (activeShift.total_break_seconds || 0);
+        const now = Date.now();
 
-        setWorked(total > 0 ? total : 0);
+        const breakSecs =
+          shift.total_break_seconds || 0;
+
+        setWorked(
+          Math.floor(
+            (now - start) / 1000 - breakSecs
+          )
+        );
       }, 1000);
     }
 
     return () => clearInterval(timer);
-  }, [activeShift]);
+  }, [shift]);
 
-  const load = async () => {
-    const [shift, rota, leave] =
-      await Promise.all([
-        shiftAPI.getActive(),
-        scheduleAPI.getMine(),
-        holidayAPI.getMine(),
-      ]);
+  async function load() {
+    try {
+      setLoading(true);
 
-    setActiveShift(shift);
-    setSchedule(rota || []);
-    setHolidays(leave || []);
-  };
+      const [a, b, c] =
+        await Promise.all([
+          shiftAPI.getActive(),
+          scheduleAPI.getMine(),
+          holidayAPI.getMine(),
+        ]);
+
+      setShift(a || null);
+      setSchedule(
+        Array.isArray(b) ? b : []
+      );
+      setHolidays(
+        Array.isArray(c) ? c : []
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (loading) return <Loading />;
 
   return (
     <div className="space-y-6">
-      <Header
+      <Title
         title="Welcome Back"
-        sub="Your employee dashboard"
+        sub="Your personal workspace"
       />
 
       <div className="grid md:grid-cols-4 gap-4">
         <Card
           title="Status"
-          value={activeShift ? "Clocked In" : "Offline"}
+          value={
+            shift ? "Clocked In" : "Offline"
+          }
           icon={<Clock3 size={16} />}
         />
 
         <Card
           title="Worked Today"
-          value={formatTime(worked)}
+          value={format(worked)}
           icon={<Activity size={16} />}
         />
 
         <Card
-          title="My Shifts"
+          title="Upcoming Shifts"
           value={schedule.length}
           icon={<CalendarDays size={16} />}
         />
@@ -182,31 +151,94 @@ function EmployeeDashboard() {
           icon={<Plane size={16} />}
         />
       </div>
+
+      <Panel title="Upcoming Schedule">
+        {schedule.length === 0 ? (
+          <p className="text-gray-400">
+            No shifts scheduled
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {schedule
+              .slice(0, 5)
+              .map((item) => (
+                <div
+                  key={item.id}
+                  className="border border-white/10 rounded-xl p-4"
+                >
+                  <p className="font-medium">
+                    {item.date}
+                  </p>
+
+                  <p className="text-sm text-gray-400">
+                    {item.start_time?.slice(
+                      11,
+                      16
+                    )}{" "}
+                    -{" "}
+                    {item.end_time?.slice(
+                      11,
+                      16
+                    )}
+                  </p>
+                </div>
+              ))}
+          </div>
+        )}
+      </Panel>
     </div>
   );
 }
 
-/* =========================================================
-MANAGER
-========================================================= */
+/* ================================================= */
+/* MANAGER */
+/* ================================================= */
 
 function ManagerDashboard() {
-  const [stats, setStats] = useState({});
+  const [loading, setLoading] =
+    useState(true);
+
+  const [stats, setStats] =
+    useState({});
 
   useEffect(() => {
     load();
   }, []);
 
-  const load = async () => {
-    const summary = await reportAPI.getSummary();
-    setStats(summary || {});
-  };
+  async function load() {
+    try {
+      setLoading(true);
+
+      const data =
+        await reportAPI.getSummary();
+
+      setStats(data || {});
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const taskData = [
+    {
+      name: "Open",
+      value:
+        (stats.tasks || 0) -
+        (stats.completedTasks || 0),
+    },
+    {
+      name: "Done",
+      value:
+        stats.completedTasks || 0,
+    },
+  ];
+
+  if (loading) return <Loading />;
 
   return (
     <div className="space-y-6">
-      <Header
+      <Title
         title="Manager Dashboard"
-        sub="Operations overview"
+        sub="Team operations"
       />
 
       <div className="grid md:grid-cols-4 gap-4">
@@ -223,70 +255,160 @@ function ManagerDashboard() {
         />
 
         <Card
-          title="Live Users"
+          title="Live Staff"
           value={stats.activeUsers || 0}
           icon={<Clock3 size={16} />}
         />
 
         <Card
           title="Completed"
-          value={stats.completedTasks || 0}
-          icon={<CalendarDays size={16} />}
+          value={
+            stats.completedTasks || 0
+          }
+          icon={
+            <CheckCircle2 size={16} />
+          }
         />
       </div>
+
+      <Panel title="Task Status">
+        <ChartBox>
+          <ResponsiveContainer>
+            <BarChart data={taskData}>
+              <XAxis dataKey="name" />
+              <YAxis />
+              <Tooltip />
+              <Bar
+                dataKey="value"
+                fill="#6366f1"
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartBox>
+      </Panel>
     </div>
   );
 }
 
-/* =========================================================
-ADMIN
-========================================================= */
+/* ================================================= */
+/* ADMIN */
+/* ================================================= */
 
 function AdminDashboard() {
-  const [stats, setStats] = useState({});
-  const [plan, setPlan] = useState("free");
-  const [live, setLive] = useState([]);
-  const [updated, setUpdated] = useState(null);
+  const [loading, setLoading] =
+    useState(true);
+
+  const [stats, setStats] =
+    useState({});
+
+  const [plan, setPlan] =
+    useState("free");
+
+  const [updated, setUpdated] =
+    useState("");
 
   useEffect(() => {
     load();
 
-    const timer = setInterval(load, 10000);
-    return () => clearInterval(timer);
+    const timer =
+      setInterval(load, 15000);
+
+    return () =>
+      clearInterval(timer);
   }, []);
 
-  const load = async () => {
-    const [summary, billing, active] =
-      await Promise.all([
-        reportAPI.getSummary(),
-        billingAPI.getStatus(),
-        shiftAPI.getActiveAll(),
-      ]);
+  async function load() {
+    try {
+      setLoading(true);
 
-    setStats(summary || {});
-    setPlan(billing?.plan || "free");
-    setLive(active || []);
-    setUpdated(new Date());
-  };
+      const [summary, bill] =
+        await Promise.all([
+          reportAPI.getSummary(),
+          billingAPI.getStatus(),
+        ]);
 
-  const validPins = useMemo(
-    () =>
-      live.filter(
-        (x) => x.latitude && x.longitude
-      ),
-    [live]
-  );
+      setStats(summary || {});
+      setPlan(
+        bill?.plan || "free"
+      );
+
+      setUpdated(
+        new Date().toLocaleTimeString()
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const attendance =
+    stats.users > 0
+      ? Math.round(
+          ((stats.activeUsers || 0) /
+            stats.users) *
+            100
+        )
+      : 0;
+
+  const pieData = [
+    {
+      name: "Present",
+      value: attendance,
+    },
+    {
+      name: "Away",
+      value: 100 - attendance,
+    },
+  ];
+
+  const workloadData = [
+    {
+      name: "Tasks",
+      value: stats.tasks || 0,
+    },
+    {
+      name: "Completed",
+      value:
+        stats.completedTasks || 0,
+    },
+    {
+      name: "Live",
+      value:
+        stats.activeUsers || 0,
+    },
+  ];
+
+  const trendData = [
+    {
+      day: "Users",
+      value: stats.users || 0,
+    },
+    {
+      day: "Tasks",
+      value: stats.tasks || 0,
+    },
+    {
+      day: "Shifts",
+      value: stats.shifts || 0,
+    },
+    {
+      day: "Done",
+      value:
+        stats.completedTasks || 0,
+    },
+  ];
+
+  if (loading) return <Loading />;
 
   return (
     <div className="space-y-6">
-      <Header
+      <Title
         title="Admin Dashboard"
-        sub="Premium live business overview"
+        sub="Real business analytics"
       />
 
       <div className="grid md:grid-cols-4 gap-4">
         <Card
-          title="Total Staff"
+          title="Staff"
           value={stats.users || 0}
           icon={<Users size={16} />}
         />
@@ -298,8 +420,10 @@ function AdminDashboard() {
         />
 
         <Card
-          title="Live Users"
-          value={stats.activeUsers || 0}
+          title="Clocked In"
+          value={
+            stats.activeUsers || 0
+          }
           icon={<Clock3 size={16} />}
         />
 
@@ -310,114 +434,99 @@ function AdminDashboard() {
         />
       </div>
 
-      <Panel title="Live Employee Tracker">
-        <div className="flex justify-between items-center mb-4 flex-wrap gap-3">
-          <div className="text-sm text-gray-400">
-            Real-time clock-in positions
-          </div>
+      <div className="grid lg:grid-cols-3 gap-4">
+        <Panel title="Business Activity">
+          <ChartBox>
+            <ResponsiveContainer>
+              <AreaChart
+                data={trendData}
+              >
+                <XAxis dataKey="day" />
+                <YAxis />
+                <Tooltip />
+                <Area
+                  dataKey="value"
+                  stroke="#6366f1"
+                  fill="#6366f1"
+                  fillOpacity={0.2}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </ChartBox>
+        </Panel>
 
-          <div className="flex items-center gap-3 text-xs text-gray-400">
-            <span>
-              {validPins.length} active
-            </span>
+        <Panel title="Operations">
+          <ChartBox>
+            <ResponsiveContainer>
+              <BarChart
+                data={workloadData}
+              >
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Bar
+                  dataKey="value"
+                  fill="#22c55e"
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartBox>
+        </Panel>
 
-            <span className="flex items-center gap-1">
-              <RefreshCw size={12} />
-              {updated
-                ? updated.toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    second: "2-digit",
-                  })
-                : "--:--"}
-            </span>
-          </div>
-        </div>
-
-        {validPins.length === 0 ? (
-          <div className="text-gray-400">
-            No staff currently clocked in.
-          </div>
-        ) : (
-          <div className="overflow-hidden rounded-2xl border border-white/10">
-            <MapContainer
-              center={[
-                Number(validPins[0].latitude),
-                Number(validPins[0].longitude),
-              ]}
-              zoom={12}
-              className="h-[420px] w-full"
-            >
-              <TileLayer
-                attribution="&copy; OpenStreetMap"
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
-
-              <FitToPins rows={validPins} />
-
-              {validPins.map((row) => (
-                <Marker
-                  key={row.id}
-                  icon={pulseIcon}
-                  position={[
-                    Number(row.latitude),
-                    Number(row.longitude),
-                  ]}
+        <Panel title="Attendance">
+          <ChartBox>
+            <ResponsiveContainer>
+              <PieChart>
+                <Pie
+                  data={pieData}
+                  dataKey="value"
+                  innerRadius={55}
+                  outerRadius={80}
                 >
-                  <Popup>
-                    <div className="text-sm">
-                      <p className="font-semibold">
-                        {row.users?.name ||
-                          "Employee"}
-                      </p>
+                  <Cell fill="#22c55e" />
+                  <Cell fill="#1e293b" />
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </ChartBox>
 
-                      <p className="text-gray-500">
-                        Clocked in:
-                      </p>
+          <p className="text-center text-2xl font-semibold">
+            {attendance}%
+          </p>
+        </Panel>
+      </div>
 
-                      <p>
-                        {time(row.clock_in_time)}
-                      </p>
-                    </div>
-                  </Popup>
-                </Marker>
-              ))}
-            </MapContainer>
-          </div>
-        )}
+      <Panel title="Live Updates">
+        <div className="text-sm text-gray-400 flex items-center gap-2">
+          <RefreshCw size={14} />
+          Last refresh {updated}
+        </div>
       </Panel>
     </div>
   );
 }
 
-/* =========================================================
-MAP AUTO FIT
-========================================================= */
+/* ================================================= */
+/* COMPONENTS */
+/* ================================================= */
 
-function FitToPins({ rows }) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (!rows.length) return;
-
-    const bounds = rows.map((x) => [
-      Number(x.latitude),
-      Number(x.longitude),
-    ]);
-
-    map.fitBounds(bounds, {
-      padding: [40, 40],
-    });
-  }, [rows, map]);
-
-  return null;
+function Loading() {
+  return (
+    <div className="text-gray-400 flex items-center gap-2">
+      <Loader2
+        size={16}
+        className="animate-spin"
+      />
+      Loading dashboard...
+    </div>
+  );
 }
 
-/* =========================================================
-UI
-========================================================= */
-
-function Header({ title, sub }) {
+function Title({
+  title,
+  sub,
+}) {
   return (
     <div>
       <h1 className="text-3xl font-semibold">
@@ -431,21 +540,14 @@ function Header({ title, sub }) {
   );
 }
 
-function Panel({ title, children }) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-[#020617] p-6">
-      <h2 className="font-semibold mb-4">
-        {title}
-      </h2>
-      {children}
-    </div>
-  );
-}
-
-function Card({ title, value, icon }) {
+function Card({
+  title,
+  value,
+  icon,
+}) {
   return (
     <div className="rounded-2xl border border-white/10 bg-[#020617] p-5">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between">
         <p className="text-xs text-gray-400">
           {title}
         </p>
@@ -455,32 +557,53 @@ function Card({ title, value, icon }) {
         </div>
       </div>
 
-      <h3 className="text-2xl font-semibold mt-3 capitalize">
+      <h2 className="text-2xl font-semibold mt-3 capitalize">
         {value}
-      </h3>
+      </h2>
     </div>
   );
 }
 
-function formatTime(sec) {
+function Panel({
+  title,
+  children,
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-[#020617] p-6">
+      <h2 className="font-semibold mb-4">
+        {title}
+      </h2>
+
+      {children}
+    </div>
+  );
+}
+
+function ChartBox({
+  children,
+}) {
+  return (
+    <div style={{ height: 260 }}>
+      {children}
+    </div>
+  );
+}
+
+function format(sec) {
   const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
+  const m = Math.floor(
+    (sec % 3600) / 60
+  );
   const s = sec % 60;
 
-  return `${String(h).padStart(2, "0")}:${String(
-    m
-  ).padStart(2, "0")}:${String(s).padStart(
+  return `${String(h).padStart(
+    2,
+    "0"
+  )}:${String(m).padStart(
+    2,
+    "0"
+  )}:${String(s).padStart(
     2,
     "0"
   )}`;
-}
-
-function time(date) {
-  return new Date(date).toLocaleTimeString(
-    [],
-    {
-      hour: "2-digit",
-      minute: "2-digit",
-    }
-  );
 }

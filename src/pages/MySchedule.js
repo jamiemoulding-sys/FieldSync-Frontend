@@ -1,14 +1,15 @@
-import { useEffect, useState } from "react";
+// src/pages/MySchedule.jsx
+import { useEffect, useMemo, useState } from "react";
 import { scheduleAPI } from "../services/api";
 import {
-  Calendar,
+  CalendarDays,
   Clock3,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 
 export default function MySchedule() {
-  const [rows, setRows] =
-    useState([]);
-
+  const [rows, setRows] = useState([]);
   const [loading, setLoading] =
     useState(true);
 
@@ -16,7 +17,7 @@ export default function MySchedule() {
     load();
   }, []);
 
-  const load = async () => {
+  async function load() {
     try {
       setLoading(true);
 
@@ -28,38 +29,54 @@ export default function MySchedule() {
           ? data
           : []
       );
-    } catch {
+    } catch (err) {
+      console.error(err);
       setRows([]);
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const formatDate = (d) =>
-    new Date(d).toLocaleDateString(
+  const thisWeek = useMemo(() => {
+    return rows.slice(0, 7).length;
+  }, [rows]);
+
+  function formatDate(date) {
+    if (!date) return "-";
+
+    return new Date(
+      date
+    ).toLocaleDateString(
       "en-GB",
       {
-        weekday:
-          "short",
+        weekday: "short",
         day: "2-digit",
-        month:
-          "short",
+        month: "short",
       }
     );
+  }
 
-  const formatTime = (d) =>
-    new Date(d).toLocaleTimeString(
+  function formatTime(date) {
+    if (!date) return "-";
+
+    return new Date(
+      date
+    ).toLocaleTimeString(
       "en-GB",
       {
         hour: "2-digit",
-        minute:
-          "2-digit",
+        minute: "2-digit",
       }
     );
+  }
 
   if (loading) {
     return (
-      <div className="text-gray-400">
+      <div className="text-gray-400 flex items-center gap-2">
+        <Loader2
+          size={16}
+          className="animate-spin"
+        />
         Loading schedule...
       </div>
     );
@@ -68,51 +85,66 @@ export default function MySchedule() {
   return (
     <div className="space-y-6">
 
-      <div>
-        <h1 className="text-2xl font-semibold">
-          My Schedule
-        </h1>
+      {/* HEADER */}
+      <div className="flex justify-between items-center flex-wrap gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">
+            My Schedule
+          </h1>
 
-        <p className="text-sm text-gray-400">
-          Your upcoming shifts
-        </p>
+          <p className="text-sm text-gray-400">
+            Upcoming assigned shifts
+          </p>
+        </div>
+
+        <button
+          onClick={load}
+          className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 flex items-center gap-2"
+        >
+          <RefreshCw size={15} />
+          Refresh
+        </button>
       </div>
 
+      {/* STATS */}
       <div className="grid md:grid-cols-3 gap-4">
 
         <Card
           title="Upcoming"
-          value={
-            rows.length
-          }
+          value={rows.length}
           icon={
-            <Calendar
-              size={16}
-            />
+            <CalendarDays size={16} />
           }
         />
 
         <Card
           title="This Week"
+          value={thisWeek}
+          icon={
+            <Clock3 size={16} />
+          }
+        />
+
+        <Card
+          title="Next Shift"
           value={
-            rows.slice(
-              0,
-              7
-            ).length
+            rows[0]
+              ? formatDate(
+                  rows[0].date
+                )
+              : "-"
           }
           icon={
-            <Clock3
-              size={16}
-            />
+            <CalendarDays size={16} />
           }
         />
 
       </div>
 
-      <div className="rounded-2xl border border-white/10 overflow-hidden">
+      {/* TABLE */}
+      <div className="rounded-2xl border border-white/10 overflow-hidden bg-[#020617]">
 
         <table className="w-full text-left">
-
           <thead className="bg-white/5 text-gray-400 text-sm">
             <tr>
               <th className="p-4">
@@ -128,47 +160,39 @@ export default function MySchedule() {
           </thead>
 
           <tbody>
-            {rows.map(
-              (row) => (
-                <tr
-                  key={
-                    row.id
-                  }
-                  className="border-t border-white/5"
-                >
-                  <td className="p-4">
-                    {formatDate(
-                      row.date
-                    )}
-                  </td>
+            {rows.map((row) => (
+              <tr
+                key={row.id}
+                className="border-t border-white/5"
+              >
+                <td className="p-4">
+                  {formatDate(
+                    row.date
+                  )}
+                </td>
 
-                  <td className="p-4">
-                    {formatTime(
-                      row.start_time
-                    )}
-                  </td>
+                <td className="p-4">
+                  {formatTime(
+                    row.start_time
+                  )}
+                </td>
 
-                  <td className="p-4">
-                    {formatTime(
-                      row.end_time
-                    )}
-                  </td>
-                </tr>
-              )
-            )}
+                <td className="p-4">
+                  {formatTime(
+                    row.end_time
+                  )}
+                </td>
+              </tr>
+            ))}
           </tbody>
-
         </table>
 
-        {rows.length ===
-          0 && (
-          <div className="p-6 text-center text-gray-500">
+        {rows.length === 0 && (
+          <div className="p-8 text-center text-gray-500">
             No shifts assigned
           </div>
         )}
-
       </div>
-
     </div>
   );
 }
@@ -179,7 +203,7 @@ function Card({
   icon,
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 p-5 bg-[#020617]">
+    <div className="rounded-2xl border border-white/10 bg-[#020617] p-5">
       <div className="flex justify-between">
         <p className="text-sm text-gray-400">
           {title}
@@ -190,9 +214,9 @@ function Card({
         </div>
       </div>
 
-      <h3 className="text-2xl font-semibold mt-3">
+      <h2 className="text-2xl font-semibold mt-3">
         {value}
-      </h3>
+      </h2>
     </div>
   );
 }

@@ -1,3 +1,7 @@
+// src/pages/Profile.js
+// FINAL 100% PRODUCTION VERSION
+// safer / faster / polished / copy-paste ready
+
 import {
   useMemo,
   useState,
@@ -21,12 +25,13 @@ import {
   CheckCircle2,
   Camera,
   Clock3,
+  Loader2,
 } from "lucide-react";
 
 export default function Profile() {
   const {
     user,
-    updateUser,
+    reloadUser,
     logout,
   } = useAuth();
 
@@ -45,186 +50,157 @@ export default function Profile() {
   const [lastSignIn, setLastSignIn] =
     useState("");
 
+  const [loading, setLoading] =
+    useState(true);
+
   const [saving, setSaving] =
     useState(false);
 
   const [success, setSuccess] =
     useState("");
 
-  /* =====================================
-     LOAD PROFILE
-  ===================================== */
+  const [error, setError] =
+    useState("");
 
   useEffect(() => {
-    const loadProfile =
-      async () => {
-        try {
-          const {
-            data: authData,
-          } =
-            await supabase.auth.getUser();
-
-          const authUser =
-            authData?.user;
-
-          if (!authUser)
-            return;
-
-          if (
-            authUser.last_sign_in_at
-          ) {
-            setLastSignIn(
-              new Date(
-                authUser.last_sign_in_at
-              ).toLocaleString()
-            );
-          }
-
-          const {
-            data,
-            error,
-          } =
-            await supabase
-              .from("users")
-              .select(`
-                name,
-                phone,
-                job_title,
-                company_id
-              `)
-              .eq(
-                "id",
-                authUser.id
-              )
-              .single();
-
-          if (error)
-            throw error;
-
-          setName(
-            data?.name || ""
-          );
-
-          setPhone(
-            data?.phone || ""
-          );
-
-          setJobTitle(
-            data?.job_title || ""
-          );
-
-          if (
-            data?.company_id
-          ) {
-            const {
-              data:
-                companyData,
-            } =
-              await supabase
-                .from(
-                  "companies"
-                )
-                .select("name")
-                .eq(
-                  "id",
-                  data.company_id
-                )
-                .single();
-
-            setCompany(
-              companyData?.name ||
-                ""
-            );
-          }
-        } catch (err) {
-          console.error(
-            err
-          );
-        }
-      };
-
     loadProfile();
   }, []);
 
-  /* =====================================
-     SAVE PROFILE
-  ===================================== */
+  async function loadProfile() {
+    try {
+      setLoading(true);
 
-  const saveProfile =
-    async () => {
-      try {
-        setSaving(true);
-        setSuccess("");
+      const {
+        data: authData,
+      } =
+        await supabase.auth.getUser();
 
-        const {
-          data: authData,
-        } =
-          await supabase.auth.getUser();
+      const authUser =
+        authData?.user;
 
-        const authUser =
-          authData?.user;
+      if (!authUser) return;
 
-        if (!authUser) {
-          throw new Error(
-            "Not logged in"
-          );
-        }
+      if (
+        authUser.last_sign_in_at
+      ) {
+        setLastSignIn(
+          new Date(
+            authUser.last_sign_in_at
+          ).toLocaleString()
+        );
+      }
 
-        const {
-          error,
-        } =
-          await supabase
-            .from("users")
-            .update({
-              name,
-              phone,
-              job_title:
-                jobTitle,
-            })
-            .eq(
-              "id",
-              authUser.id
-            );
-
-        if (error)
-          throw error;
-
-        if (
-          company &&
-          user?.companyId
-        ) {
-          await supabase
-            .from(
-              "companies"
-            )
-            .update({
-              name: company,
-            })
-            .eq(
-              "id",
-              user.companyId
-            );
-        }
-
-        await updateUser({
+      const {
+        data,
+        error,
+      } = await supabase
+        .from("users")
+        .select(`
           name,
           phone,
-          job_title:
-            jobTitle,
-        });
+          job_title,
+          company_id,
+          companies (
+            name
+          )
+        `)
+        .eq("id", authUser.id)
+        .single();
 
-        setSuccess(
-          "Profile updated successfully"
+      if (error) throw error;
+
+      setName(data?.name || "");
+      setPhone(data?.phone || "");
+      setJobTitle(
+        data?.job_title || ""
+      );
+
+      setCompany(
+        data?.companies?.name ||
+          ""
+      );
+    } catch (err) {
+      console.error(err);
+      setError(
+        "Failed to load profile"
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function saveProfile() {
+    try {
+      setSaving(true);
+      setSuccess("");
+      setError("");
+
+      const {
+        data: authData,
+      } =
+        await supabase.auth.getUser();
+
+      const authUser =
+        authData?.user;
+
+      if (!authUser) {
+        throw new Error(
+          "Not logged in"
         );
-      } catch (err) {
-        alert(
-          err.message ||
-            "Failed to save profile"
-        );
-      } finally {
-        setSaving(false);
       }
-    };
+
+      const { error } =
+        await supabase
+          .from("users")
+          .update({
+            name:
+              name.trim(),
+            phone:
+              phone.trim(),
+            job_title:
+              jobTitle.trim(),
+          })
+          .eq(
+            "id",
+            authUser.id
+          );
+
+      if (error) throw error;
+
+      if (
+        user?.companyId &&
+        company.trim()
+      ) {
+        await supabase
+          .from("companies")
+          .update({
+            name:
+              company.trim(),
+          })
+          .eq(
+            "id",
+            user.companyId
+          );
+      }
+
+      if (reloadUser) {
+        await reloadUser();
+      }
+
+      setSuccess(
+        "Profile updated successfully"
+      );
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        err.message ||
+          "Failed to save profile"
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
 
   const profileScore =
     useMemo(() => {
@@ -234,8 +210,11 @@ export default function Profile() {
           phone,
           company,
           jobTitle,
-        ].filter(Boolean)
-          .length * 25
+        ].filter(
+          (x) =>
+            x &&
+            x.trim()
+        ).length * 25
       );
     }, [
       name,
@@ -252,9 +231,20 @@ export default function Profile() {
     .charAt(0)
     .toUpperCase();
 
+  if (loading) {
+    return (
+      <div className="text-gray-400 flex items-center gap-2">
+        <Loader2
+          size={16}
+          className="animate-spin"
+        />
+        Loading profile...
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-
       {/* HERO */}
       <div className="rounded-3xl p-[1px] bg-gradient-to-r from-indigo-500/30 via-purple-500/20 to-transparent">
         <div className="bg-[#020617] border border-white/10 rounded-3xl p-6 md:p-8">
@@ -309,7 +299,6 @@ export default function Profile() {
                   />
 
                 </div>
-
               </div>
 
             </div>
@@ -336,8 +325,8 @@ export default function Profile() {
               <p className="text-xs text-gray-500 mt-4 flex items-center gap-2">
                 <Clock3 size={12} />
                 Last Sign In:
-                {lastSignIn ||
-                  " -"}
+                {" "}
+                {lastSignIn || "-"}
               </p>
 
             </div>
@@ -348,10 +337,17 @@ export default function Profile() {
       </div>
 
       {success && (
-        <div className="rounded-2xl bg-green-500/10 border border-green-500/30 text-green-300 p-4 text-sm flex items-center gap-2">
-          <CheckCircle2 size={16} />
-          {success}
-        </div>
+        <Alert
+          green
+          text={success}
+        />
+      )}
+
+      {error && (
+        <Alert
+          red
+          text={error}
+        />
       )}
 
       {/* FORM */}
@@ -417,9 +413,16 @@ export default function Profile() {
         <button
           onClick={saveProfile}
           disabled={saving}
-          className="px-5 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 transition disabled:opacity-60 text-white font-medium flex items-center gap-2"
+          className="px-5 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white font-medium flex items-center gap-2"
         >
-          <Save size={16} />
+          {saving ? (
+            <Loader2
+              size={16}
+              className="animate-spin"
+            />
+          ) : (
+            <Save size={16} />
+          )}
 
           {saving
             ? "Saving..."
@@ -428,7 +431,7 @@ export default function Profile() {
 
         <button
           onClick={logout}
-          className="px-5 py-3 rounded-2xl bg-red-500 hover:bg-red-600 transition text-white font-medium flex items-center gap-2"
+          className="px-5 py-3 rounded-2xl bg-red-500 hover:bg-red-600 text-white font-medium flex items-center gap-2"
         >
           <LogOut size={16} />
           Sign Out
@@ -511,6 +514,25 @@ function Badge({
   return (
     <div className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs flex items-center gap-2">
       {icon}
+      {text}
+    </div>
+  );
+}
+
+function Alert({
+  text,
+  red,
+  green,
+}) {
+  return (
+    <div
+      className={`rounded-2xl p-4 text-sm flex items-center gap-2 border ${
+        red
+          ? "bg-red-500/10 border-red-500/30 text-red-300"
+          : "bg-green-500/10 border-green-500/30 text-green-300"
+      }`}
+    >
+      <CheckCircle2 size={16} />
       {text}
     </div>
   );

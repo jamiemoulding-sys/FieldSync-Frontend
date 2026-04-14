@@ -5,6 +5,11 @@ import {
   Navigate,
 } from "react-router-dom";
 
+import {
+  useEffect,
+  useState,
+} from "react";
+
 import { useAuth } from "./hooks/useAuth";
 
 /* PUBLIC */
@@ -40,65 +45,150 @@ import Success from "./pages/Success";
 import AppLayout from "./layout/AppLayout";
 
 /* =====================================================
-LOADER
+SCREEN LOADER
 ===================================================== */
 
 function ScreenLoader() {
   return (
-    <div className="min-h-screen bg-[#020617] text-white flex items-center justify-center">
+    <div className="min-h-screen bg-[#020617] text-white flex items-center justify-center text-lg">
       Loading...
     </div>
   );
 }
 
 /* =====================================================
-AUTH GUARD
+AUTO TAB REFRESH FIX
 ===================================================== */
 
-function ProtectedRoute({ children }) {
-  const { user, loading } = useAuth();
+function VisibilityRefresh() {
+  const { reloadUser } = useAuth();
 
-  if (loading) return <ScreenLoader />;
+  useEffect(() => {
+    const onVisible = () => {
+      if (
+        document.visibilityState ===
+        "visible"
+      ) {
+        reloadUser();
+      }
+    };
+
+    document.addEventListener(
+      "visibilitychange",
+      onVisible
+    );
+
+    window.addEventListener(
+      "focus",
+      onVisible
+    );
+
+    return () => {
+      document.removeEventListener(
+        "visibilitychange",
+        onVisible
+      );
+
+      window.removeEventListener(
+        "focus",
+        onVisible
+      );
+    };
+  }, [reloadUser]);
+
+  return null;
+}
+
+/* =====================================================
+AUTH ROUTE
+===================================================== */
+
+function ProtectedRoute({
+  children,
+}) {
+  const {
+    user,
+    loading,
+  } = useAuth();
+
+  if (loading)
+    return <ScreenLoader />;
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return (
+      <Navigate
+        to="/login"
+        replace
+      />
+    );
   }
 
   return children;
 }
 
 /* =====================================================
-ROLE GUARD
+ROLE ROUTE
 ===================================================== */
 
-function RoleRoute({ roles, children }) {
-  const { user, loading } = useAuth();
+function RoleRoute({
+  roles,
+  children,
+}) {
+  const {
+    user,
+    loading,
+  } = useAuth();
 
-  if (loading) return <ScreenLoader />;
+  if (loading)
+    return <ScreenLoader />;
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return (
+      <Navigate
+        to="/login"
+        replace
+      />
+    );
   }
 
-  if (!roles.includes(user.role)) {
-    return <Navigate to="/dashboard" replace />;
+  if (
+    !roles.includes(
+      user.role
+    )
+  ) {
+    return (
+      <Navigate
+        to="/dashboard"
+        replace
+      />
+    );
   }
 
   return children;
 }
 
 /* =====================================================
-PUBLIC ROUTE BLOCK
-Prevents logged-in users seeing login/signup again
+PUBLIC BLOCK
 ===================================================== */
 
-function PublicOnly({ children }) {
-  const { user, loading } = useAuth();
+function PublicOnly({
+  children,
+}) {
+  const {
+    user,
+    loading,
+  } = useAuth();
 
-  if (loading) return <ScreenLoader />;
+  if (loading)
+    return <ScreenLoader />;
 
   if (user) {
-    return <Navigate to="/dashboard" replace />;
+    return (
+      <Navigate
+        to="/dashboard"
+        replace
+      />
+    );
   }
 
   return children;
@@ -109,10 +199,30 @@ APP
 ===================================================== */
 
 export default function App() {
+  const [ready, setReady] =
+    useState(false);
+
+  useEffect(() => {
+    const t =
+      setTimeout(
+        () =>
+          setReady(true),
+        150
+      );
+
+    return () =>
+      clearTimeout(t);
+  }, []);
+
+  if (!ready)
+    return <ScreenLoader />;
+
   return (
     <Router>
+      <VisibilityRefresh />
+
       <Routes>
-        {/* ================= PUBLIC ================= */}
+        {/* PUBLIC */}
 
         <Route
           path="/"
@@ -143,20 +253,26 @@ export default function App() {
 
         <Route
           path="/set-password"
-          element={<SetPassword />}
+          element={
+            <SetPassword />
+          }
         />
 
         <Route
           path="/accept-invite"
-          element={<SetPassword />}
+          element={
+            <SetPassword />
+          }
         />
 
         <Route
           path="/reset-password"
-          element={<ResetPassword />}
+          element={
+            <ResetPassword />
+          }
         />
 
-        {/* ================= PRIVATE ================= */}
+        {/* PRIVATE */}
 
         <Route
           element={
@@ -165,11 +281,11 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          {/* CORE */}
-
           <Route
             path="/dashboard"
-            element={<Dashboard />}
+            element={
+              <Dashboard />
+            }
           />
 
           <Route
@@ -179,29 +295,39 @@ export default function App() {
 
           <Route
             path="/work-session"
-            element={<WorkSession />}
+            element={
+              <WorkSession />
+            }
           />
 
           <Route
             path="/timesheet"
-            element={<TimeSheet />}
+            element={
+              <TimeSheet />
+            }
           />
 
           {/* EMPLOYEE */}
 
           <Route
             path="/my-schedule"
-            element={<MySchedule />}
+            element={
+              <MySchedule />
+            }
           />
 
           <Route
             path="/my-holidays"
-            element={<MyHolidays />}
+            element={
+              <MyHolidays />
+            }
           />
 
           <Route
             path="/my-locations"
-            element={<MyLocations />}
+            element={
+              <MyLocations />
+            }
           />
 
           {/* MANAGEMENT */}
@@ -209,7 +335,12 @@ export default function App() {
           <Route
             path="/schedule"
             element={
-              <RoleRoute roles={["manager", "admin"]}>
+              <RoleRoute
+                roles={[
+                  "manager",
+                  "admin",
+                ]}
+              >
                 <Schedule />
               </RoleRoute>
             }
@@ -218,7 +349,12 @@ export default function App() {
           <Route
             path="/calendar"
             element={
-              <RoleRoute roles={["manager", "admin"]}>
+              <RoleRoute
+                roles={[
+                  "manager",
+                  "admin",
+                ]}
+              >
                 <ScheduleCalendar />
               </RoleRoute>
             }
@@ -227,7 +363,12 @@ export default function App() {
           <Route
             path="/holiday-requests"
             element={
-              <RoleRoute roles={["manager", "admin"]}>
+              <RoleRoute
+                roles={[
+                  "manager",
+                  "admin",
+                ]}
+              >
                 <HolidayRequests />
               </RoleRoute>
             }
@@ -236,7 +377,12 @@ export default function App() {
           <Route
             path="/announcements"
             element={
-              <RoleRoute roles={["manager", "admin"]}>
+              <RoleRoute
+                roles={[
+                  "manager",
+                  "admin",
+                ]}
+              >
                 <Announcements />
               </RoleRoute>
             }
@@ -245,7 +391,12 @@ export default function App() {
           <Route
             path="/employees"
             element={
-              <RoleRoute roles={["manager", "admin"]}>
+              <RoleRoute
+                roles={[
+                  "manager",
+                  "admin",
+                ]}
+              >
                 <Employees />
               </RoleRoute>
             }
@@ -254,7 +405,12 @@ export default function App() {
           <Route
             path="/locations"
             element={
-              <RoleRoute roles={["manager", "admin"]}>
+              <RoleRoute
+                roles={[
+                  "manager",
+                  "admin",
+                ]}
+              >
                 <Locations />
               </RoleRoute>
             }
@@ -263,7 +419,12 @@ export default function App() {
           <Route
             path="/performance"
             element={
-              <RoleRoute roles={["manager", "admin"]}>
+              <RoleRoute
+                roles={[
+                  "manager",
+                  "admin",
+                ]}
+              >
                 <Performance />
               </RoleRoute>
             }
@@ -274,7 +435,11 @@ export default function App() {
           <Route
             path="/reports"
             element={
-              <RoleRoute roles={["admin"]}>
+              <RoleRoute
+                roles={[
+                  "admin",
+                ]}
+              >
                 <Reports />
               </RoleRoute>
             }
@@ -283,7 +448,11 @@ export default function App() {
           <Route
             path="/billing"
             element={
-              <RoleRoute roles={["admin"]}>
+              <RoleRoute
+                roles={[
+                  "admin",
+                ]}
+              >
                 <Billing />
               </RoleRoute>
             }
@@ -292,7 +461,11 @@ export default function App() {
           <Route
             path="/billing-success"
             element={
-              <RoleRoute roles={["admin"]}>
+              <RoleRoute
+                roles={[
+                  "admin",
+                ]}
+              >
                 <Success />
               </RoleRoute>
             }
@@ -302,15 +475,22 @@ export default function App() {
 
           <Route
             path="/profile"
-            element={<Profile />}
+            element={
+              <Profile />
+            }
           />
         </Route>
 
-        {/* ================= FALLBACK ================= */}
+        {/* FALLBACK */}
 
         <Route
           path="*"
-          element={<Navigate to="/dashboard" replace />}
+          element={
+            <Navigate
+              to="/dashboard"
+              replace
+            />
+          }
         />
       </Routes>
     </Router>

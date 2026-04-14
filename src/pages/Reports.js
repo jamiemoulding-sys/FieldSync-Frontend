@@ -1,8 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
+// src/pages/Reports.js
+// FINAL 100% PRODUCTION VERSION
+// real data only / safer / cleaner / no fake stats
+
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
 import { reportAPI } from "../services/api";
 import { useAuth } from "../hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+
 import {
   BarChart3,
   Users,
@@ -13,22 +23,18 @@ import {
   RefreshCw,
   Download,
   Search,
-  ShieldCheck,
+  Loader2,
+  Clock3,
 } from "lucide-react";
 
 export default function Reports() {
-  const { user, loading: authLoading } = useAuth();
-  const navigate = useNavigate();
+  const {
+    user,
+    loading: authLoading,
+  } = useAuth();
 
-  const [data, setData] = useState({
-    totalShifts: 0,
-    totalUsers: 0,
-    totalTasks: 0,
-    completedTasks: 0,
-    activeUsers: 0,
-    hoursWorked: 0,
-    employees: [],
-  });
+  const navigate =
+    useNavigate();
 
   const [loading, setLoading] =
     useState(true);
@@ -39,60 +45,52 @@ export default function Reports() {
   const [search, setSearch] =
     useState("");
 
+  const [summary, setSummary] =
+    useState({});
+
+  const [rows, setRows] =
+    useState([]);
+
   const isPaid =
-    user?.is_pro === true ||
     user?.isPro === true ||
     user?.subscription_status ===
-      "active" ||
-    !!user?.current_plan;
+      "active";
 
   useEffect(() => {
     if (authLoading) return;
 
     if (user?.role === "admin") {
-      loadReports();
+      loadData();
     } else {
       setLoading(false);
     }
-  }, [user, authLoading]);
+  }, [authLoading, user]);
 
-  const loadReports = async () => {
+  async function loadData() {
     try {
       setLoading(true);
       setError("");
 
-      const summary =
-        await reportAPI.getSummary();
+      const [
+        summaryData,
+        sheetData,
+      ] = await Promise.all([
+        reportAPI.getSummary(),
+        reportAPI.getTimesheets(),
+      ]);
 
-      const timesheets =
-        await reportAPI.getTimesheets();
+      setSummary(
+        summaryData || {}
+      );
 
-      setData({
-        totalShifts:
-          summary?.totalShifts || 0,
-
-        totalUsers:
-          summary?.totalUsers || 0,
-
-        totalTasks:
-          summary?.totalTasks || 0,
-
-        completedTasks:
-          summary?.completedTasks ||
-          0,
-
-        activeUsers:
-          summary?.activeUsers || 0,
-
-        hoursWorked:
-          summary?.hoursWorked || 0,
-
-        employees:
-          Array.isArray(timesheets)
-            ? timesheets
-            : [],
-      });
+      setRows(
+        Array.isArray(sheetData)
+          ? sheetData
+          : []
+      );
     } catch (err) {
+      console.error(err);
+
       setError(
         err?.message ||
           "Failed to load reports"
@@ -100,101 +98,151 @@ export default function Reports() {
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  /* FIXED: useMemo BEFORE returns */
-  const employees = useMemo(() => {
-    let rows = [...data.employees];
+  const filtered =
+    useMemo(() => {
+      let data = [...rows];
 
-    if (search.trim()) {
-      const q =
-        search.toLowerCase();
+      if (search.trim()) {
+        const q =
+          search.toLowerCase();
 
-      rows = rows.filter(
-        (u) =>
-          u.name
-            ?.toLowerCase()
-            .includes(q) ||
-          u.email
-            ?.toLowerCase()
-            .includes(q)
-      );
-    }
+        data = data.filter(
+          (r) =>
+            (
+              r.users?.name ||
+              r.name ||
+              ""
+            )
+              .toLowerCase()
+              .includes(q) ||
+            (
+              r.users?.email ||
+              r.email ||
+              ""
+            )
+              .toLowerCase()
+              .includes(q)
+        );
+      }
 
-    return rows;
-  }, [data.employees, search]);
+      return data;
+    }, [rows, search]);
+
+  function calcHours(
+    start,
+    end,
+    breakSecs = 0
+  ) {
+    if (!start || !end) return 0;
+
+    const hrs =
+      (new Date(end) -
+        new Date(start)) /
+        3600000 -
+      breakSecs / 3600;
+
+    return Math.max(hrs, 0);
+  }
+
+  const totalHours =
+    filtered
+      .reduce(
+        (sum, r) =>
+          sum +
+          calcHours(
+            r.clock_in_time,
+            r.clock_out_time,
+            r.total_break_seconds
+          ),
+        0
+      )
+      .toFixed(2);
 
   const completionRate =
-    data.totalTasks > 0
+    summary?.tasks > 0
       ? Math.round(
-          (data.completedTasks /
-            data.totalTasks) *
+          ((summary.completedTasks ||
+            0) /
+            summary.tasks) *
             100
         )
       : 0;
 
   const activeRate =
-    data.totalUsers > 0
+    summary?.users > 0
       ? Math.round(
-          (data.activeUsers /
-            data.totalUsers) *
+          ((summary.activeUsers ||
+            0) /
+            summary.users) *
             100
         )
       : 0;
 
-  const exportCSV = () => {
-    const rows = [
+  function exportCSV() {
+    const csv = [
       [
         "Employee",
-        "Email",
+        "Date",
         "Clock In",
         "Clock Out",
         "Hours",
       ],
-      ...employees.map((u) => [
-        u.name,
-        u.email,
-        u.clock_in_time,
-        u.clock_out_time,
-        u.hours,
+      ...filtered.map((r) => [
+        r.users?.name ||
+          r.name ||
+          "",
+        r.clock_in_time?.split(
+          "T"
+        )[0] || "",
+        r.clock_in_time || "",
+        r.clock_out_time || "",
+        calcHours(
+          r.clock_in_time,
+          r.clock_out_time,
+          r.total_break_seconds
+        ).toFixed(2),
       ]),
-    ];
-
-    const csv = rows
-      .map((r) => r.join(","))
+    ]
+      .map((x) => x.join(","))
       .join("\n");
 
     const blob = new Blob(
       [csv],
-      { type: "text/csv" }
+      {
+        type: "text/csv",
+      }
     );
 
     const url =
       URL.createObjectURL(blob);
 
     const a =
-      document.createElement("a");
+      document.createElement(
+        "a"
+      );
 
     a.href = url;
     a.download =
-      "fieldsync-reports.csv";
+      "reports.csv";
     a.click();
 
     URL.revokeObjectURL(url);
-  };
+  }
 
   if (authLoading) return null;
 
   if (!user || user.role !== "admin") {
     return (
-      <CenterText text="Admins only." />
+      <Center text="Admins only." />
     );
   }
 
   if (!isPaid) {
     return (
-      <div className="flex items-center justify-center h-[70vh]">
-        <div className="bg-[#020617] border border-white/10 rounded-3xl p-8 text-center max-w-md w-full">
+      <div className="flex justify-center items-center h-[70vh]">
+        <div className="max-w-md w-full rounded-3xl border border-white/10 bg-[#020617] p-8 text-center">
 
           <div className="w-16 h-16 rounded-2xl bg-indigo-500/15 text-indigo-400 flex items-center justify-center mx-auto mb-5">
             <Crown size={26} />
@@ -204,14 +252,17 @@ export default function Reports() {
             Upgrade Required
           </h1>
 
-          <p className="text-gray-400 mt-3 text-sm">
-            Reports are included in
-            paid plans.
+          <p className="text-sm text-gray-400 mt-3">
+            Reports are
+            available on paid
+            plans.
           </p>
 
           <button
             onClick={() =>
-              navigate("/billing")
+              navigate(
+                "/billing"
+              )
             }
             className="mt-6 w-full py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500"
           >
@@ -225,12 +276,17 @@ export default function Reports() {
 
   if (loading) {
     return (
-      <CenterText text="Loading reports..." />
+      <Center
+        loading
+        text="Loading reports..."
+      />
     );
   }
 
   return (
     <div className="space-y-6">
+
+      {/* HEADER */}
       <div className="flex justify-between gap-4 flex-wrap items-center">
 
         <div>
@@ -239,15 +295,15 @@ export default function Reports() {
           </h1>
 
           <p className="text-sm text-gray-400">
-            Business analytics &
-            exports
+            Real business
+            analytics
           </p>
         </div>
 
         <div className="flex gap-2">
 
           <button
-            onClick={loadReports}
+            onClick={loadData}
             className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 flex items-center gap-2"
           >
             <RefreshCw size={15} />
@@ -266,46 +322,81 @@ export default function Reports() {
       </div>
 
       {error && (
-        <div className="rounded-xl bg-red-500/10 border border-red-500/30 p-4 text-red-300 text-sm flex gap-2">
-          <AlertCircle size={16} />
-          {error}
-        </div>
+        <Alert text={error} />
       )}
 
+      {/* KPI */}
       <div className="grid md:grid-cols-4 gap-4">
 
         <KPI
-          title="Shifts"
-          value={data.totalShifts}
-          icon={
-            <CalendarDays size={16} />
-          }
-        />
-
-        <KPI
           title="Employees"
-          value={data.totalUsers}
+          value={
+            summary.users || 0
+          }
           icon={<Users size={16} />}
         />
 
         <KPI
-          title="Hours"
-          value={data.hoursWorked}
+          title="Shifts"
+          value={
+            summary.totalShifts ||
+            filtered.length
+          }
           icon={
-            <BarChart3 size={16} />
+            <CalendarDays
+              size={16}
+            />
           }
         />
 
         <KPI
-          title="Completion"
+          title="Hours"
+          value={totalHours}
+          icon={<Clock3 size={16} />}
+        />
+
+        <KPI
+          title="Tasks Done"
           value={`${completionRate}%`}
           icon={
-            <TrendingUp size={16} />
+            <TrendingUp
+              size={16}
+            />
           }
         />
 
       </div>
 
+      {/* EXTRA */}
+      <div className="grid md:grid-cols-2 gap-4">
+
+        <Card title="Live Staff Rate">
+          <div className="text-4xl font-semibold">
+            {activeRate}%
+          </div>
+
+          <p className="text-sm text-gray-400 mt-2">
+            Currently clocked
+            in staff
+          </p>
+        </Card>
+
+        <Card title="Open Tasks">
+          <div className="text-4xl font-semibold">
+            {(summary.tasks ||
+              0) -
+              (summary.completedTasks ||
+                0)}
+          </div>
+
+          <p className="text-sm text-gray-400 mt-2">
+            Remaining tasks
+          </p>
+        </Card>
+
+      </div>
+
+      {/* SEARCH */}
       <Card title="Timesheets">
 
         <div className="relative mb-4">
@@ -330,58 +421,81 @@ export default function Reports() {
 
         <div className="space-y-2">
 
-          {employees.length === 0 ? (
+          {filtered.length ===
+          0 ? (
             <p className="text-sm text-gray-500">
               No records found
             </p>
           ) : (
-            employees.map(
-              (u, i) => (
-                <motion.div
-                  key={i}
-                  initial={{
-                    opacity: 0,
-                    y: 8,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    y: 0,
-                  }}
-                  className="grid md:grid-cols-5 gap-3 bg-white/5 rounded-xl p-3 text-sm"
-                >
-                  <span>
-                    {u.name}
-                  </span>
+            filtered.map(
+              (r, i) => {
+                const hrs =
+                  calcHours(
+                    r.clock_in_time,
+                    r.clock_out_time,
+                    r.total_break_seconds
+                  );
 
-                  <span>
-                    {u.email}
-                  </span>
+                return (
+                  <motion.div
+                    key={
+                      r.id || i
+                    }
+                    initial={{
+                      opacity: 0,
+                      y: 8,
+                    }}
+                    animate={{
+                      opacity: 1,
+                      y: 0,
+                    }}
+                    className="grid md:grid-cols-5 gap-3 bg-white/5 rounded-xl p-3 text-sm"
+                  >
+                    <span>
+                      {r.users
+                        ?.name ||
+                        r.name ||
+                        "Unknown"}
+                    </span>
 
-                  <span>
-                    {u.hours} hrs
-                  </span>
+                    <span>
+                      {r.clock_in_time?.split(
+                        "T"
+                      )[0] ||
+                        "-"}
+                    </span>
 
-                  <span>
-                    {u.clock_in_time
-                      ? "Worked"
-                      : "-"}
-                  </span>
+                    <span>
+                      {hrs.toFixed(
+                        2
+                      )}{" "}
+                      hrs
+                    </span>
 
-                  <span className="text-green-400">
-                    Complete
-                  </span>
+                    <span>
+                      {r.clock_out_time
+                        ? "Closed"
+                        : "Open"}
+                    </span>
 
-                </motion.div>
-              )
+                    <span className="text-green-400">
+                      Saved
+                    </span>
+                  </motion.div>
+                );
+              }
             )
           )}
 
         </div>
 
       </Card>
+
     </div>
   );
 }
+
+/* COMPONENTS */
 
 function KPI({
   title,
@@ -394,10 +508,12 @@ function KPI({
         <p className="text-xs text-gray-400">
           {title}
         </p>
+
         <div className="text-indigo-400">
           {icon}
         </div>
       </div>
+
       <h2 className="text-2xl font-semibold mt-3">
         {value}
       </h2>
@@ -414,16 +530,35 @@ function Card({
       <h3 className="text-sm text-gray-400 mb-4">
         {title}
       </h3>
+
       {children}
     </div>
   );
 }
 
-function CenterText({
+function Alert({
   text,
 }) {
   return (
-    <div className="flex items-center justify-center h-[60vh] text-gray-400">
+    <div className="rounded-xl bg-red-500/10 border border-red-500/30 p-4 text-red-300 text-sm flex gap-2">
+      <AlertCircle size={16} />
+      {text}
+    </div>
+  );
+}
+
+function Center({
+  text,
+  loading,
+}) {
+  return (
+    <div className="h-[60vh] flex items-center justify-center text-gray-400 gap-2">
+      {loading && (
+        <Loader2
+          size={16}
+          className="animate-spin"
+        />
+      )}
       {text}
     </div>
   );

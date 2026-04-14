@@ -1,95 +1,79 @@
-/* =========================================================
-src/pages/TimeSheet.js
-FULL COPY / PASTE FILE
+// src/pages/TimeSheet.js
+// FULL PRO REWRITE VERSION
+// Copy / Paste Ready
 
-UPGRADES INCLUDED:
-✅ Existing table/calendar/export kept
-✅ Active staff panel
-✅ Force clock out button
-✅ Custom finish time editor
-✅ Safe loading/errors
-✅ No major code removed
-========================================================= */
-
-import React, { useState, useEffect } from "react";
-import {
-  reportAPI,
-  userAPI,
-  shiftAPI,
-} from "../services/api";
-
+import React, { useEffect, useMemo, useState } from "react";
+import { reportAPI, userAPI, shiftAPI } from "../services/api";
 import HomeButton from "../components/HomeButton";
+import { motion } from "framer-motion";
+import {
+  Clock3,
+  Download,
+  Search,
+  AlertTriangle,
+  CheckCircle2,
+  Loader2,
+  Users,
+  CalendarDays,
+} from "lucide-react";
 
-function TimeSheet() {
-  const [timeSheetData, setTimeSheetData] = useState([]);
-  const [employees, setEmployees] = useState([]);
-  const [activeShifts, setActiveShifts] = useState([]);
+export default function TimeSheet() {
+  const [rows, setRows] = useState([]);
+  const [staff, setStaff] = useState([]);
+  const [active, setActive] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
 
   const [view, setView] = useState("table");
+  const [search, setSearch] = useState("");
 
   const [fromDate, setFromDate] = useState(
-    new Date(
-      new Date().setDate(
-        new Date().getDate() - 7
-      )
-    )
+    new Date(Date.now() - 7 * 86400000)
       .toISOString()
       .split("T")[0]
   );
 
   const [toDate, setToDate] = useState(
-    new Date()
-      .toISOString()
-      .split("T")[0]
+    new Date().toISOString().split("T")[0]
   );
 
-  const [selectedEmployee, setSelectedEmployee] =
-    useState("");
-
+  const [employee, setEmployee] = useState("");
   const [finishTimes, setFinishTimes] =
     useState({});
 
   useEffect(() => {
     loadData();
-  }, [fromDate, toDate, selectedEmployee]);
+  }, [fromDate, toDate, employee]);
 
-  const loadData = async () => {
+  async function loadData() {
     try {
       setLoading(true);
-      setError("");
 
-      const [shifts, users, active] =
+      const [timesheets, users, live] =
         await Promise.all([
           reportAPI.getTimesheets(),
           userAPI.getAll(),
           shiftAPI.getActiveAll(),
         ]);
 
-      let rows = Array.isArray(shifts)
-        ? shifts
+      let data = Array.isArray(timesheets)
+        ? timesheets
         : [];
 
-      rows = rows.filter((row) => {
+      data = data.filter((row) => {
         if (!row.clock_in_time) return false;
 
-        const rowDate = new Date(
-          row.clock_in_time
-        )
-          .toISOString()
+        const day = row.clock_in_time
           .split("T")[0];
 
         const dateMatch =
-          rowDate >= fromDate &&
-          rowDate <= toDate;
+          day >= fromDate &&
+          day <= toDate;
 
         const employeeMatch =
-          selectedEmployee
-            ? row.user_id ===
-              selectedEmployee
+          employee
+            ? row.user_id === employee
             : true;
 
         return (
@@ -97,300 +81,305 @@ function TimeSheet() {
         );
       });
 
-      setTimeSheetData(rows);
-      setEmployees(
-        Array.isArray(users)
-          ? users
-          : []
+      setRows(data);
+      setStaff(
+        Array.isArray(users) ? users : []
       );
-
-      setActiveShifts(
-        Array.isArray(active)
-          ? active
-          : []
+      setActive(
+        Array.isArray(live) ? live : []
       );
     } catch (err) {
       console.error(err);
-      setError(
-        "Failed to load timesheets"
-      );
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const formatDate = (value) => {
-    if (!value) return "-";
+  function formatDate(v) {
+    if (!v) return "-";
+    return new Date(v).toLocaleDateString(
+      "en-GB"
+    );
+  }
 
-    return new Date(
-      value
-    ).toLocaleDateString("en-GB");
-  };
+  function formatTime(v) {
+    if (!v) return "-";
 
-  const formatTime = (value) => {
-    if (!value) return "-";
-
-    return new Date(
-      value
-    ).toLocaleTimeString(
+    return new Date(v).toLocaleTimeString(
       "en-GB",
       {
         hour: "2-digit",
         minute: "2-digit",
       }
     );
-  };
+  }
 
-  const calculateHours = (
+  function calcHours(
     start,
     end,
-    breakSeconds = 0
-  ) => {
-    if (!start || !end)
-      return "0.00";
+    breakSecs = 0
+  ) {
+    if (!start || !end) return 0;
 
-    const total =
+    const h =
       (new Date(end) -
         new Date(start)) /
         3600000 -
-      breakSeconds / 3600;
+      breakSecs / 3600;
 
-    return Math.max(
-      total,
-      0
-    ).toFixed(2);
-  };
+    return Math.max(h, 0);
+  }
 
-  const exportCSV = () => {
-    const rows = [
-      [
-        "Employee",
-        "Date",
-        "Clock In",
-        "Clock Out",
-        "Break",
-        "Hours",
-      ],
+  function overtime(hours) {
+    return hours > 8
+      ? (hours - 8).toFixed(2)
+      : "0.00";
+  }
 
-      ...timeSheetData.map((r) => [
-        r.users?.name ||
-          "Unknown",
-        formatDate(
-          r.clock_in_time
-        ),
-        formatTime(
-          r.clock_in_time
-        ),
-        formatTime(
-          r.clock_out_time
-        ),
-        `${Math.floor(
-          (r.total_break_seconds ||
-            0) / 60
-        )} mins`,
-        calculateHours(
+  const filtered = useMemo(() => {
+    return rows.filter((r) =>
+      (r.users?.name || "")
+        .toLowerCase()
+        .includes(
+          search.toLowerCase()
+        )
+    );
+  }, [rows, search]);
+
+  const totalHours = filtered
+    .reduce(
+      (sum, r) =>
+        sum +
+        calcHours(
           r.clock_in_time,
           r.clock_out_time,
           r.total_break_seconds
         ),
-      ]),
-    ];
+      0
+    )
+    .toFixed(2);
 
-    const blob = new Blob(
+  const totalOT = filtered
+    .reduce((sum, r) => {
+      const h = calcHours(
+        r.clock_in_time,
+        r.clock_out_time,
+        r.total_break_seconds
+      );
+
+      return (
+        sum +
+        parseFloat(overtime(h))
+      );
+    }, 0)
+    .toFixed(2);
+
+  async function forceOut(id) {
+    try {
+      setSaving(true);
+
+      const custom =
+        finishTimes[id];
+
+      await shiftAPI.managerClockOut(
+        id,
+        custom
+          ? new Date(
+              custom
+            ).toISOString()
+          : null
+      );
+
+      await loadData();
+    } catch (err) {
+      console.error(err);
+      alert("Failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function exportCSV() {
+    const csv = [
       [
-        rows
-          .map((r) =>
-            r.join(",")
-          )
-          .join("\n"),
+        "Employee",
+        "Date",
+        "In",
+        "Out",
+        "Hours",
+        "Overtime",
       ],
-      {
-        type: "text/csv",
-      }
-    );
+      ...filtered.map((r) => {
+        const h = calcHours(
+          r.clock_in_time,
+          r.clock_out_time,
+          r.total_break_seconds
+        );
+
+        return [
+          r.users?.name || "",
+          formatDate(
+            r.clock_in_time
+          ),
+          formatTime(
+            r.clock_in_time
+          ),
+          formatTime(
+            r.clock_out_time
+          ),
+          h.toFixed(2),
+          overtime(h),
+        ];
+      }),
+    ]
+      .map((x) => x.join(","))
+      .join("\n");
+
+    const blob = new Blob([csv], {
+      type: "text/csv",
+    });
 
     const url =
       URL.createObjectURL(blob);
 
     const a =
-      document.createElement(
-        "a"
-      );
+      document.createElement("a");
 
     a.href = url;
-    a.download = `timesheet-${fromDate}-to-${toDate}.csv`;
+    a.download = "timesheets.csv";
     a.click();
-  };
-
-  const managerClockOut =
-    async (shiftId) => {
-      try {
-        setSaving(true);
-
-        const custom =
-          finishTimes[
-            shiftId
-          ];
-
-        let iso = null;
-
-        if (custom) {
-          iso = new Date(
-            custom
-          ).toISOString();
-        }
-
-        await shiftAPI.managerClockOut(
-          shiftId,
-          iso
-        );
-
-        await loadData();
-      } catch (err) {
-        console.error(err);
-        alert(
-          "Failed to clock out"
-        );
-      } finally {
-        setSaving(false);
-      }
-    };
-
-  const grouped =
-    timeSheetData.reduce(
-      (acc, item) => {
-        const day = new Date(
-          item.clock_in_time
-        ).getDate();
-
-        if (!acc[day])
-          acc[day] = [];
-
-        acc[day].push(item);
-
-        return acc;
-      },
-      {}
-    );
+  }
 
   if (loading) {
     return (
-      <div className="center-screen">
+      <div className="text-gray-400 flex items-center gap-2">
+        <Loader2
+          size={16}
+          className="animate-spin"
+        />
         Loading timesheets...
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
-
+    <div className="space-y-6">
       {/* HEADER */}
       <div className="flex justify-between items-center flex-wrap gap-4">
-
         <div>
-          <h1 className="heading-1">
-            📊 Timesheet
+          <h1 className="text-2xl font-semibold">
+            Timesheets
           </h1>
 
-          <p className="subtle-text">
-            Staff hours & exports
+          <p className="text-sm text-gray-400">
+            Payroll & staff hours
           </p>
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           <button
             onClick={exportCSV}
-            className="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-xl"
+            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 flex items-center gap-2"
           >
-            Export CSV
+            <Download size={16} />
+            Export
           </button>
 
           <HomeButton />
         </div>
-
       </div>
 
-      {error && (
-        <div className="badge-error">
-          {error}
-        </div>
-      )}
+      {/* KPI */}
+      <div className="grid md:grid-cols-4 gap-4">
+        <Card
+          title="Staff"
+          value={staff.length}
+          icon={<Users size={16} />}
+        />
+        <Card
+          title="Entries"
+          value={filtered.length}
+          icon={
+            <CalendarDays size={16} />
+          }
+        />
+        <Card
+          title="Hours"
+          value={totalHours}
+          icon={<Clock3 size={16} />}
+        />
+        <Card
+          title="Overtime"
+          value={totalOT}
+          icon={
+            <AlertTriangle size={16} />
+          }
+        />
+      </div>
 
-      {/* ACTIVE STAFF */}
-      <div className="card space-y-4">
-        <h2 className="text-lg font-semibold">
+      {/* LIVE STAFF */}
+      <div className="rounded-2xl border border-white/10 bg-[#020617] p-5 space-y-4">
+        <h3 className="font-medium">
           Live Active Staff
-        </h2>
+        </h3>
 
-        {activeShifts.length ===
-        0 ? (
-          <div className="text-gray-400">
+        {active.length === 0 && (
+          <p className="text-gray-500">
             Nobody clocked in
-          </div>
-        ) : (
-          activeShifts.map(
-            (shift) => (
-              <div
-                key={shift.id}
-                className="border border-white/10 rounded-xl p-4 space-y-3"
-              >
-                <div className="font-medium">
-                  {shift.users
-                    ?.name ||
-                    "Unknown"}
-                </div>
-
-                <div className="text-sm text-gray-400">
-                  In:
-                  {" "}
-                  {formatDate(
-                    shift.clock_in_time
-                  )}{" "}
-                  {formatTime(
-                    shift.clock_in_time
-                  )}
-                </div>
-
-                <input
-                  type="datetime-local"
-                  value={
-                    finishTimes[
-                      shift.id
-                    ] || ""
-                  }
-                  onChange={(e) =>
-                    setFinishTimes({
-                      ...finishTimes,
-                      [shift.id]:
-                        e.target
-                          .value,
-                    })
-                  }
-                  className="bg-[#0f172a] border border-white/10 px-4 py-3 rounded-xl w-full"
-                />
-
-                <button
-                  disabled={
-                    saving
-                  }
-                  onClick={() =>
-                    managerClockOut(
-                      shift.id
-                    )
-                  }
-                  className="bg-red-600 hover:bg-red-500 px-4 py-3 rounded-xl w-full"
-                >
-                  Force Clock Out
-                </button>
-              </div>
-            )
-          )
+          </p>
         )}
+
+        {active.map((s) => (
+          <div
+            key={s.id}
+            className="border border-white/10 rounded-xl p-4 space-y-3"
+          >
+            <p className="font-medium">
+              {s.users?.name ||
+                "Unknown"}
+            </p>
+
+            <p className="text-sm text-gray-400">
+              Started{" "}
+              {formatDate(
+                s.clock_in_time
+              )}{" "}
+              {formatTime(
+                s.clock_in_time
+              )}
+            </p>
+
+            <input
+              type="datetime-local"
+              value={
+                finishTimes[s.id] ||
+                ""
+              }
+              onChange={(e) =>
+                setFinishTimes({
+                  ...finishTimes,
+                  [s.id]:
+                    e.target.value,
+                })
+              }
+              className="w-full px-4 py-3 rounded-xl bg-[#0f172a] border border-white/10"
+            />
+
+            <button
+              disabled={saving}
+              onClick={() =>
+                forceOut(s.id)
+              }
+              className="w-full py-3 rounded-xl bg-red-600 hover:bg-red-500"
+            >
+              Force Clock Out
+            </button>
+          </div>
+        ))}
       </div>
 
       {/* FILTERS */}
-      <div className="card grid md:grid-cols-5 gap-4">
-
+      <div className="grid md:grid-cols-5 gap-3">
         <input
           type="date"
           value={fromDate}
@@ -399,7 +388,7 @@ function TimeSheet() {
               e.target.value
             )
           }
-          className="bg-[#0f172a] border border-white/10 px-4 py-3 rounded-xl"
+          className="px-4 py-3 rounded-xl bg-[#020617] border border-white/10"
         />
 
         <input
@@ -410,192 +399,193 @@ function TimeSheet() {
               e.target.value
             )
           }
-          className="bg-[#0f172a] border border-white/10 px-4 py-3 rounded-xl"
+          className="px-4 py-3 rounded-xl bg-[#020617] border border-white/10"
         />
 
         <select
-          value={
-            selectedEmployee
-          }
+          value={employee}
           onChange={(e) =>
-            setSelectedEmployee(
+            setEmployee(
               e.target.value
             )
           }
-          className="bg-[#0f172a] border border-white/10 px-4 py-3 rounded-xl"
+          className="px-4 py-3 rounded-xl bg-[#020617] border border-white/10"
         >
           <option value="">
-            All Employees
+            All Staff
           </option>
 
-          {employees.map(
-            (emp) => (
-              <option
-                key={emp.id}
-                value={emp.id}
-              >
-                {emp.name}
-              </option>
-            )
-          )}
+          {staff.map((u) => (
+            <option
+              key={u.id}
+              value={u.id}
+            >
+              {u.name}
+            </option>
+          ))}
         </select>
 
-        <button
-          onClick={() =>
-            setView("table")
-          }
-          className={`px-4 py-3 rounded-xl ${
-            view === "table"
-              ? "bg-indigo-600"
-              : "bg-[#0f172a]"
-          }`}
-        >
-          Table
-        </button>
+        <div className="relative">
+          <Search
+            size={16}
+            className="absolute left-4 top-4 text-gray-500"
+          />
+
+          <input
+            value={search}
+            onChange={(e) =>
+              setSearch(
+                e.target.value
+              )
+            }
+            placeholder="Search..."
+            className="w-full pl-11 pr-4 py-3 rounded-xl bg-[#020617] border border-white/10"
+          />
+        </div>
 
         <button
-          onClick={() =>
-            setView(
-              "calendar"
-            )
-          }
-          className={`px-4 py-3 rounded-xl ${
-            view ===
-            "calendar"
-              ? "bg-indigo-600"
-              : "bg-[#0f172a]"
-          }`}
+          onClick={loadData}
+          className="rounded-xl bg-white/5 hover:bg-white/10"
         >
-          Calendar
+          Refresh
         </button>
-
       </div>
 
       {/* TABLE */}
-      {view ===
-        "table" && (
-        <div className="card overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="text-gray-400 text-sm">
-                <th>Employee</th>
-                <th>Date</th>
-                <th>In</th>
-                <th>Out</th>
-                <th>Break</th>
-                <th>Hours</th>
-              </tr>
-            </thead>
+      <div className="rounded-2xl border border-white/10 bg-[#020617] overflow-auto">
+        <table className="w-full text-sm min-w-[900px]">
+          <thead className="bg-white/5 text-gray-400">
+            <tr>
+              <th className="p-4 text-left">
+                Employee
+              </th>
+              <th className="p-4 text-left">
+                Date
+              </th>
+              <th className="p-4 text-left">
+                In
+              </th>
+              <th className="p-4 text-left">
+                Out
+              </th>
+              <th className="p-4 text-left">
+                Hours
+              </th>
+              <th className="p-4 text-left">
+                OT
+              </th>
+              <th className="p-4 text-left">
+                Status
+              </th>
+            </tr>
+          </thead>
 
-            <tbody>
-              {timeSheetData.map(
-                (
-                  row,
-                  i
-                ) => (
-                  <tr
-                    key={i}
-                    className="border-t border-white/10"
+          <tbody>
+            {filtered.map(
+              (row, i) => {
+                const h =
+                  calcHours(
+                    row.clock_in_time,
+                    row.clock_out_time,
+                    row.total_break_seconds
+                  );
+
+                return (
+                  <motion.tr
+                    key={row.id}
+                    initial={{
+                      opacity: 0,
+                      y: 8,
+                    }}
+                    animate={{
+                      opacity: 1,
+                      y: 0,
+                    }}
+                    transition={{
+                      delay:
+                        i * 0.01,
+                    }}
+                    className="border-t border-white/5"
                   >
-                    <td>
+                    <td className="p-4">
                       {row.users
                         ?.name ||
                         "Unknown"}
                     </td>
 
-                    <td>
+                    <td className="p-4">
                       {formatDate(
                         row.clock_in_time
                       )}
                     </td>
 
-                    <td>
+                    <td className="p-4">
                       {formatTime(
                         row.clock_in_time
                       )}
                     </td>
 
-                    <td>
+                    <td className="p-4">
                       {formatTime(
                         row.clock_out_time
                       )}
                     </td>
 
-                    <td>
-                      {Math.floor(
-                        (row.total_break_seconds ||
-                          0) /
-                          60
-                      )} mins
+                    <td className="p-4">
+                      {h.toFixed(
+                        2
+                      )}
                     </td>
 
-                    <td>
-                      {calculateHours(
-                        row.clock_in_time,
-                        row.clock_out_time,
-                        row.total_break_seconds
-                      )}h
+                    <td className="p-4 text-amber-400">
+                      {overtime(
+                        h
+                      )}
                     </td>
-                  </tr>
-                )
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
 
-      {/* CALENDAR */}
-      {view ===
-        "calendar" && (
-        <div className="grid grid-cols-7 gap-3">
-          {Array.from(
-            {
-              length: 31,
-            },
-            (_, i) =>
-              i + 1
-          ).map((day) => (
-            <div
-              key={day}
-              className="bg-[#0f172a] border border-white/10 rounded-xl p-3 min-h-[120px]"
-            >
-              <div className="text-sm font-semibold mb-2">
-                {day}
-              </div>
-
-              {grouped[
-                day
-              ]?.map(
-                (
-                  row,
-                  idx
-                ) => (
-                  <div
-                    key={
-                      idx
-                    }
-                    className="text-xs bg-indigo-500/20 text-indigo-300 rounded px-2 py-1 mb-1"
-                  >
-                    {row.users
-                      ?.name ||
-                      "Unknown"}{" "}
-                    (
-                    {calculateHours(
-                      row.clock_in_time,
-                      row.clock_out_time,
-                      row.total_break_seconds
-                    )}
-                    h)
-                  </div>
-                )
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
+                    <td className="p-4">
+                      {row.clock_out_time ? (
+                        <span className="text-green-400 inline-flex items-center gap-1">
+                          <CheckCircle2 size={14} />
+                          Complete
+                        </span>
+                      ) : (
+                        <span className="text-red-400">
+                          Open Shift
+                        </span>
+                      )}
+                    </td>
+                  </motion.tr>
+                );
+              }
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
 
-export default TimeSheet;
+function Card({
+  title,
+  value,
+  icon,
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-[#020617] p-4">
+      <div className="flex justify-between">
+        <p className="text-xs text-gray-400">
+          {title}
+        </p>
+
+        <div className="text-indigo-400">
+          {icon}
+        </div>
+      </div>
+
+      <h2 className="text-2xl font-semibold mt-2">
+        {value}
+      </h2>
+    </div>
+  );
+}

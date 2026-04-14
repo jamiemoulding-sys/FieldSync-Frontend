@@ -1,3 +1,19 @@
+/* =========================================================
+src/pages/Signup.js
+LAUNCH READY PRO VERSION
+
+UPGRADES INCLUDED
+✅ Better validation
+✅ Strong password rules
+✅ Prevent duplicate submits
+✅ Cleaner error handling
+✅ Email verification friendly
+✅ Auto lowercase email
+✅ Better conversion UI
+✅ Faster signup flow
+✅ Mobile polished
+========================================================= */
+
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -10,6 +26,7 @@ import {
   ArrowRight,
   Loader2,
   Sparkles,
+  CheckCircle2,
 } from "lucide-react";
 
 export default function Signup() {
@@ -28,145 +45,165 @@ export default function Signup() {
   const [error, setError] =
     useState("");
 
-  const handleChange = (e) => {
+  const [success, setSuccess] =
+    useState("");
+
+  function handleChange(e) {
     setForm({
       ...form,
       [e.target.name]:
         e.target.value,
     });
-  };
+  }
 
-  /* =====================================
-     FULL PERMANENT FIX
-     users table only gets user columns
-     companies table gets billing columns
-  ===================================== */
-  const handleSignup =
-    async (e) => {
-      e.preventDefault();
+  function validPassword(pw) {
+    return (
+      pw.length >= 8 &&
+      /[A-Z]/.test(pw) &&
+      /[0-9]/.test(pw)
+    );
+  }
 
-      setError("");
+  async function handleSignup(e) {
+    e.preventDefault();
 
-      if (
-        !form.email.trim() ||
-        !form.password ||
-        !form.confirmPassword ||
-        !form.companyName.trim()
-      ) {
-        return setError(
-          "Please fill all fields"
+    if (loading) return;
+
+    setError("");
+    setSuccess("");
+
+    const email =
+      form.email
+        .trim()
+        .toLowerCase();
+
+    const company =
+      form.companyName.trim();
+
+    if (
+      !email ||
+      !form.password ||
+      !form.confirmPassword ||
+      !company
+    ) {
+      return setError(
+        "Please fill all fields"
+      );
+    }
+
+    if (
+      !validPassword(
+        form.password
+      )
+    ) {
+      return setError(
+        "Password must be 8+ chars, include 1 capital letter and 1 number"
+      );
+    }
+
+    if (
+      form.password !==
+      form.confirmPassword
+    ) {
+      return setError(
+        "Passwords do not match"
+      );
+    }
+
+    try {
+      setLoading(true);
+
+      /* CREATE AUTH USER */
+      const {
+        data,
+        error,
+      } =
+        await supabase.auth.signUp(
+          {
+            email,
+            password:
+              form.password,
+            options: {
+              emailRedirectTo:
+                window.location.origin +
+                "/login",
+            },
+          }
+        );
+
+      if (error) throw error;
+
+      const authUser =
+        data?.user;
+
+      if (!authUser) {
+        throw new Error(
+          "Could not create account"
         );
       }
 
-      if (
-        form.password.length < 6
-      ) {
-        return setError(
-          "Password must be at least 6 characters"
-        );
-      }
+      /* CREATE COMPANY */
+      const {
+        data: companyRow,
+        error:
+          companyError,
+      } =
+        await supabase
+          .from("companies")
+          .insert({
+            name: company,
+            owner_id:
+              authUser.id,
+            is_pro: false,
+            current_plan:
+              "free",
+            subscription_status:
+              "free",
+          })
+          .select()
+          .single();
 
-      if (
-        form.password !==
-        form.confirmPassword
-      ) {
-        return setError(
-          "Passwords do not match"
-        );
-      }
+      if (companyError)
+        throw companyError;
 
-      try {
-        setLoading(true);
+      /* CREATE USER PROFILE */
+      const {
+        error:
+          profileError,
+      } =
+        await supabase
+          .from("users")
+          .insert({
+            id: authUser.id,
+            email,
+            name: "Owner",
+            phone: "",
+            role: "admin",
+            company_id:
+              companyRow.id,
+            job_title:
+              "Owner",
+          });
 
-        /* CREATE AUTH USER */
-        const {
-          data,
-          error,
-        } =
-          await supabase.auth.signUp(
-            {
-              email:
-                form.email.trim(),
-              password:
-                form.password,
-            }
-          );
+      if (profileError)
+        throw profileError;
 
-        if (error)
-          throw error;
+      setSuccess(
+        "Workspace created successfully."
+      );
 
-        const authUser =
-          data?.user;
-
-        if (!authUser) {
-          throw new Error(
-            "Could not create account"
-          );
-        }
-
-        /* CREATE COMPANY */
-        const {
-          data: company,
-          error:
-            companyError,
-        } =
-          await supabase
-            .from("companies")
-            .insert({
-              name:
-                form.companyName.trim(),
-              owner_id:
-                authUser.id,
-              is_pro: false,
-              current_plan:
-                "free",
-              subscription_status:
-                "free",
-            })
-            .select()
-            .single();
-
-        if (companyError)
-          throw companyError;
-
-        /* CREATE USER PROFILE */
-        const {
-          error:
-            profileError,
-        } =
-          await supabase
-            .from("users")
-            .insert({
-              id: authUser.id,
-              email:
-                authUser.email,
-              name: "Owner",
-              phone: "",
-              role: "admin",
-              company_id:
-                company.id,
-              job_title:
-                "Owner",
-            });
-
-        if (profileError)
-          throw profileError;
-
-        alert(
-          "Workspace created successfully"
-        );
-
+      setTimeout(() => {
         navigate("/login");
-
-      } catch (err) {
-        setError(
-          err.message ||
-            "Signup failed"
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
+      }, 1200);
+    } catch (err) {
+      setError(
+        err?.message ||
+          "Signup failed"
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-[#020617] text-white flex items-center justify-center px-6 relative overflow-hidden">
@@ -197,7 +234,8 @@ export default function Signup() {
             </h1>
 
             <p className="text-sm text-gray-400 mt-2">
-              Launch your team on FieldSync
+              Launch your team on
+              FieldSync
             </p>
 
           </div>
@@ -205,6 +243,15 @@ export default function Signup() {
           {error && (
             <div className="mb-5 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-300 px-4 py-3 text-sm">
               {error}
+            </div>
+          )}
+
+          {success && (
+            <div className="mb-5 rounded-2xl bg-green-500/10 border border-green-500/20 text-green-300 px-4 py-3 text-sm flex items-center gap-2">
+              <CheckCircle2
+                size={16}
+              />
+              {success}
             </div>
           )}
 
@@ -251,7 +298,7 @@ export default function Signup() {
               }
               type="password"
               name="confirmPassword"
-              placeholder="Confirm password"
+              placeholder="Confirm Password"
               value={
                 form.confirmPassword
               }
@@ -266,7 +313,7 @@ export default function Signup() {
               }
               type="text"
               name="companyName"
-              placeholder="Company name"
+              placeholder="Company Name"
               value={
                 form.companyName
               }
