@@ -792,4 +792,42 @@ export const billingAPI = {
   },
 };
 
+/* ==================================================
+MANAGER
+================================================== */
+
+export const managerAPI = {
+  getActiveShifts: async () => {
+    const data = await shiftAPI.getActiveAll();
+
+    return {
+      data: data || [],
+    };
+  },
+
+  clockOutStaff: async (
+    shiftId,
+    hhmm
+  ) => {
+    let finalTime =
+      new Date().toISOString();
+
+    if (hhmm) {
+      const today =
+        new Date()
+          .toISOString()
+          .split("T")[0];
+
+      finalTime = `${today}T${hhmm}:00`;
+    }
+
+    await shiftAPI.managerClockOut(
+      shiftId,
+      finalTime
+    );
+
+    return true;
+  },
+};
+
 export default api;
