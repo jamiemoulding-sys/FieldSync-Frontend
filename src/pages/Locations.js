@@ -1,9 +1,13 @@
 /* =========================================================
 src/pages/Locations.js
-FULL FILE
-- Manual pin movement supported (save exact point)
-- Better UX text
-- Geofence warning note added
+FULL COPY / PASTE FILE
+
+UPDATES INCLUDED:
+- Manual pin movement supported
+- Search postcode then refine exact point
+- Better save validation
+- Improved UX
+- Safe loading / deleting
 ========================================================= */
 
 import {
@@ -33,6 +37,9 @@ export default function Locations() {
   const [saving, setSaving] =
     useState(false);
 
+  const [loading, setLoading] =
+    useState(true);
+
   const [form, setForm] =
     useState({
       name: "",
@@ -43,12 +50,20 @@ export default function Locations() {
   const load =
     async () => {
       try {
+        setLoading(true);
+
         const data =
           await locationAPI.getLocations();
 
-        setLocations(data || []);
+        setLocations(
+          Array.isArray(data)
+            ? data
+            : []
+        );
       } catch (err) {
         console.error(err);
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -77,7 +92,8 @@ export default function Locations() {
     setEditing(row);
 
     setForm({
-      name: row.name,
+      name:
+        row.name || "",
       address:
         row.address || "",
       radius:
@@ -102,7 +118,7 @@ export default function Locations() {
 
       if (!position) {
         return alert(
-          "Please choose exact map location"
+          "Please choose an exact map pin"
         );
       }
 
@@ -132,8 +148,10 @@ export default function Locations() {
         }
 
         setShowModal(false);
+
         reset();
-        load();
+
+        await load();
 
       } catch (err) {
         console.error(err);
@@ -156,24 +174,35 @@ export default function Locations() {
         return;
       }
 
-      await locationAPI.delete(
-        id
-      );
+      try {
+        await locationAPI.delete(
+          id
+        );
 
-      load();
+        await load();
+
+      } catch (err) {
+        console.error(err);
+
+        alert(
+          "Failed to delete"
+        );
+      }
     };
 
   return (
     <div className="space-y-6">
 
-      <div className="flex justify-between items-center flex-wrap gap-3">
+      {/* HEADER */}
+      <div className="flex justify-between items-center flex-wrap gap-4">
+
         <div>
           <h1 className="text-2xl font-semibold">
             Locations
           </h1>
 
           <p className="text-sm text-gray-400 mt-1">
-            Set exact geofence pins and radius for clock in.
+            Set exact clock-in geofence locations
           </p>
         </div>
 
@@ -185,81 +214,99 @@ export default function Locations() {
         >
           Add Location
         </button>
+
       </div>
 
-      <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-4 text-sm text-yellow-200">
-        If staff can still clock in outside the area, your clock-in page needs geofence enforcement logic updating next.
+      {/* INFO */}
+      <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/10 p-4 text-sm text-indigo-200">
+        Search postcode first, then drag or click the pin to exact entrance / building.
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4">
-        {locations.map(
-          (loc) => (
-            <div
-              key={loc.id}
-              className="border border-white/10 rounded-2xl p-5 bg-[#020617]"
-            >
-              <h2 className="font-semibold text-lg">
-                {loc.name}
-              </h2>
+      {/* LIST */}
+      {loading ? (
+        <div className="text-gray-400">
+          Loading locations...
+        </div>
+      ) : (
+        <div className="grid md:grid-cols-2 gap-4">
 
-              <p className="text-sm text-gray-400 mt-2">
-                {
-                  loc.address
-                }
-              </p>
+          {locations.map(
+            (loc) => (
+              <div
+                key={loc.id}
+                className="border border-white/10 rounded-2xl p-5 bg-[#020617]"
+              >
+                <h2 className="font-semibold text-lg">
+                  {loc.name}
+                </h2>
 
-              <p className="text-sm mt-3">
-                Radius:{" "}
-                {
-                  loc.radius
-                }
-                m
-              </p>
+                <p className="text-sm text-gray-400 mt-2">
+                  {
+                    loc.address
+                  }
+                </p>
 
-              <p className="text-xs text-gray-500 mt-2">
-                Lat:{" "}
-                {
-                  Number(
+                <p className="text-sm mt-3">
+                  Radius:{" "}
+                  {
+                    loc.radius
+                  }
+                  m
+                </p>
+
+                <p className="text-xs text-gray-500 mt-2">
+                  Lat:{" "}
+                  {Number(
                     loc.latitude
-                  ).toFixed(6)
-                }
-                {" | "}
-                Lng:{" "}
-                {
-                  Number(
+                  ).toFixed(6)}
+                  {" | "}
+                  Lng:{" "}
+                  {Number(
                     loc.longitude
-                  ).toFixed(6)
-                }
-              </p>
+                  ).toFixed(6)}
+                </p>
 
-              <div className="flex gap-2 mt-4">
-                <button
-                  onClick={() =>
-                    edit(
-                      loc
-                    )
-                  }
-                  className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10"
-                >
-                  Edit
-                </button>
+                <div className="flex gap-2 mt-4">
 
-                <button
-                  onClick={() =>
-                    remove(
-                      loc.id
-                    )
-                  }
-                  className="px-3 py-2 rounded-xl bg-red-500/20 text-red-300"
-                >
-                  Delete
-                </button>
+                  <button
+                    onClick={() =>
+                      edit(
+                        loc
+                      )
+                    }
+                    className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10"
+                  >
+                    Edit
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      remove(
+                        loc.id
+                      )
+                    }
+                    className="px-3 py-2 rounded-xl bg-red-500/20 text-red-300"
+                  >
+                    Delete
+                  </button>
+
+                </div>
+
               </div>
-            </div>
-          )
-        )}
-      </div>
+            )
+          )}
 
+          {locations.length ===
+            0 && (
+            <div className="text-gray-500">
+              No locations yet
+            </div>
+          )}
+
+        </div>
+      )}
+
+      {/* MODAL */}
       {showModal && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 overflow-y-auto">
 
@@ -272,7 +319,9 @@ export default function Locations() {
             </h2>
 
             <form
-              onSubmit={save}
+              onSubmit={
+                save
+              }
               className="space-y-4"
             >
 
@@ -309,12 +358,12 @@ export default function Locations() {
                         .value,
                   })
                 }
-                placeholder="Address or postcode"
+                placeholder="Postcode or address"
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3"
               />
 
               <div className="text-sm text-gray-400">
-                Search postcode, then drag / click map pin to exact building entrance.
+                Move the marker manually for exact placement.
               </div>
 
               <LocationPicker
@@ -324,11 +373,9 @@ export default function Locations() {
                 setPosition={
                   setPosition
                 }
-                radius={
-                  Number(
-                    form.radius
-                  )
-                }
+                radius={Number(
+                  form.radius
+                )}
                 onSelectAddress={(
                   addr
                 ) =>

@@ -124,7 +124,7 @@ export default function Employees() {
       try {
         setSaving(true);
 
-        await userAPI.updateRole(
+        await userAPI.update(
           id,
           { role }
         );
@@ -218,7 +218,7 @@ export default function Employees() {
 
   return (
     <div className="space-y-6">
-      {/* HEADER */}
+
       <div className="flex justify-between items-center flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-semibold flex items-center gap-2">
@@ -260,7 +260,6 @@ export default function Employees() {
         </div>
       </div>
 
-      {/* FILTERS */}
       <div className="grid md:grid-cols-2 gap-3">
         <div className="relative">
           <Search
@@ -296,22 +295,18 @@ export default function Employees() {
           <option value="all">
             All Roles
           </option>
-
           <option value="employee">
             Employee
           </option>
-
           <option value="manager">
             Manager
           </option>
-
           <option value="admin">
             Admin
           </option>
         </select>
       </div>
 
-      {/* KPI */}
       <div className="grid md:grid-cols-3 gap-4">
         <StatCard
           title="Total Staff"
@@ -343,7 +338,6 @@ export default function Employees() {
         />
       </div>
 
-      {/* TABLE */}
       <div className="rounded-2xl overflow-hidden border border-white/10 bg-[#020617]">
         <table className="w-full text-sm">
           <thead className="bg-white/5 text-gray-400">
@@ -351,11 +345,9 @@ export default function Employees() {
               <th className="text-left p-4">
                 User
               </th>
-
               <th className="text-left p-4">
                 Role
               </th>
-
               <th className="text-left p-4">
                 Action
               </th>
@@ -499,7 +491,6 @@ export default function Employees() {
         )}
       </div>
 
-      {/* MODAL */}
       {inviteOpen && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-6">
           <div className="w-full max-w-md rounded-2xl bg-[#020617] border border-white/10 p-6 space-y-4">
@@ -537,11 +528,9 @@ export default function Employees() {
               <option value="employee">
                 Employee
               </option>
-
               <option value="manager">
                 Manager
               </option>
-
               <option value="admin">
                 Admin
               </option>

@@ -1,3 +1,15 @@
+/* =========================================================
+src/pages/WorkSession.js
+FULL COPY / PASTE FILE
+
+FIXES INCLUDED
+✅ Geofence enforced
+✅ Blocks clock in outside allowed radius
+✅ Shows warning if outside zone
+✅ Keeps all your existing layout
+✅ No code removed
+========================================================= */
+
 import { useEffect, useState } from "react";
 import {
   shiftAPI,
@@ -11,6 +23,7 @@ import {
   Coffee,
   MapPin,
   Loader2,
+  AlertTriangle,
 } from "lucide-react";
 
 export default function WorkSession() {
@@ -34,6 +47,9 @@ export default function WorkSession() {
 
   const [saving, setSaving] =
     useState(false);
+
+  const [warning, setWarning] =
+    useState("");
 
   useEffect(() => {
     load();
@@ -104,12 +120,76 @@ export default function WorkSession() {
       );
 
       setLocations(
-        locs || []
+        Array.isArray(locs)
+          ? locs
+          : []
       );
     } finally {
       setLoading(false);
     }
   };
+
+  /* ==================================================
+  DISTANCE CHECK
+  ================================================== */
+
+  const distanceMeters = (
+    lat1,
+    lon1,
+    lat2,
+    lon2
+  ) => {
+    const R = 6371000;
+
+    const dLat =
+      ((lat2 - lat1) *
+        Math.PI) /
+      180;
+
+    const dLon =
+      ((lon2 - lon1) *
+        Math.PI) /
+      180;
+
+    const a =
+      Math.sin(
+        dLat / 2
+      ) *
+        Math.sin(
+          dLat / 2
+        ) +
+      Math.cos(
+        (lat1 *
+          Math.PI) /
+          180
+      ) *
+        Math.cos(
+          (lat2 *
+            Math.PI) /
+            180
+        ) *
+        Math.sin(
+          dLon / 2
+        ) *
+        Math.sin(
+          dLon / 2
+        );
+
+    const c =
+      2 *
+      Math.atan2(
+        Math.sqrt(a),
+        Math.sqrt(
+          1 - a
+        )
+      );
+
+    return R * c;
+  };
+
+  /* ==================================================
+  CLOCK IN
+  ================================================== */
 
   const clockIn = () => {
     if (!selectedLocation) {
@@ -118,18 +198,71 @@ export default function WorkSession() {
       );
     }
 
+    const site =
+      locations.find(
+        (x) =>
+          String(x.id) ===
+          String(
+            selectedLocation
+          )
+      );
+
+    if (!site) {
+      return alert(
+        "Location not found"
+      );
+    }
+
     setSaving(true);
+    setWarning("");
 
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         try {
+          const userLat =
+            pos.coords.latitude;
+
+          const userLng =
+            pos.coords.longitude;
+
+          const distance =
+            distanceMeters(
+              userLat,
+              userLng,
+              Number(
+                site.latitude
+              ),
+              Number(
+                site.longitude
+              )
+            );
+
+          const radius =
+            Number(
+              site.radius
+            ) || 100;
+
+          if (
+            distance >
+            radius
+          ) {
+            setWarning(
+              `Outside geofence. You are ${Math.round(
+                distance
+              )}m away. Allowed radius ${radius}m.`
+            );
+
+            setSaving(false);
+            return;
+          }
+
           await shiftAPI.clockIn({
             location_id:
               selectedLocation,
             latitude:
-              pos.coords.latitude,
+              userLat,
             longitude:
-              pos.coords.longitude,
+              userLng,
           });
 
           await load();
@@ -139,9 +272,13 @@ export default function WorkSession() {
       },
       () => {
         setSaving(false);
+
         alert(
           "Location permission needed"
         );
+      },
+      {
+        enableHighAccuracy: true,
       }
     );
   };
@@ -149,7 +286,9 @@ export default function WorkSession() {
   const clockOut = async () => {
     try {
       setSaving(true);
+
       await shiftAPI.clockOut();
+
       await load();
     } finally {
       setSaving(false);
@@ -219,6 +358,13 @@ export default function WorkSession() {
         </p>
       </div>
 
+      {warning && (
+        <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-red-300 text-sm flex gap-2">
+          <AlertTriangle size={16} />
+          {warning}
+        </div>
+      )}
+
       {/* ACTIVE SHIFT */}
       {activeShift ? (
         <div className="rounded-3xl border border-white/10 bg-[#020617] p-8 text-center">
@@ -237,11 +383,7 @@ export default function WorkSession() {
 
           {activeShift.break_started_at && (
             <p className="text-amber-400 mt-3">
-              Break:
-              {" "}
-              {format(
-                breakSec
-              )}
+              Break: {format(breakSec)}
             </p>
           )}
 
@@ -295,7 +437,7 @@ export default function WorkSession() {
           </h2>
 
           <p className="text-sm text-gray-400 mt-1">
-            Select your work site first
+            Must be inside work radius
           </p>
 
           <div className="relative mt-5">

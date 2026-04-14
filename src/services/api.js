@@ -1,6 +1,6 @@
 // src/services/api.js
 // FULL FIXED COPY/PASTE VERSION
-// Multi-company safe + legacy methods restored
+// Multi-company safe + legacy methods restored + clock fixes + dashboard stats fixed
 
 import axios from "axios";
 import supabase from "../lib/supabase";
@@ -326,7 +326,7 @@ export const shiftAPI = {
 
     const { data, error } = await supabase
       .from("shifts")
-      .select("*")
+      .select("*, users(name,email)")
       .eq("company_id", companyId)
       .order("clock_in_time", {
         ascending: false,
@@ -353,6 +353,21 @@ export const shiftAPI = {
     return data;
   },
 
+  getActiveAll: async () => {
+    const companyId = await getCompanyId();
+
+    const { data, error } = await supabase
+      .from("shifts")
+      .select("*, users(name,email)")
+      .eq("company_id", companyId)
+      .is("clock_out_time", null)
+      .order("clock_in_time");
+
+    if (error) throw error;
+
+    return data || [];
+  },
+
   clockIn: async (payload = {}) => {
     const user = await getCurrentUser();
 
@@ -363,7 +378,91 @@ export const shiftAPI = {
         user_id: user.id,
         company_id: user.company_id,
         clock_in_time: new Date().toISOString(),
+        total_break_seconds: 0,
       });
+
+    if (error) throw error;
+
+    return true;
+  },
+
+  clockOut: async () => {
+    const user = await getCurrentUser();
+
+    const { error } = await supabase
+      .from("shifts")
+      .update({
+        clock_out_time: new Date().toISOString(),
+        break_started_at: null,
+      })
+      .eq("user_id", user.id)
+      .eq("company_id", user.company_id)
+      .is("clock_out_time", null);
+
+    if (error) throw error;
+
+    return true;
+  },
+
+  startBreak: async () => {
+    const user = await getCurrentUser();
+
+    const { error } = await supabase
+      .from("shifts")
+      .update({
+        break_started_at: new Date().toISOString(),
+      })
+      .eq("user_id", user.id)
+      .eq("company_id", user.company_id)
+      .is("clock_out_time", null);
+
+    if (error) throw error;
+
+    return true;
+  },
+
+  endBreak: async () => {
+    const active = await shiftAPI.getActive();
+
+    if (!active?.break_started_at) return true;
+
+    const extraSeconds = Math.floor(
+      (Date.now() -
+        new Date(active.break_started_at).getTime()) /
+        1000
+    );
+
+    const { error } = await supabase
+      .from("shifts")
+      .update({
+        break_started_at: null,
+        total_break_seconds:
+          (active.total_break_seconds || 0) +
+          extraSeconds,
+      })
+      .eq("id", active.id);
+
+    if (error) throw error;
+
+    return true;
+  },
+
+  managerClockOut: async (
+    shiftId,
+    clockOutTime
+  ) => {
+    const companyId = await getCompanyId();
+
+    const { error } = await supabase
+      .from("shifts")
+      .update({
+        clock_out_time:
+          clockOutTime ||
+          new Date().toISOString(),
+        break_started_at: null,
+      })
+      .eq("id", shiftId)
+      .eq("company_id", companyId);
 
     if (error) throw error;
 
@@ -381,10 +480,15 @@ export const reportAPI = {
     const tasks = await taskAPI.getAll();
     const shifts = await shiftAPI.getAll();
 
+    const activeUsers = shifts.filter(
+      (x) => !x.clock_out_time
+    ).length;
+
     return {
-      totalUsers: users.length,
-      totalTasks: tasks.length,
-      totalShifts: shifts.length,
+      users: users.length,
+      tasks: tasks.length,
+      shifts: shifts.length,
+      activeUsers,
       completedTasks: tasks.filter(
         (x) => x.completed
       ).length,
@@ -541,12 +645,7 @@ export const holidayAPI = {
 
     if (error) throw error;
 
-    return (
-      data?.map((x) => ({
-        ...x,
-        name: x.users?.name || "",
-      })) || []
-    );
+    return data || [];
   },
 
   getMine: async () => {

@@ -1,3 +1,16 @@
+/* =========================================================
+src/pages/TimeSheet.js
+FULL COPY / PASTE FILE
+
+FIXES INCLUDED:
+- Uses reportAPI.getTimesheets()
+- Safe loading
+- Better error handling
+- Export CSV
+- Table + Calendar views
+- No broken functions
+========================================================= */
+
 import React, {
   useState,
   useEffect,
@@ -19,6 +32,12 @@ function TimeSheet() {
 
   const [loading, setLoading] =
     useState(true);
+
+  const [error, setError] =
+    useState("");
+
+  const [view, setView] =
+    useState("table");
 
   const [fromDate, setFromDate] =
     useState(
@@ -43,12 +62,6 @@ function TimeSheet() {
     setSelectedEmployee,
   ] = useState("");
 
-  const [error, setError] =
-    useState("");
-
-  const [view, setView] =
-    useState("table");
-
   useEffect(() => {
     loadData();
   }, [
@@ -57,90 +70,107 @@ function TimeSheet() {
     selectedEmployee,
   ]);
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      setError("");
+  const loadData =
+    async () => {
+      try {
+        setLoading(true);
+        setError("");
 
-      const [
-        shifts,
-        users,
-      ] = await Promise.all([
-        reportAPI.getTimesheets(),
-        userAPI.getAll(),
-      ]);
+        const [
+          shifts,
+          users,
+        ] = await Promise.all([
+          reportAPI.getTimesheets(),
+          userAPI.getAll(),
+        ]);
 
-      let rows =
-        Array.isArray(shifts)
-          ? shifts
-          : [];
+        let rows =
+          Array.isArray(shifts)
+            ? shifts
+            : [];
 
-      rows = rows.filter(
-        (row) => {
-          if (!row.clock_in_time)
-            return false;
-
-          const rowDate =
-            new Date(
-              row.clock_in_time
+        rows = rows.filter(
+          (row) => {
+            if (
+              !row.clock_in_time
             )
-              .toISOString()
-              .split("T")[0];
+              return false;
 
-          const dateMatch =
-            rowDate >= fromDate &&
-            rowDate <= toDate;
+            const rowDate =
+              new Date(
+                row.clock_in_time
+              )
+                .toISOString()
+                .split("T")[0];
 
-          const employeeMatch =
-            selectedEmployee
-              ? row.user_id ===
-                selectedEmployee
-              : true;
+            const dateMatch =
+              rowDate >=
+                fromDate &&
+              rowDate <=
+                toDate;
 
-          return (
-            dateMatch &&
-            employeeMatch
-          );
-        }
-      );
+            const employeeMatch =
+              selectedEmployee
+                ? row.user_id ===
+                  selectedEmployee
+                : true;
 
-      setTimeSheetData(rows);
+            return (
+              dateMatch &&
+              employeeMatch
+            );
+          }
+        );
 
-      setEmployees(
-        Array.isArray(users)
-          ? users
-          : []
-      );
-    } catch (err) {
-      console.error(err);
+        setTimeSheetData(
+          rows
+        );
 
-      setError(
-        "Failed to load timesheet"
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+        setEmployees(
+          Array.isArray(
+            users
+          )
+            ? users
+            : []
+        );
 
-  const formatTime = (t) => {
-    if (!t) return "-";
+      } catch (err) {
+        console.error(err);
+
+        setError(
+          "Failed to load timesheets"
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+  const formatTime = (
+    value
+  ) => {
+    if (!value)
+      return "-";
 
     return new Date(
-      t
+      value
     ).toLocaleTimeString(
       "en-GB",
       {
         hour: "2-digit",
-        minute: "2-digit",
+        minute:
+          "2-digit",
       }
     );
   };
 
-  const formatDate = (t) => {
-    if (!t) return "-";
+  const formatDate = (
+    value
+  ) => {
+    if (!value)
+      return "-";
 
     return new Date(
-      t
+      value
     ).toLocaleDateString(
       "en-GB"
     );
@@ -151,14 +181,18 @@ function TimeSheet() {
     end,
     breakSeconds = 0
   ) => {
-    if (!start || !end)
+    if (
+      !start ||
+      !end
+    )
       return "0.00";
 
     const total =
       (new Date(end) -
         new Date(start)) /
         3600000 -
-      breakSeconds / 3600;
+      breakSeconds /
+        3600;
 
     return Math.max(
       total,
@@ -166,89 +200,99 @@ function TimeSheet() {
     ).toFixed(2);
   };
 
-  const exportCSV = () => {
-    const rows = [
-      [
-        "Employee",
-        "Date",
-        "Clock In",
-        "Clock Out",
-        "Break",
-        "Hours",
-      ],
-
-      ...timeSheetData.map(
-        (r) => [
-          r.users?.name ||
-            "Unknown",
-
-          formatDate(
-            r.clock_in_time
-          ),
-
-          formatTime(
-            r.clock_in_time
-          ),
-
-          formatTime(
-            r.clock_out_time
-          ),
-
-          `${Math.floor(
-            (r.total_break_seconds ||
-              0) / 60
-          )} mins`,
-
-          calculateHours(
-            r.clock_in_time,
-            r.clock_out_time,
-            r.total_break_seconds
-          ),
-        ]
-      ),
-    ];
-
-    const blob =
-      new Blob(
+  const exportCSV =
+    () => {
+      const rows = [
         [
-          rows
-            .map((r) =>
-              r.join(",")
-            )
-            .join("\n"),
+          "Employee",
+          "Date",
+          "Clock In",
+          "Clock Out",
+          "Break",
+          "Hours",
         ],
-        {
-          type: "text/csv",
-        }
-      );
 
-    const url =
-      URL.createObjectURL(
-        blob
-      );
+        ...timeSheetData.map(
+          (r) => [
+            r.users
+              ?.name ||
+              "Unknown",
 
-    const a =
-      document.createElement(
-        "a"
-      );
+            formatDate(
+              r.clock_in_time
+            ),
 
-    a.href = url;
-    a.download = `timesheet-${fromDate}-to-${toDate}.csv`;
-    a.click();
-  };
+            formatTime(
+              r.clock_in_time
+            ),
+
+            formatTime(
+              r.clock_out_time
+            ),
+
+            `${Math.floor(
+              (r.total_break_seconds ||
+                0) / 60
+            )} mins`,
+
+            calculateHours(
+              r.clock_in_time,
+              r.clock_out_time,
+              r.total_break_seconds
+            ),
+          ]
+        ),
+      ];
+
+      const blob =
+        new Blob(
+          [
+            rows
+              .map((r) =>
+                r.join(",")
+              )
+              .join("\n"),
+          ],
+          {
+            type: "text/csv",
+          }
+        );
+
+      const url =
+        URL.createObjectURL(
+          blob
+        );
+
+      const a =
+        document.createElement(
+          "a"
+        );
+
+      a.href = url;
+
+      a.download = `timesheet-${fromDate}-to-${toDate}.csv`;
+
+      a.click();
+    };
 
   const grouped =
     timeSheetData.reduce(
-      (acc, item) => {
-        const date =
+      (
+        acc,
+        item
+      ) => {
+        const day =
           new Date(
             item.clock_in_time
           ).getDate();
 
-        if (!acc[date])
-          acc[date] = [];
+        if (!acc[day])
+          acc[day] =
+            [];
 
-        acc[date].push(item);
+        acc[day].push(
+          item
+        );
 
         return acc;
       },
@@ -258,22 +302,24 @@ function TimeSheet() {
   if (loading) {
     return (
       <div className="center-screen">
-        Loading timesheet...
+        Loading timesheets...
       </div>
     );
   }
 
   return (
     <div className="space-y-8">
+
+      {/* HEADER */}
       <div className="flex justify-between items-center flex-wrap gap-4">
+
         <div>
           <h1 className="heading-1">
             📊 Timesheet
           </h1>
 
           <p className="subtle-text">
-            Staff hours &
-            exports
+            Staff hours & exports
           </p>
         </div>
 
@@ -289,6 +335,7 @@ function TimeSheet() {
 
           <HomeButton />
         </div>
+
       </div>
 
       {error && (
@@ -299,12 +346,18 @@ function TimeSheet() {
 
       {/* FILTERS */}
       <div className="card grid md:grid-cols-5 gap-4">
+
         <input
           type="date"
-          value={fromDate}
-          onChange={(e) =>
+          value={
+            fromDate
+          }
+          onChange={(
+            e
+          ) =>
             setFromDate(
-              e.target.value
+              e.target
+                .value
             )
           }
           className="bg-[#0f172a] text-white border border-white/10 px-4 py-3 rounded-xl"
@@ -312,10 +365,15 @@ function TimeSheet() {
 
         <input
           type="date"
-          value={toDate}
-          onChange={(e) =>
+          value={
+            toDate
+          }
+          onChange={(
+            e
+          ) =>
             setToDate(
-              e.target.value
+              e.target
+                .value
             )
           }
           className="bg-[#0f172a] text-white border border-white/10 px-4 py-3 rounded-xl"
@@ -325,9 +383,12 @@ function TimeSheet() {
           value={
             selectedEmployee
           }
-          onChange={(e) =>
+          onChange={(
+            e
+          ) =>
             setSelectedEmployee(
-              e.target.value
+              e.target
+                .value
             )
           }
           className="bg-[#0f172a] text-white border border-white/10 px-4 py-3 rounded-xl"
@@ -337,12 +398,16 @@ function TimeSheet() {
           </option>
 
           {employees.map(
-            (e) => (
+            (emp) => (
               <option
-                key={e.id}
-                value={e.id}
+                key={
+                  emp.id
+                }
+                value={
+                  emp.id
+                }
               >
-                {e.name}
+                {emp.name}
               </option>
             )
           )}
@@ -350,15 +415,18 @@ function TimeSheet() {
 
         <button
           onClick={() =>
-            setView("table")
+            setView(
+              "table"
+            )
           }
           className={`px-4 py-3 rounded-xl ${
-            view === "table"
+            view ===
+            "table"
               ? "bg-indigo-600 text-white"
               : "bg-[#0f172a] text-gray-300"
           }`}
         >
-          Table View
+          Table
         </button>
 
         <button
@@ -376,12 +444,16 @@ function TimeSheet() {
         >
           Calendar
         </button>
+
       </div>
 
       {/* TABLE */}
-      {view === "table" && (
+      {view ===
+        "table" && (
         <div className="card overflow-x-auto">
+
           <table className="w-full text-left">
+
             <thead>
               <tr className="text-gray-400 text-sm">
                 <th>
@@ -406,9 +478,10 @@ function TimeSheet() {
             </thead>
 
             <tbody>
+
               {timeSheetData.map(
                 (
-                  r,
+                  row,
                   i
                 ) => (
                   <tr
@@ -416,51 +489,54 @@ function TimeSheet() {
                     className="border-t border-white/10"
                   >
                     <td>
-                      {r.users
+                      {row
+                        .users
                         ?.name ||
                         "Unknown"}
                     </td>
 
                     <td>
                       {formatDate(
-                        r.clock_in_time
+                        row.clock_in_time
                       )}
                     </td>
 
                     <td>
                       {formatTime(
-                        r.clock_in_time
+                        row.clock_in_time
                       )}
                     </td>
 
                     <td>
                       {formatTime(
-                        r.clock_out_time
+                        row.clock_out_time
                       )}
                     </td>
 
                     <td>
                       {Math.floor(
-                        (r.total_break_seconds ||
+                        (row.total_break_seconds ||
                           0) /
                           60
-                      )}{" "}
-                      mins
+                      )} mins
                     </td>
 
                     <td>
                       {calculateHours(
-                        r.clock_in_time,
-                        r.clock_out_time,
-                        r.total_break_seconds
-                      )}
-                      h
+                        row.clock_in_time,
+                        row.clock_out_time,
+                        row.total_break_seconds
+                      )}h
                     </td>
+
                   </tr>
                 )
               )}
+
             </tbody>
+
           </table>
+
         </div>
       )}
 
@@ -468,46 +544,62 @@ function TimeSheet() {
       {view ===
         "calendar" && (
         <div className="grid grid-cols-7 gap-3">
+
           {Array.from(
             {
               length: 31,
             },
-            (_, i) => i + 1
-          ).map((day) => (
-            <div
-              key={day}
-              className="bg-[#0f172a] border border-white/10 rounded-xl p-3 min-h-[120px]"
-            >
-              <div className="text-sm font-semibold mb-2">
-                {day}
-              </div>
+            (
+              _,
+              i
+            ) =>
+              i + 1
+          ).map(
+            (
+              day
+            ) => (
+              <div
+                key={
+                  day
+                }
+                className="bg-[#0f172a] border border-white/10 rounded-xl p-3 min-h-[120px]"
+              >
+                <div className="text-sm font-semibold mb-2">
+                  {day}
+                </div>
 
-              {grouped[
-                day
-              ]?.map(
-                (
-                  r,
-                  idx
-                ) => (
-                  <div
-                    key={idx}
-                    className="text-xs bg-indigo-500/20 text-indigo-300 rounded px-2 py-1 mb-1"
-                  >
-                    {r.users
-                      ?.name ||
-                      "Unknown"}{" "}
-                    (
-                    {calculateHours(
-                      r.clock_in_time,
-                      r.clock_out_time,
-                      r.total_break_seconds
-                    )}
-                    h)
-                  </div>
-                )
-              )}
-            </div>
-          ))}
+                {grouped[
+                  day
+                ]?.map(
+                  (
+                    row,
+                    idx
+                  ) => (
+                    <div
+                      key={
+                        idx
+                      }
+                      className="text-xs bg-indigo-500/20 text-indigo-300 rounded px-2 py-1 mb-1"
+                    >
+                      {row
+                        .users
+                        ?.name ||
+                        "Unknown"}{" "}
+                      (
+                      {calculateHours(
+                        row.clock_in_time,
+                        row.clock_out_time,
+                        row.total_break_seconds
+                      )}
+                      h)
+                    </div>
+                  )
+                )}
+
+              </div>
+            )
+          )}
+
         </div>
       )}
 
@@ -517,6 +609,7 @@ function TimeSheet() {
           No records found
         </div>
       )}
+
     </div>
   );
 }
