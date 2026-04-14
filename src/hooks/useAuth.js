@@ -2,6 +2,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useRef,
 } from "react";
 
 import {
@@ -10,251 +11,339 @@ import {
 
 import supabase from "../lib/supabase";
 
+/* =====================================================
+GLOBAL SINGLETON STATE
+Prevents multiple hook instances causing lock errors
+===================================================== */
+
+let authUserState = null;
+let authLoadingState = true;
+let subscribers = [];
+let initialized = false;
+let authListener = null;
+let loadingPromise = null;
+
+/* =====================================================
+HELPERS
+===================================================== */
+
+function emit() {
+  subscribers.forEach((fn) =>
+    fn({
+      user: authUserState,
+      loading: authLoadingState,
+    })
+  );
+}
+
+function setGlobalUser(user) {
+  authUserState = user;
+  emit();
+}
+
+function setGlobalLoading(value) {
+  authLoadingState = value;
+  emit();
+}
+
+/* =====================================================
+LOAD PROFILE
+===================================================== */
+
+async function fetchProfile() {
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.user) {
+      setGlobalUser(null);
+      return null;
+    }
+
+    const authUser = session.user;
+
+    const {
+      data,
+      error,
+    } = await supabase
+      .from("users")
+      .select(`
+        *,
+        companies (
+          id,
+          name,
+          is_pro,
+          current_plan,
+          subscription_status
+        )
+      `)
+      .eq("id", authUser.id)
+      .single();
+
+    if (error) throw error;
+
+    const profile = {
+      id: authUser.id,
+      email: authUser.email,
+
+      name:
+        data.name || "",
+
+      phone:
+        data.phone || "",
+
+      role:
+        data.role ||
+        "employee",
+
+      companyId:
+        data.company_id,
+
+      companyName:
+        data.companies?.name ||
+        "",
+
+      jobTitle:
+        data.job_title ||
+        "",
+
+      isPro:
+        data.companies?.is_pro ||
+        false,
+
+      current_plan:
+        data.companies
+          ?.current_plan ||
+        "free",
+
+      subscription_status:
+        data.companies
+          ?.subscription_status ||
+        "free",
+    };
+
+    setGlobalUser(profile);
+
+    return profile;
+  } catch (err) {
+    console.error(err);
+    setGlobalUser(null);
+    return null;
+  }
+}
+
+/* =====================================================
+INIT ONCE ONLY
+===================================================== */
+
+async function initAuth() {
+  if (initialized) return;
+
+  initialized = true;
+
+  setGlobalLoading(true);
+
+  await fetchProfile();
+
+  authListener =
+    supabase.auth.onAuthStateChange(
+      async (event) => {
+        if (
+          event ===
+          "SIGNED_OUT"
+        ) {
+          setGlobalUser(null);
+          setGlobalLoading(false);
+          return;
+        }
+
+        if (
+          event ===
+            "SIGNED_IN" ||
+          event ===
+            "TOKEN_REFRESHED" ||
+          event ===
+            "USER_UPDATED"
+        ) {
+          setGlobalLoading(true);
+          await fetchProfile();
+          setGlobalLoading(false);
+        }
+      }
+    );
+
+  setGlobalLoading(false);
+}
+
+/* =====================================================
+HOOK
+===================================================== */
+
 export function useAuth() {
   const navigate =
     useNavigate();
 
+  const mounted =
+    useRef(true);
+
   const [user, setUser] =
-    useState(null);
+    useState(authUserState);
 
   const [loading, setLoading] =
-    useState(true);
+    useState(authLoadingState);
 
-  /* =====================================
-     LOAD USER PROFILE
-  ===================================== */
+  useEffect(() => {
+    mounted.current = true;
 
-  const loadUser =
+    const sub = (state) => {
+      if (!mounted.current)
+        return;
+
+      setUser(state.user);
+      setLoading(
+        state.loading
+      );
+    };
+
+    subscribers.push(sub);
+
+    if (!initialized) {
+      initAuth();
+    }
+
+    return () => {
+      mounted.current =
+        false;
+
+      subscribers =
+        subscribers.filter(
+          (x) => x !== sub
+        );
+    };
+  }, []);
+
+  /* =====================================================
+  SAFE RELOAD
+  Prevent duplicate parallel requests
+  ===================================================== */
+
+  const reloadUser =
     useCallback(
       async () => {
-        try {
-          setLoading(true);
-
-          const {
-            data: {
-              session,
-            },
-          } =
-            await supabase.auth.getSession();
-
-          if (!session?.user) {
-            setUser(null);
-            return null;
-          }
-
-          const authUser =
-            session.user;
-
-          const {
-            data,
-            error,
-          } =
-            await supabase
-              .from("users")
-              .select(`
-                *,
-                companies (
-                  id,
-                  name,
-                  is_pro,
-                  current_plan,
-                  subscription_status
-                )
-              `)
-              .eq(
-                "id",
-                authUser.id
-              )
-              .single();
-
-          if (error)
-            throw error;
-
-          const profile = {
-            id: authUser.id,
-
-            email:
-              authUser.email,
-
-            name:
-              data.name || "",
-
-            phone:
-              data.phone || "",
-
-            role:
-              data.role ||
-              "employee",
-
-            companyId:
-              data.company_id,
-
-            companyName:
-              data.companies
-                ?.name || "",
-
-            jobTitle:
-              data.job_title ||
-              "",
-
-            isPro:
-              data.companies
-                ?.is_pro ||
-              false,
-
-            current_plan:
-              data.companies
-                ?.current_plan ||
-              "free",
-
-            subscription_status:
-              data.companies
-                ?.subscription_status ||
-              "free",
-          };
-
-          setUser(profile);
-
-          return profile;
-
-        } catch (err) {
-          console.error(err);
-          setUser(null);
-          return null;
-        } finally {
-          setLoading(false);
+        if (
+          loadingPromise
+        ) {
+          return loadingPromise;
         }
+
+        loadingPromise =
+          (async () => {
+            setGlobalLoading(
+              true
+            );
+
+            const profile =
+              await fetchProfile();
+
+            setGlobalLoading(
+              false
+            );
+
+            loadingPromise =
+              null;
+
+            return profile;
+          })();
+
+        return loadingPromise;
       },
       []
     );
 
-  /* =====================================
-     ROUTE BY ROLE
-  ===================================== */
+  /* =====================================================
+  ROUTE USER
+  ===================================================== */
 
-  const routeUser = (
-    profile
-  ) => {
-    if (!profile) {
-      navigate("/login");
-      return;
-    }
-
-    if (
-      profile.role ===
-      "admin"
-    ) {
-      navigate("/dashboard");
-      return;
-    }
-
-    if (
-      profile.role ===
-      "manager"
-    ) {
-      navigate("/dashboard");
-      return;
-    }
-
-    navigate(
-      "/employee-dashboard"
-    );
-  };
-
-  /* =====================================
-     INIT SESSION
-  ===================================== */
-
-  useEffect(() => {
-    loadUser();
-
-    const {
-      data:
-        listener,
-    } =
-      supabase.auth.onAuthStateChange(
-        async (
-          event
-        ) => {
-          if (
-            event ===
-              "SIGNED_OUT"
-          ) {
-            setUser(null);
-            navigate(
-              "/login"
-            );
-            return;
-          }
-
-          if (
-            event ===
-              "SIGNED_IN" ||
-            event ===
-              "TOKEN_REFRESHED"
-          ) {
-            await loadUser();
-          }
+  const routeUser =
+    useCallback(
+      (profile) => {
+        if (!profile) {
+          navigate(
+            "/login"
+          );
+          return;
         }
-      );
 
-    return () =>
-      listener.subscription.unsubscribe();
-  }, [
-    loadUser,
-    navigate,
-  ]);
+        navigate(
+          "/dashboard"
+        );
+      },
+      [navigate]
+    );
 
-  /* =====================================
-     LOGIN
-  ===================================== */
+  /* =====================================================
+  LOGIN
+  ===================================================== */
 
   const login =
-    async (
-      email,
-      password
-    ) => {
-      const { error } =
-        await supabase.auth.signInWithPassword(
-          {
-            email,
-            password,
-          }
+    useCallback(
+      async (
+        email,
+        password
+      ) => {
+        const {
+          error,
+        } =
+          await supabase.auth.signInWithPassword(
+            {
+              email,
+              password,
+            }
+          );
+
+        if (error)
+          throw error;
+
+        const profile =
+          await reloadUser();
+
+        routeUser(
+          profile
         );
+      },
+      [
+        reloadUser,
+        routeUser,
+      ]
+    );
 
-      if (error)
-        throw error;
-
-      const profile =
-        await loadUser();
-
-      routeUser(
-        profile
-      );
-    };
-
-  /* =====================================
-     LOGOUT
-  ===================================== */
+  /* =====================================================
+  LOGOUT
+  ===================================================== */
 
   const logout =
-    async () => {
-      await supabase.auth.signOut();
+    useCallback(
+      async () => {
+        await supabase.auth.signOut();
 
-      setUser(null);
+        setGlobalUser(
+          null
+        );
 
-      navigate(
-        "/login"
-      );
-    };
+        navigate(
+          "/login"
+        );
+      },
+      [navigate]
+    );
 
   return {
     user,
     loading,
     login,
     logout,
-    reloadUser:
-      loadUser,
+    reloadUser,
 
     isAdmin:
       user?.role ===

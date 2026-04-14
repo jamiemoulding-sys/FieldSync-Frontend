@@ -39,142 +39,125 @@ import Profile from "./pages/Profile";
 import Success from "./pages/Success";
 import AppLayout from "./layout/AppLayout";
 
-/* =====================================
+/* =====================================================
+LOADER
+===================================================== */
+
+function ScreenLoader() {
+  return (
+    <div className="min-h-screen bg-[#020617] text-white flex items-center justify-center">
+      Loading...
+    </div>
+  );
+}
+
+/* =====================================================
 AUTH GUARD
-===================================== */
+===================================================== */
 
-function ProtectedRoute({
-  children,
-}) {
-  const {
-    user,
-    loading,
-  } = useAuth();
+function ProtectedRoute({ children }) {
+  const { user, loading } = useAuth();
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#020617] text-white flex items-center justify-center">
-        Loading...
-      </div>
-    );
-  }
+  if (loading) return <ScreenLoader />;
 
   if (!user) {
-    return (
-      <Navigate
-        to="/login"
-        replace
-      />
-    );
+    return <Navigate to="/login" replace />;
   }
 
   return children;
 }
 
-/* =====================================
+/* =====================================================
 ROLE GUARD
-===================================== */
+===================================================== */
 
-function RoleRoute({
-  roles,
-  children,
-}) {
-  const {
-    user,
-    loading,
-  } = useAuth();
+function RoleRoute({ roles, children }) {
+  const { user, loading } = useAuth();
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#020617] text-white flex items-center justify-center">
-        Loading...
-      </div>
-    );
-  }
+  if (loading) return <ScreenLoader />;
 
   if (!user) {
-    return (
-      <Navigate
-        to="/login"
-        replace
-      />
-    );
+    return <Navigate to="/login" replace />;
   }
 
-  if (
-    !roles.includes(
-      user.role
-    )
-  ) {
-    if (
-      user.role ===
-      "employee"
-    ) {
-      return (
-        <Navigate
-          to="/my-schedule"
-          replace
-        />
-      );
-    }
-
-    return (
-      <Navigate
-        to="/dashboard"
-        replace
-      />
-    );
+  if (!roles.includes(user.role)) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return children;
 }
 
-/* =====================================
+/* =====================================================
+PUBLIC ROUTE BLOCK
+Prevents logged-in users seeing login/signup again
+===================================================== */
+
+function PublicOnly({ children }) {
+  const { user, loading } = useAuth();
+
+  if (loading) return <ScreenLoader />;
+
+  if (user) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return children;
+}
+
+/* =====================================================
 APP
-===================================== */
+===================================================== */
 
 export default function App() {
   return (
     <Router>
       <Routes>
+        {/* ================= PUBLIC ================= */}
 
-        {/* PUBLIC */}
         <Route
           path="/"
           element={
-            <Landing />
+            <PublicOnly>
+              <Landing />
+            </PublicOnly>
           }
         />
 
         <Route
           path="/signup"
           element={
-            <Signup />
+            <PublicOnly>
+              <Signup />
+            </PublicOnly>
           }
         />
 
         <Route
           path="/login"
           element={
-            <Login />
+            <PublicOnly>
+              <Login />
+            </PublicOnly>
           }
         />
 
         <Route
           path="/set-password"
-          element={
-            <SetPassword />
-          }
+          element={<SetPassword />}
+        />
+
+        <Route
+          path="/accept-invite"
+          element={<SetPassword />}
         />
 
         <Route
           path="/reset-password"
-          element={
-            <ResetPassword />
-          }
+          element={<ResetPassword />}
         />
 
-        {/* PRIVATE AREA */}
+        {/* ================= PRIVATE ================= */}
+
         <Route
           element={
             <ProtectedRoute>
@@ -182,68 +165,51 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-
           {/* CORE */}
+
           <Route
             path="/dashboard"
-            element={
-              <Dashboard />
-            }
+            element={<Dashboard />}
           />
 
           <Route
             path="/tasks"
-            element={
-              <Tasks />
-            }
+            element={<Tasks />}
           />
 
           <Route
             path="/work-session"
-            element={
-              <WorkSession />
-            }
+            element={<WorkSession />}
           />
 
           <Route
             path="/timesheet"
-            element={
-              <TimeSheet />
-            }
+            element={<TimeSheet />}
           />
 
           {/* EMPLOYEE */}
+
           <Route
             path="/my-schedule"
-            element={
-              <MySchedule />
-            }
+            element={<MySchedule />}
           />
 
           <Route
             path="/my-holidays"
-            element={
-              <MyHolidays />
-            }
+            element={<MyHolidays />}
           />
 
           <Route
             path="/my-locations"
-            element={
-              <MyLocations />
-            }
+            element={<MyLocations />}
           />
 
           {/* MANAGEMENT */}
+
           <Route
             path="/schedule"
             element={
-              <RoleRoute
-                roles={[
-                  "manager",
-                  "admin",
-                ]}
-              >
+              <RoleRoute roles={["manager", "admin"]}>
                 <Schedule />
               </RoleRoute>
             }
@@ -252,12 +218,7 @@ export default function App() {
           <Route
             path="/calendar"
             element={
-              <RoleRoute
-                roles={[
-                  "manager",
-                  "admin",
-                ]}
-              >
+              <RoleRoute roles={["manager", "admin"]}>
                 <ScheduleCalendar />
               </RoleRoute>
             }
@@ -266,12 +227,7 @@ export default function App() {
           <Route
             path="/holiday-requests"
             element={
-              <RoleRoute
-                roles={[
-                  "manager",
-                  "admin",
-                ]}
-              >
+              <RoleRoute roles={["manager", "admin"]}>
                 <HolidayRequests />
               </RoleRoute>
             }
@@ -280,12 +236,7 @@ export default function App() {
           <Route
             path="/announcements"
             element={
-              <RoleRoute
-                roles={[
-                  "manager",
-                  "admin",
-                ]}
-              >
+              <RoleRoute roles={["manager", "admin"]}>
                 <Announcements />
               </RoleRoute>
             }
@@ -294,12 +245,7 @@ export default function App() {
           <Route
             path="/employees"
             element={
-              <RoleRoute
-                roles={[
-                  "manager",
-                  "admin",
-                ]}
-              >
+              <RoleRoute roles={["manager", "admin"]}>
                 <Employees />
               </RoleRoute>
             }
@@ -308,26 +254,8 @@ export default function App() {
           <Route
             path="/locations"
             element={
-              <RoleRoute
-                roles={[
-                  "manager",
-                  "admin",
-                ]}
-              >
+              <RoleRoute roles={["manager", "admin"]}>
                 <Locations />
-              </RoleRoute>
-            }
-          />
-
-          <Route
-            path="/reports"
-            element={
-              <RoleRoute
-                roles={[
-                  "admin",
-                ]}
-              >
-                <Reports />
               </RoleRoute>
             }
           />
@@ -335,13 +263,19 @@ export default function App() {
           <Route
             path="/performance"
             element={
-              <RoleRoute
-                roles={[
-                  "manager",
-                  "admin",
-                ]}
-              >
+              <RoleRoute roles={["manager", "admin"]}>
                 <Performance />
+              </RoleRoute>
+            }
+          />
+
+          {/* ADMIN */}
+
+          <Route
+            path="/reports"
+            element={
+              <RoleRoute roles={["admin"]}>
+                <Reports />
               </RoleRoute>
             }
           />
@@ -349,11 +283,7 @@ export default function App() {
           <Route
             path="/billing"
             element={
-              <RoleRoute
-                roles={[
-                  "admin",
-                ]}
-              >
+              <RoleRoute roles={["admin"]}>
                 <Billing />
               </RoleRoute>
             }
@@ -362,35 +292,26 @@ export default function App() {
           <Route
             path="/billing-success"
             element={
-              <RoleRoute
-                roles={[
-                  "admin",
-                ]}
-              >
+              <RoleRoute roles={["admin"]}>
                 <Success />
               </RoleRoute>
             }
           />
 
+          {/* COMMON */}
+
           <Route
             path="/profile"
-            element={
-              <Profile />
-            }
+            element={<Profile />}
           />
         </Route>
 
-        {/* FALLBACK */}
+        {/* ================= FALLBACK ================= */}
+
         <Route
           path="*"
-          element={
-            <Navigate
-              to="/"
-              replace
-            />
-          }
+          element={<Navigate to="/dashboard" replace />}
         />
-
       </Routes>
     </Router>
   );
