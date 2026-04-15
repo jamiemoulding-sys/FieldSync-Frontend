@@ -61,11 +61,8 @@ export default function MyHolidays() {
       setSaving(true);
 
       await holidayAPI.create({
-        start_date:
-          form.start_date,
-        end_date:
-          form.end_date,
-        type: "holiday",
+        start_date: form.start_date,
+        end_date: form.end_date,
       });
 
       setForm({
