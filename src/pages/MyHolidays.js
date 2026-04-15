@@ -1,10 +1,6 @@
 import { useEffect, useState } from "react";
 import { holidayAPI } from "../services/api";
-import {
-  Plane,
-  Calendar,
-  Send,
-} from "lucide-react";
+import { Send } from "lucide-react";
 
 export default function MyHolidays() {
   const [rows, setRows] = useState([]);
@@ -14,7 +10,6 @@ export default function MyHolidays() {
   const [form, setForm] = useState({
     start_date: "",
     end_date: "",
-    reason: "",
   });
 
   useEffect(() => {
@@ -65,12 +60,17 @@ export default function MyHolidays() {
     try {
       setSaving(true);
 
-      await holidayAPI.create(form);
+      await holidayAPI.create({
+        start_date:
+          form.start_date,
+        end_date:
+          form.end_date,
+        type: "holiday",
+      });
 
       setForm({
         start_date: "",
         end_date: "",
-        reason: "",
       });
 
       await load();
@@ -90,11 +90,17 @@ export default function MyHolidays() {
   }
 
   function badge(status) {
-    if (status === "approved") {
+    if (
+      status ===
+      "approved"
+    ) {
       return "bg-green-500/20 text-green-400";
     }
 
-    if (status === "rejected") {
+    if (
+      status ===
+      "rejected"
+    ) {
       return "bg-red-500/20 text-red-400";
     }
 
@@ -111,7 +117,6 @@ export default function MyHolidays() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-semibold">
           My Holidays
@@ -122,7 +127,6 @@ export default function MyHolidays() {
         </p>
       </div>
 
-      {/* Form */}
       <form
         onSubmit={submit}
         className="rounded-2xl border border-white/10 p-6 bg-[#020617] space-y-4"
@@ -130,7 +134,9 @@ export default function MyHolidays() {
         <div className="grid md:grid-cols-2 gap-4">
           <input
             type="date"
-            value={form.start_date}
+            value={
+              form.start_date
+            }
             onChange={(e) =>
               setForm({
                 ...form,
@@ -144,7 +150,9 @@ export default function MyHolidays() {
 
           <input
             type="date"
-            value={form.end_date}
+            value={
+              form.end_date
+            }
             onChange={(e) =>
               setForm({
                 ...form,
@@ -156,19 +164,6 @@ export default function MyHolidays() {
             required
           />
         </div>
-
-        <textarea
-          placeholder="Reason"
-          value={form.reason}
-          onChange={(e) =>
-            setForm({
-              ...form,
-              reason:
-                e.target.value,
-            })
-          }
-          className="w-full min-h-[100px] bg-white/5 border border-white/10 rounded-xl px-4 py-3"
-        />
 
         <button
           type="submit"
@@ -183,17 +178,12 @@ export default function MyHolidays() {
         </button>
       </form>
 
-      {/* Table */}
       <div className="rounded-2xl border border-white/10 overflow-hidden">
         <table className="w-full text-left">
           <thead className="bg-white/5 text-gray-400 text-sm">
             <tr>
               <th className="p-4">
                 Dates
-              </th>
-
-              <th className="p-4">
-                Reason
               </th>
 
               <th className="p-4">
@@ -206,7 +196,7 @@ export default function MyHolidays() {
             {rows.length === 0 ? (
               <tr>
                 <td
-                  colSpan="3"
+                  colSpan="2"
                   className="p-4 text-gray-500"
                 >
                   No requests yet
@@ -221,10 +211,6 @@ export default function MyHolidays() {
                   <td className="p-4">
                     {row.start_date} →{" "}
                     {row.end_date}
-                  </td>
-
-                  <td className="p-4">
-                    {row.reason}
                   </td>
 
                   <td className="p-4">
