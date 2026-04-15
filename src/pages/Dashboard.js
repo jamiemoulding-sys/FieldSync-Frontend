@@ -1,6 +1,6 @@
 // src/pages/Dashboard.js
-// FULL REAL VERSION WITH FIXES
-// Keeps original structure + adds fixes requested
+// FULL COMPLETE VERSION
+// Original structure kept + fixes added
 
 import { useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
@@ -119,12 +119,18 @@ function EmployeeDashboard({ user }) {
         ]);
 
       setShift(a || null);
+
       setSchedule(
         Array.isArray(b) ? b : []
       );
+
+      // FIX: Supabase may return {data}
       setHolidays(
-        Array.isArray(c) ? c : []
+        Array.isArray(c)
+          ? c
+          : c?.data || []
       );
+
       setTasks(
         Array.isArray(d) ? d : []
       );
@@ -141,8 +147,16 @@ function EmployeeDashboard({ user }) {
 
   if (loading) return <Loading />;
 
-  const weekSchedule =
-    schedule.slice(0, 5);
+  // FIX: Monday-Friday only
+  const weekSchedule = schedule
+    .filter((row) => {
+      const day = new Date(
+        row.date
+      ).getDay();
+
+      return day >= 1 && day <= 5;
+    })
+    .slice(0, 5);
 
   return (
     <div className="space-y-6">
@@ -194,7 +208,8 @@ function EmployeeDashboard({ user }) {
 
       <div className="grid lg:grid-cols-2 gap-4">
         <Panel title="Working Week">
-          {weekSchedule.length === 0 ? (
+          {weekSchedule.length ===
+          0 ? (
             <p className="text-gray-400">
               No shifts booked
             </p>

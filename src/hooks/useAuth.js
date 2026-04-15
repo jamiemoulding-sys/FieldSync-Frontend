@@ -1,7 +1,7 @@
 // src/hooks/useAuth.js
-// FULL FIXED VERSION
-// Prevents blank screen after tab idle / background
-// Safe auth refresh + cleaner loading state
+// FINAL FULL FIXED VERSION
+// Fixes blank white screen after idle/background tab
+// Stable auth state + refresh on focus + safe loading
 
 import {
   useState,
@@ -9,11 +9,7 @@ import {
   useCallback,
   useRef,
 } from "react";
-
-import {
-  useNavigate,
-} from "react-router-dom";
-
+import { useNavigate } from "react-router-dom";
 import supabase from "../lib/supabase";
 
 /* =====================================================
@@ -22,9 +18,10 @@ GLOBAL STATE
 
 let authUserState = null;
 let authLoadingState = true;
-let subscribers = [];
 let initialized = false;
+let subscribers = [];
 let loadingPromise = null;
+let authSubscription = null;
 let visibilityBound = false;
 
 /* =====================================================
@@ -51,27 +48,25 @@ function setGlobalLoading(value) {
 }
 
 /* =====================================================
-PROFILE FETCH
+FETCH PROFILE
 ===================================================== */
 
 async function fetchProfile() {
   try {
     const {
       data: { session },
-    } =
-      await supabase.auth.getSession();
+    } = await supabase.auth.getSession();
 
     if (!session?.user) {
       setGlobalUser(null);
       return null;
     }
 
-    const authUser =
-      session.user;
+    const authUser = session.user;
 
     const {
       data: userRow,
-      error,
+      error: userError,
     } = await supabase
       .from("users")
       .select(`
@@ -85,13 +80,13 @@ async function fetchProfile() {
       .eq("id", authUser.id)
       .single();
 
-    if (error) throw error;
+    if (userError) throw userError;
 
     let company = null;
 
     if (userRow.company_id) {
       const {
-        data,
+        data: companyRow,
       } = await supabase
         .from("companies")
         .select(`
@@ -101,45 +96,29 @@ async function fetchProfile() {
           current_plan,
           subscription_status
         `)
-        .eq(
-          "id",
-          userRow.company_id
-        )
+        .eq("id", userRow.company_id)
         .single();
 
-      company = data || null;
+      company = companyRow || null;
     }
 
     const profile = {
       id: authUser.id,
       email: authUser.email,
 
-      name:
-        userRow.name || "",
+      name: userRow.name || "",
+      phone: userRow.phone || "",
+      role: userRow.role || "employee",
 
-      phone:
-        userRow.phone || "",
+      companyId: userRow.company_id,
+      companyName: company?.name || "",
 
-      role:
-        userRow.role ||
-        "employee",
+      jobTitle: userRow.job_title || "",
 
-      companyId:
-        userRow.company_id,
-
-      companyName:
-        company?.name || "",
-
-      jobTitle:
-        userRow.job_title || "",
-
-      isPro:
-        company?.is_pro ||
-        false,
+      isPro: company?.is_pro || false,
 
       current_plan:
-        company?.current_plan ||
-        "free",
+        company?.current_plan || "free",
 
       subscription_status:
         company?.subscription_status ||
@@ -151,18 +130,17 @@ async function fetchProfile() {
     return profile;
   } catch (err) {
     console.error(
-      "fetchProfile error:",
+      "fetchProfile failed:",
       err
     );
 
     setGlobalUser(null);
-
     return null;
   }
 }
 
 /* =====================================================
-RELOAD SESSION AFTER TAB RETURNS
+REFRESH SESSION
 ===================================================== */
 
 async function refreshSession() {
@@ -174,7 +152,7 @@ async function refreshSession() {
     await fetchProfile();
   } catch (err) {
     console.error(
-      "refreshSession error:",
+      "refreshSession failed:",
       err
     );
   } finally {
@@ -195,49 +173,48 @@ async function initAuth() {
     setGlobalLoading(true);
 
     await fetchProfile();
-  } catch (err) {
-    console.error(err);
   } finally {
     setGlobalLoading(false);
   }
 
-  /* AUTH EVENTS */
-  supabase.auth.onAuthStateChange(
-    async (event) => {
-      try {
-        if (
-          event ===
-          "SIGNED_OUT"
-        ) {
-          setGlobalUser(null);
-          return;
-        }
+  /* AUTH LISTENER */
+  const {
+    data: { subscription },
+  } =
+    supabase.auth.onAuthStateChange(
+      async (event) => {
+        try {
+          if (
+            event === "SIGNED_OUT"
+          ) {
+            setGlobalUser(null);
+            setGlobalLoading(false);
+            return;
+          }
 
-        if (
-          event ===
-            "SIGNED_IN" ||
-          event ===
-            "TOKEN_REFRESHED" ||
-          event ===
-            "USER_UPDATED"
-        ) {
-          setGlobalLoading(
-            true
-          );
-
-          await fetchProfile();
+          if (
+            event ===
+              "SIGNED_IN" ||
+            event ===
+              "TOKEN_REFRESHED" ||
+            event ===
+              "USER_UPDATED"
+          ) {
+            setGlobalLoading(true);
+            await fetchProfile();
+          }
+        } catch (err) {
+          console.error(err);
+        } finally {
+          setGlobalLoading(false);
         }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setGlobalLoading(
-          false
-        );
       }
-    }
-  );
+    );
 
-  /* TAB RETURNS FROM BACKGROUND */
+  authSubscription =
+    subscription;
+
+  /* TAB RETURN FIX */
   if (!visibilityBound) {
     visibilityBound = true;
 
@@ -288,10 +265,7 @@ export function useAuth() {
       )
         return;
 
-      setUser(
-        state.user
-      );
-
+      setUser(state.user);
       setLoading(
         state.loading
       );
@@ -334,10 +308,7 @@ export function useAuth() {
                 true
               );
 
-              const profile =
-                await fetchProfile();
-
-              return profile;
+              return await fetchProfile();
             } finally {
               setGlobalLoading(
                 false
@@ -403,15 +374,17 @@ export function useAuth() {
   const logout =
     useCallback(
       async () => {
-        await supabase.auth.signOut();
+        try {
+          await supabase.auth.signOut();
+        } finally {
+          setGlobalUser(
+            null
+          );
 
-        setGlobalUser(
-          null
-        );
-
-        navigate(
-          "/login"
-        );
+          navigate(
+            "/login"
+          );
+        }
       },
       [navigate]
     );
@@ -419,6 +392,7 @@ export function useAuth() {
   return {
     user,
     loading,
+
     login,
     logout,
     reloadUser,
