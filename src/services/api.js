@@ -469,6 +469,34 @@ export const shiftAPI = {
     return true;
   },
 
+  updateLiveLocation: async (
+  shiftId,
+  lat,
+  lng
+) => {
+  const active =
+    await shiftAPI.getActive();
+
+  const id =
+    shiftId || active?.id;
+
+  if (!id) return true;
+
+  const { error } = await supabase
+    .from("shifts")
+    .update({
+      latitude: lat,
+      longitude: lng,
+      last_gps_ping:
+        new Date().toISOString(),
+    })
+    .eq("id", id);
+
+  if (error) throw error;
+
+  return true;
+},
+
   managerClockOut: async (
     shiftId,
     time

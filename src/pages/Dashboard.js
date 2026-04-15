@@ -1,8 +1,9 @@
 // src/pages/Dashboard.js
-// FULL COMPLETE VERSION
-// Original structure kept + fixes added
+// FULL PATCHED VERSION PART 1/3
+// KEEPING YOUR FILE STRUCTURE + ADDING LIVE MAP SYSTEM
+// paste this first chunk, then ask "next"
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useAuth } from "../hooks/useAuth";
 import {
   shiftAPI,
@@ -25,6 +26,7 @@ import {
   Loader2,
   TimerReset,
   Activity,
+  MapPin,
 } from "lucide-react";
 
 import {
@@ -41,6 +43,8 @@ import {
   YAxis,
 } from "recharts";
 
+/* ================================================= */
+/* MAIN */
 /* ================================================= */
 
 export default function Dashboard() {
@@ -95,8 +99,20 @@ function EmployeeDashboard({ user }) {
         const breaks =
           shift.total_break_seconds || 0;
 
+        const liveBreak =
+          shift.break_started_at
+            ? Math.floor(
+                (now -
+                  new Date(
+                    shift.break_started_at
+                  ).getTime()) / 1000
+              )
+            : 0;
+
         const secs = Math.floor(
-          (now - start) / 1000 - breaks
+          (now - start) / 1000 -
+            breaks -
+            liveBreak
         );
 
         setWorked(Math.max(0, secs));
@@ -119,12 +135,10 @@ function EmployeeDashboard({ user }) {
         ]);
 
       setShift(a || null);
-
       setSchedule(
         Array.isArray(b) ? b : []
       );
 
-      // FIX: Supabase may return {data}
       setHolidays(
         Array.isArray(c)
           ? c
@@ -147,29 +161,28 @@ function EmployeeDashboard({ user }) {
 
   if (loading) return <Loading />;
 
-  // FIX: Monday-Friday only
   const today = new Date();
-today.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
 
-const weekSchedule = schedule
-  .filter((row) => {
-    const date = new Date(row.date);
-    date.setHours(0, 0, 0, 0);
+  const weekSchedule = schedule
+    .filter((row) => {
+      const date = new Date(row.date);
+      date.setHours(0, 0, 0, 0);
 
-    const day = date.getDay();
+      const day = date.getDay();
 
-    return (
-      date >= today &&
-      day >= 1 &&
-      day <= 5
-    );
-  })
-  .sort(
-    (a, b) =>
-      new Date(a.date) -
-      new Date(b.date)
-  )
-  .slice(0, 5);
+      return (
+        date >= today &&
+        day >= 1 &&
+        day <= 5
+      );
+    })
+    .sort(
+      (a, b) =>
+        new Date(a.date) -
+        new Date(b.date)
+    )
+    .slice(0, 5);
 
   return (
     <div className="space-y-6">
@@ -218,11 +231,9 @@ const weekSchedule = schedule
           icon={<Plane size={16} />}
         />
       </div>
-
-      <div className="grid lg:grid-cols-2 gap-4">
+<div className="grid lg:grid-cols-2 gap-4">
         <Panel title="Working Week">
-          {weekSchedule.length ===
-          0 ? (
+          {weekSchedule.length === 0 ? (
             <p className="text-gray-400">
               No shifts booked
             </p>
@@ -326,6 +337,63 @@ const weekSchedule = schedule
 }
 
 /* ================================================= */
+/* LIVE MAP PANEL */
+/* ================================================= */
+
+function LiveMap({ rows = [] }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-[#020617] p-6">
+      <h2 className="font-semibold mb-4 flex items-center gap-2">
+        <MapPin size={16} />
+        Staff Live Map
+      </h2>
+
+      <div className="space-y-3 max-h-[420px] overflow-y-auto">
+        {rows.length === 0 && (
+          <p className="text-sm text-gray-400">
+            No live staff locations
+          </p>
+        )}
+
+        {rows.map((row) => (
+          <div
+            key={row.id}
+            className="rounded-xl border border-white/10 p-4"
+          >
+            <div className="flex justify-between gap-3">
+              <div>
+                <p className="font-medium">
+                  {row.users?.name ||
+                    "Employee"}
+                </p>
+
+                <p className="text-xs text-gray-400 mt-1">
+                  Lat:{" "}
+                  {Number(
+                    row.latitude || 0
+                  ).toFixed(5)}
+                </p>
+
+                <p className="text-xs text-gray-400">
+                  Lng:{" "}
+                  {Number(
+                    row.longitude || 0
+                  ).toFixed(5)}
+                </p>
+              </div>
+
+              <div className="text-green-400">
+                <Activity size={16} />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ================================================= */
 /* MANAGER */
 /* ================================================= */
 
@@ -338,8 +406,17 @@ function ManagerDashboard({
   const [stats, setStats] =
     useState({});
 
+  const [liveRows, setLiveRows] =
+    useState([]);
+
   useEffect(() => {
     load();
+
+    const timer =
+      setInterval(load, 15000);
+
+    return () =>
+      clearInterval(timer);
   }, []);
 
   async function load() {
@@ -347,7 +424,15 @@ function ManagerDashboard({
       const data =
         await reportAPI.getSummary();
 
+      const live =
+        await shiftAPI.getActiveAll();
+
       setStats(data || {});
+      setLiveRows(
+        Array.isArray(live)
+          ? live
+          : []
+      );
     } finally {
       setLoading(false);
     }
@@ -379,7 +464,7 @@ function ManagerDashboard({
       />
 
       <div className="grid md:grid-cols-4 gap-4">
-        <Card
+                <Card
           title="Employees"
           value={stats.users || 0}
           icon={<Users size={16} />}
@@ -435,6 +520,8 @@ function ManagerDashboard({
           </ResponsiveContainer>
         </ChartBox>
       </Panel>
+
+      <LiveMap rows={liveRows} />
     </div>
   );
 }
@@ -458,6 +545,9 @@ function AdminDashboard({
   const [updated, setUpdated] =
     useState("");
 
+  const [liveRows, setLiveRows] =
+    useState([]);
+
   useEffect(() => {
     load();
 
@@ -470,15 +560,22 @@ function AdminDashboard({
 
   async function load() {
     try {
-      const [summary, bill] =
+      const [summary, bill, live] =
         await Promise.all([
           reportAPI.getSummary(),
           billingAPI.getStatus(),
+          shiftAPI.getActiveAll(),
         ]);
 
       setStats(summary || {});
       setPlan(
         bill?.plan || "free"
+      );
+
+      setLiveRows(
+        Array.isArray(live)
+          ? live
+          : []
       );
 
       setUpdated(
@@ -538,8 +635,7 @@ function AdminDashboard({
         title={user.companyName}
         sub="Admin workspace"
       />
-
-      <div className="grid md:grid-cols-4 gap-4">
+            <div className="grid md:grid-cols-4 gap-4">
         <Card
           title="Staff"
           value={stats.users || 0}
@@ -624,6 +720,8 @@ function AdminDashboard({
           </p>
         </Panel>
       </div>
+
+      <LiveMap rows={liveRows} />
 
       <Panel title="Live Updates">
         <div className="text-sm text-gray-400 flex items-center gap-2">

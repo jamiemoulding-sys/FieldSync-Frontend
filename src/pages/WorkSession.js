@@ -1,13 +1,14 @@
 // src/pages/WorkSession.js
-// FULL COMPLETE VERSION
-// Original file kept + fixes:
-// - brighter dropdown
-// - safer geolocation
-// - no blank state
-// - better timers
-// - auto refresh
+// FULL PATCHED VERSION
+// Your original file preserved + added:
+// ✅ Live GPS tracking while clocked in
+// ✅ Stops tracking on break
+// ✅ Resumes after break
+// ✅ Stops on clock out
+// ✅ Existing UI untouched
+// ✅ Same structure preserved
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   shiftAPI,
   locationAPI,
@@ -55,6 +56,9 @@ export default function WorkSession() {
   const [distanceAway, setDistanceAway] =
     useState(null);
 
+  /* NEW */
+  const watchRef = useRef(null);
+
   useEffect(() => {
     load();
 
@@ -64,6 +68,78 @@ export default function WorkSession() {
     return () =>
       clearInterval(timer);
   }, []);
+
+  /* ===============================
+     LIVE TRACKING PATCH
+  =============================== */
+
+  useEffect(() => {
+    if (!activeShift) {
+      stopTracking();
+      return;
+    }
+
+    if (
+      activeShift.break_started_at
+    ) {
+      stopTracking();
+      return;
+    }
+
+    startTracking();
+
+    return () => stopTracking();
+  }, [activeShift]);
+
+  function stopTracking() {
+    if (
+      watchRef.current !== null
+    ) {
+      navigator.geolocation.clearWatch(
+        watchRef.current
+      );
+
+      watchRef.current = null;
+    }
+  }
+
+  function startTracking() {
+    if (!activeShift) return;
+
+    if (
+      watchRef.current !== null
+    )
+      return;
+
+    if (
+      !navigator.geolocation
+    )
+      return;
+
+    watchRef.current =
+      navigator.geolocation.watchPosition(
+        async (pos) => {
+          try {
+            await shiftAPI.updateLiveLocation(
+              activeShift.id,
+              pos.coords.latitude,
+              pos.coords.longitude
+            );
+          } catch (err) {
+            console.error(err);
+          }
+        },
+        (err) =>
+          console.error(err),
+        {
+          enableHighAccuracy: true,
+          maximumAge: 5000,
+          timeout: 10000,
+        }
+      );
+  }
+
+  /* =============================== */
 
   useEffect(() => {
     let timer;
@@ -286,6 +362,8 @@ export default function WorkSession() {
 
   async function clockOut() {
     try {
+      stopTracking();
+
       setSaving(true);
       await shiftAPI.clockOut();
       await load();
@@ -303,6 +381,7 @@ export default function WorkSession() {
       ) {
         await shiftAPI.endBreak();
       } else {
+        stopTracking();
         await shiftAPI.startBreak();
       }
 
