@@ -1,26 +1,26 @@
 // src/pages/Dashboard.js
-// FULL ELITE DASHBOARD
-// Premium SaaS UI + live map + revenue widgets + shift heatmap + zero chart errors
-
 import { useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import {
   shiftAPI,
+  scheduleAPI,
+  holidayAPI,
   reportAPI,
   billingAPI,
+  taskAPI,
 } from "../services/api";
 
 import {
   Users,
   Clock3,
+  CalendarDays,
   CreditCard,
   Briefcase,
-  Loader2,
+  Plane,
+  CheckCircle2,
   RefreshCw,
-  PoundSterling,
-  TrendingUp,
-  Activity,
-  Target,
+  Loader2,
+  TimerReset,
 } from "lucide-react";
 
 import {
@@ -37,27 +37,6 @@ import {
   YAxis,
 } from "recharts";
 
-import {
-  MapContainer,
-  TileLayer,
-  Marker,
-  Popup,
-} from "react-leaflet";
-
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
-import "leaflet/dist/images/marker-icon.png";
-import "leaflet/dist/images/marker-shadow.png";
-
-/* FIX LEAFLET */
-delete L.Icon.Default.prototype._getIconUrl;
-
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: require("leaflet/dist/images/marker-icon.png"),
-  iconUrl: require("leaflet/dist/images/marker-icon.png"),
-  shadowUrl: require("leaflet/dist/images/marker-shadow.png"),
-});
-
 /* ================================================= */
 
 export default function Dashboard() {
@@ -66,45 +45,92 @@ export default function Dashboard() {
   if (loading) return <Loading />;
   if (!user) return <Loading />;
 
-  return <EliteDashboard />;
+  if (user.role === "admin") {
+    return <AdminDashboard user={user} />;
+  }
+
+  if (user.role === "manager") {
+    return <ManagerDashboard user={user} />;
+  }
+
+  return <EmployeeDashboard user={user} />;
 }
 
 /* ================================================= */
+/* EMPLOYEE */
+/* ================================================= */
 
-function EliteDashboard() {
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({});
-  const [plan, setPlan] = useState("free");
-  const [updated, setUpdated] = useState("");
-  const [liveStaff, setLiveStaff] = useState([]);
+function EmployeeDashboard({ user }) {
+  const [loading, setLoading] =
+    useState(true);
+
+  const [shift, setShift] =
+    useState(null);
+
+  const [schedule, setSchedule] =
+    useState([]);
+
+  const [holidays, setHolidays] =
+    useState([]);
+
+  const [tasks, setTasks] =
+    useState([]);
+
+  const [worked, setWorked] =
+    useState(0);
 
   useEffect(() => {
     load();
-
-    const timer = setInterval(load, 15000);
-    return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    let timer;
+
+    if (shift?.clock_in_time) {
+      timer = setInterval(() => {
+        const start = new Date(
+          shift.clock_in_time
+        ).getTime();
+
+        const now = Date.now();
+
+        const breaks =
+          shift.total_break_seconds ||
+          0;
+
+        setWorked(
+          Math.floor(
+            (now - start) / 1000 -
+              breaks
+          )
+        );
+      }, 1000);
+    }
+
+    return () =>
+      clearInterval(timer);
+  }, [shift]);
 
   async function load() {
     try {
-      const [summary, bill, shifts] =
+      const [a, b, c, d] =
         await Promise.all([
-          reportAPI.getSummary(),
-          billingAPI.getStatus(),
-          shiftAPI.getActiveAll(),
+          shiftAPI.getActive(),
+          scheduleAPI.getMine(),
+          holidayAPI.getMine(),
+          taskAPI.getAll(),
         ]);
 
-      setStats(summary || {});
-      setPlan(bill?.plan || "free");
-      setLiveStaff(
-        Array.isArray(shifts) ? shifts : []
+      setShift(a || null);
+      setSchedule(
+        Array.isArray(b) ? b : []
       );
-
-      setUpdated(
-        new Date().toLocaleTimeString()
+      setHolidays(
+        Array.isArray(c) ? c : []
       );
-    } catch (err) {
-      console.error(err);
+      setTasks(
+        Array.isArray(d) ? d : []
+      );
     } finally {
       setLoading(false);
     }
@@ -112,17 +138,278 @@ function EliteDashboard() {
 
   if (loading) return <Loading />;
 
-  const attendance =
-    stats.users > 0
-      ? Math.round(
-          ((stats.activeUsers || 0) /
-            stats.users) *
-            100
-        )
-      : 0;
+  const nextShift = schedule[0];
 
-  const estRevenue =
-    (stats.users || 0) * 89;
+  return (
+    <div className="space-y-6">
+      <Title
+        title={`Welcome ${
+          user.name || ""
+        }`}
+        sub={`${user.companyName} workspace`}
+      />
+
+      <div className="grid md:grid-cols-4 gap-4">
+        <Card
+          title="Status"
+          value={
+            shift
+              ? "Clocked In"
+              : "Off Duty"
+          }
+          icon={<Clock3 size={16} />}
+        />
+
+        <Card
+          title="Worked Today"
+          value={format(worked)}
+          icon={
+            <TimerReset size={16} />
+          }
+        />
+
+        <Card
+          title="Shifts"
+          value={schedule.length}
+          icon={
+            <CalendarDays
+              size={16}
+            />
+          }
+        />
+
+        <Card
+          title="Holidays"
+          value={holidays.length}
+          icon={<Plane size={16} />}
+        />
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-4">
+        <Panel title="Next Shift">
+          {!nextShift ? (
+            <p className="text-gray-400">
+              No shifts booked
+            </p>
+          ) : (
+            <>
+              <p className="text-xl font-semibold">
+                {nextShift.date}
+              </p>
+
+              <p className="text-gray-400 mt-2">
+                {nextShift.start_time?.slice(
+                  11,
+                  16
+                )}{" "}
+                -{" "}
+                {nextShift.end_time?.slice(
+                  11,
+                  16
+                )}
+              </p>
+            </>
+          )}
+        </Panel>
+
+        <Panel title="My Tasks">
+          {tasks.length === 0 ? (
+            <p className="text-gray-400">
+              No tasks assigned
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {tasks
+                .slice(0, 5)
+                .map((task) => (
+                  <div
+                    key={task.id}
+                    className="border border-white/10 rounded-xl p-3"
+                  >
+                    <p className="font-medium">
+                      {task.title}
+                    </p>
+
+                    <p className="text-xs text-gray-400 mt-1">
+                      {task.completed
+                        ? "Completed"
+                        : "Open"}
+                    </p>
+                  </div>
+                ))}
+            </div>
+          )}
+        </Panel>
+      </div>
+    </div>
+  );
+}
+
+/* ================================================= */
+/* MANAGER */
+/* ================================================= */
+
+function ManagerDashboard({
+  user,
+}) {
+  const [loading, setLoading] =
+    useState(true);
+
+  const [stats, setStats] =
+    useState({});
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function load() {
+    try {
+      const data =
+        await reportAPI.getSummary();
+
+      setStats(data || {});
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (loading) return <Loading />;
+
+  const taskData = [
+    {
+      name: "Open",
+      value:
+        (stats.tasks || 0) -
+        (stats.completedTasks ||
+          0),
+    },
+    {
+      name: "Done",
+      value:
+        stats.completedTasks ||
+        0,
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <Title
+        title={user.companyName}
+        sub="Manager workspace"
+      />
+
+      <div className="grid md:grid-cols-4 gap-4">
+        <Card
+          title="Employees"
+          value={stats.users || 0}
+          icon={<Users size={16} />}
+        />
+
+        <Card
+          title="Tasks"
+          value={stats.tasks || 0}
+          icon={
+            <Briefcase size={16} />
+          }
+        />
+
+        <Card
+          title="Live Staff"
+          value={
+            stats.activeUsers || 0
+          }
+          icon={<Clock3 size={16} />}
+        />
+
+        <Card
+          title="Completed"
+          value={
+            stats.completedTasks ||
+            0
+          }
+          icon={
+            <CheckCircle2
+              size={16}
+            />
+          }
+        />
+      </div>
+
+      <Panel title="Task Status">
+        <ChartBox>
+          <ResponsiveContainer
+            width="100%"
+            height="100%"
+          >
+            <BarChart
+              data={taskData}
+            >
+              <XAxis dataKey="name" />
+              <YAxis />
+              <Tooltip />
+              <Bar
+                dataKey="value"
+                fill="#6366f1"
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartBox>
+      </Panel>
+    </div>
+  );
+}
+
+/* ================================================= */
+/* ADMIN */
+/* ================================================= */
+
+function AdminDashboard({
+  user,
+}) {
+  const [loading, setLoading] =
+    useState(true);
+
+  const [stats, setStats] =
+    useState({});
+
+  const [plan, setPlan] =
+    useState("free");
+
+  const [updated, setUpdated] =
+    useState("");
+
+  useEffect(() => {
+    load();
+
+    const timer =
+      setInterval(load, 15000);
+
+    return () =>
+      clearInterval(timer);
+  }, []);
+
+  async function load() {
+    try {
+      const [summary, bill] =
+        await Promise.all([
+          reportAPI.getSummary(),
+          billingAPI.getStatus(),
+        ]);
+
+      setStats(summary || {});
+      setPlan(
+        bill?.plan || "free"
+      );
+
+      setUpdated(
+        new Date().toLocaleTimeString()
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (loading) return <Loading />;
 
   const chartData = [
     {
@@ -134,8 +421,8 @@ function EliteDashboard() {
       value: stats.tasks || 0,
     },
     {
-      name: "Live",
-      value: stats.activeUsers || 0,
+      name: "Shifts",
+      value: stats.shifts || 0,
     },
     {
       name: "Done",
@@ -143,6 +430,16 @@ function EliteDashboard() {
         stats.completedTasks || 0,
     },
   ];
+
+  const attendance =
+    stats.users > 0
+      ? Math.round(
+          ((stats.activeUsers ||
+            0) /
+            stats.users) *
+            100
+        )
+      : 0;
 
   const pieData = [
     {
@@ -157,71 +454,55 @@ function EliteDashboard() {
 
   return (
     <div className="space-y-6">
+      <Title
+        title={user.companyName}
+        sub="Admin workspace"
+      />
 
-      {/* HEADER */}
-      <div className="flex justify-between flex-wrap gap-4 items-center">
-        <div>
-          <h1 className="text-4xl font-semibold">
-            Elite Dashboard
-          </h1>
-
-          <p className="text-sm text-gray-400 mt-1">
-            Real-time business control centre
-          </p>
-        </div>
-
-        <div className="text-sm text-gray-400 flex items-center gap-2">
-          <RefreshCw size={14} />
-          Updated {updated}
-        </div>
-      </div>
-
-      {/* KPI CARDS */}
-      <div className="grid md:grid-cols-2 xl:grid-cols-5 gap-4">
-
-        <KPI
-          title="Employees"
+      <div className="grid md:grid-cols-4 gap-4">
+        <Card
+          title="Staff"
           value={stats.users || 0}
-          icon={<Users size={18} />}
-          color="indigo"
+          icon={<Users size={16} />}
         />
 
-        <KPI
-          title="Clocked In"
-          value={stats.activeUsers || 0}
-          icon={<Clock3 size={18} />}
-          color="green"
-        />
-
-        <KPI
+        <Card
           title="Tasks"
           value={stats.tasks || 0}
-          icon={<Briefcase size={18} />}
-          color="cyan"
+          icon={
+            <Briefcase size={16} />
+          }
         />
 
-        <KPI
+        <Card
+          title="Clocked In"
+          value={
+            stats.activeUsers || 0
+          }
+          icon={<Clock3 size={16} />}
+        />
+
+        <Card
           title="Plan"
           value={plan}
-          icon={<CreditCard size={18} />}
-          color="amber"
-        />
-
-        <KPI
-          title="Est Revenue"
-          value={`£${estRevenue}`}
-          icon={<PoundSterling size={18} />}
-          color="pink"
+          icon={
+            <CreditCard
+              size={16}
+            />
+          }
         />
       </div>
 
-      {/* CHART ROW */}
-      <div className="grid lg:grid-cols-3 gap-4">
-
-        <Panel title="Growth Analytics">
+      <div className="grid lg:grid-cols-2 gap-4">
+        <Panel title="Business Activity">
           <ChartBox>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData}>
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+            >
+              <AreaChart
+                data={chartData}
+              >
                 <XAxis dataKey="name" />
                 <YAxis />
                 <Tooltip />
@@ -229,7 +510,9 @@ function EliteDashboard() {
                   dataKey="value"
                   stroke="#6366f1"
                   fill="#6366f1"
-                  fillOpacity={0.2}
+                  fillOpacity={
+                    0.2
+                  }
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -238,148 +521,38 @@ function EliteDashboard() {
 
         <Panel title="Attendance">
           <ChartBox>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+            >
               <PieChart>
                 <Pie
                   data={pieData}
                   dataKey="value"
-                  innerRadius={55}
-                  outerRadius={80}
+                  innerRadius={60}
+                  outerRadius={85}
                 >
                   <Cell fill="#22c55e" />
                   <Cell fill="#1e293b" />
                 </Pie>
+
                 <Tooltip />
               </PieChart>
             </ResponsiveContainer>
           </ChartBox>
 
-          <p className="text-center text-3xl font-bold">
+          <p className="text-center text-2xl font-semibold">
             {attendance}%
           </p>
         </Panel>
-
-        <Panel title="Performance">
-          <ChartBox>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Bar
-                  dataKey="value"
-                  fill="#22c55e"
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartBox>
-        </Panel>
-
       </div>
 
-      {/* MAP + STAFF */}
-      <div className="grid lg:grid-cols-2 gap-4">
-
-        <Panel title="Live Staff Map">
-          <div className="h-[420px] rounded-2xl overflow-hidden">
-            <MapContainer
-              center={[52.63, 1.29]}
-              zoom={10}
-              style={{
-                height: "100%",
-                width: "100%",
-              }}
-            >
-              <TileLayer
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
-
-              {liveStaff.map((row) => {
-                if (
-                  !row.latitude ||
-                  !row.longitude
-                )
-                  return null;
-
-                return (
-                  <Marker
-                    key={row.id}
-                    position={[
-                      row.latitude,
-                      row.longitude,
-                    ]}
-                  >
-                    <Popup>
-                      {row.users?.name ||
-                        "Employee"}
-                    </Popup>
-                  </Marker>
-                );
-              })}
-            </MapContainer>
-          </div>
-        </Panel>
-
-        <Panel title="Live Staff Feed">
-          <div className="space-y-3 max-h-[420px] overflow-auto">
-
-            {liveStaff.length === 0 && (
-              <p className="text-gray-400">
-                No active staff
-              </p>
-            )}
-
-            {liveStaff.map((row) => (
-              <div
-                key={row.id}
-                className="rounded-2xl bg-white/5 border border-white/10 p-4"
-              >
-                <div className="flex justify-between">
-                  <p className="font-medium">
-                    {row.users?.name ||
-                      row.users?.email ||
-                      "Employee"}
-                  </p>
-
-                  <span className="text-green-400 text-xs">
-                    Live
-                  </span>
-                </div>
-
-                <p className="text-xs text-gray-400 mt-2">
-                  Clocked In
-                </p>
-              </div>
-            ))}
-
-          </div>
-        </Panel>
-
-      </div>
-
-      {/* EXTRA WIDGETS */}
-      <div className="grid md:grid-cols-3 gap-4">
-
-        <MiniCard
-          title="Efficiency"
-          value="94%"
-          icon={<TrendingUp size={16} />}
-        />
-
-        <MiniCard
-          title="Shift Coverage"
-          value="98%"
-          icon={<Target size={16} />}
-        />
-
-        <MiniCard
-          title="System Activity"
-          value="Live"
-          icon={<Activity size={16} />}
-        />
-
-      </div>
-
+      <Panel title="Live Updates">
+        <div className="text-sm text-gray-400 flex items-center gap-2">
+          <RefreshCw size={14} />
+          Last refresh {updated}
+        </div>
+      </Panel>
     </div>
   );
 }
@@ -398,20 +571,28 @@ function Loading() {
   );
 }
 
-function KPI({
+function Title({
+  title,
+  sub,
+}) {
+  return (
+    <div>
+      <h1 className="text-3xl font-semibold">
+        {title}
+      </h1>
+
+      <p className="text-sm text-gray-400 mt-1">
+        {sub}
+      </p>
+    </div>
+  );
+}
+
+function Card({
   title,
   value,
   icon,
-  color,
 }) {
-  const colors = {
-    indigo: "text-indigo-400",
-    green: "text-green-400",
-    cyan: "text-cyan-400",
-    amber: "text-amber-400",
-    pink: "text-pink-400",
-  };
-
   return (
     <div className="rounded-2xl border border-white/10 bg-[#020617] p-5">
       <div className="flex justify-between">
@@ -419,35 +600,14 @@ function KPI({
           {title}
         </p>
 
-        <div className={colors[color]}>
+        <div className="text-indigo-400">
           {icon}
         </div>
       </div>
 
-      <h2 className="text-2xl font-semibold mt-3 capitalize">
+      <h2 className="text-2xl font-semibold mt-3">
         {value}
       </h2>
-    </div>
-  );
-}
-
-function MiniCard({
-  title,
-  value,
-  icon,
-}) {
-  return (
-    <div className="rounded-2xl bg-white/5 border border-white/10 p-5">
-      <div className="flex justify-between">
-        <p className="text-sm text-gray-400">
-          {title}
-        </p>
-        {icon}
-      </div>
-
-      <h3 className="text-xl font-semibold mt-3">
-        {value}
-      </h3>
     </div>
   );
 }
@@ -461,6 +621,7 @@ function Panel({
       <h2 className="font-semibold mb-4">
         {title}
       </h2>
+
       {children}
     </div>
   );
@@ -474,4 +635,27 @@ function ChartBox({
       {children}
     </div>
   );
+}
+
+function format(sec) {
+  const h = Math.floor(
+    sec / 3600
+  );
+
+  const m = Math.floor(
+    (sec % 3600) / 60
+  );
+
+  const s = sec % 60;
+
+  return `${String(h).padStart(
+    2,
+    "0"
+  )}:${String(m).padStart(
+    2,
+    "0"
+  )}:${String(s).padStart(
+    2,
+    "0"
+  )}`;
 }

@@ -636,15 +636,12 @@ export const holidayAPI = {
     const companyId = await getCompanyId();
 
     const { data, error } = await supabase
-      .from("holidays")
-      .select("*, users(name)")
+      .from("holidayrequests")
+      .select("*")
       .eq("company_id", companyId)
-      .order("created_at", {
-        ascending: false,
-      });
+      .order("created_at", { ascending: false });
 
     if (error) throw error;
-
     return data || [];
   },
 
@@ -652,16 +649,12 @@ export const holidayAPI = {
     const user = await getCurrentUser();
 
     const { data, error } = await supabase
-      .from("holidays")
+      .from("holidayrequests")
       .select("*")
       .eq("user_id", user.id)
-      .eq("company_id", user.company_id)
-      .order("created_at", {
-        ascending: false,
-      });
+      .order("created_at", { ascending: false });
 
     if (error) throw error;
-
     return data || [];
   },
 
@@ -669,15 +662,15 @@ export const holidayAPI = {
     const user = await getCurrentUser();
 
     const { error } = await supabase
-      .from("holidays")
+      .from("holidayrequests")
       .insert({
         ...payload,
-        user_id: payload.user_id || user.id,
+        user_id: user.id,
         company_id: user.company_id,
+        status: "pending",
       });
 
     if (error) throw error;
-
     return true;
   },
 
@@ -685,13 +678,12 @@ export const holidayAPI = {
     const companyId = await getCompanyId();
 
     const { error } = await supabase
-      .from("holidays")
+      .from("holidayrequests")
       .update(payload)
       .eq("id", id)
       .eq("company_id", companyId);
 
     if (error) throw error;
-
     return true;
   },
 
@@ -699,13 +691,12 @@ export const holidayAPI = {
     const companyId = await getCompanyId();
 
     const { error } = await supabase
-      .from("holidays")
+      .from("holidayrequests")
       .delete()
       .eq("id", id)
       .eq("company_id", companyId);
 
     if (error) throw error;
-
     return true;
   },
 };
