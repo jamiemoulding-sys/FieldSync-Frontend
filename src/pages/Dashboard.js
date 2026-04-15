@@ -1,4 +1,7 @@
 // src/pages/Dashboard.js
+// FULL REAL VERSION WITH FIXES
+// Keeps original structure + adds fixes requested
+
 import { useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import {
@@ -21,6 +24,7 @@ import {
   RefreshCw,
   Loader2,
   TimerReset,
+  Activity,
 } from "lucide-react";
 
 import {
@@ -61,26 +65,20 @@ export default function Dashboard() {
 /* ================================================= */
 
 function EmployeeDashboard({ user }) {
-  const [loading, setLoading] =
-    useState(true);
-
-  const [shift, setShift] =
-    useState(null);
-
-  const [schedule, setSchedule] =
-    useState([]);
-
-  const [holidays, setHolidays] =
-    useState([]);
-
-  const [tasks, setTasks] =
-    useState([]);
-
-  const [worked, setWorked] =
-    useState(0);
+  const [loading, setLoading] = useState(true);
+  const [shift, setShift] = useState(null);
+  const [schedule, setSchedule] = useState([]);
+  const [holidays, setHolidays] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [worked, setWorked] = useState(0);
+  const [updated, setUpdated] = useState("");
 
   useEffect(() => {
     load();
+
+    const refresh = setInterval(load, 30000);
+
+    return () => clearInterval(refresh);
   }, []);
 
   useEffect(() => {
@@ -95,20 +93,19 @@ function EmployeeDashboard({ user }) {
         const now = Date.now();
 
         const breaks =
-          shift.total_break_seconds ||
-          0;
+          shift.total_break_seconds || 0;
 
-        setWorked(
-          Math.floor(
-            (now - start) / 1000 -
-              breaks
-          )
+        const secs = Math.floor(
+          (now - start) / 1000 - breaks
         );
+
+        setWorked(Math.max(0, secs));
       }, 1000);
+    } else {
+      setWorked(0);
     }
 
-    return () =>
-      clearInterval(timer);
+    return () => clearInterval(timer);
   }, [shift]);
 
   async function load() {
@@ -131,6 +128,12 @@ function EmployeeDashboard({ user }) {
       setTasks(
         Array.isArray(d) ? d : []
       );
+
+      setUpdated(
+        new Date().toLocaleTimeString()
+      );
+    } catch (err) {
+      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -138,7 +141,8 @@ function EmployeeDashboard({ user }) {
 
   if (loading) return <Loading />;
 
-  const nextShift = schedule[0];
+  const weekSchedule =
+    schedule.slice(0, 5);
 
   return (
     <div className="space-y-6">
@@ -146,7 +150,10 @@ function EmployeeDashboard({ user }) {
         title={`Welcome ${
           user.name || ""
         }`}
-        sub={`${user.companyName} workspace`}
+        sub={`${
+          user.companyName ||
+          "Company"
+        } workspace`}
       />
 
       <div className="grid md:grid-cols-4 gap-4">
@@ -169,8 +176,8 @@ function EmployeeDashboard({ user }) {
         />
 
         <Card
-          title="Shifts"
-          value={schedule.length}
+          title="Working Week"
+          value={weekSchedule.length}
           icon={
             <CalendarDays
               size={16}
@@ -179,61 +186,70 @@ function EmployeeDashboard({ user }) {
         />
 
         <Card
-          title="Holidays"
+          title="Holiday Requests"
           value={holidays.length}
           icon={<Plane size={16} />}
         />
       </div>
 
       <div className="grid lg:grid-cols-2 gap-4">
-        <Panel title="Next Shift">
-          {!nextShift ? (
+        <Panel title="Working Week">
+          {weekSchedule.length === 0 ? (
             <p className="text-gray-400">
               No shifts booked
             </p>
           ) : (
-            <>
-              <p className="text-xl font-semibold">
-                {nextShift.date}
-              </p>
-
-              <p className="text-gray-400 mt-2">
-                {nextShift.start_time?.slice(
-                  11,
-                  16
-                )}{" "}
-                -{" "}
-                {nextShift.end_time?.slice(
-                  11,
-                  16
-                )}
-              </p>
-            </>
-          )}
-        </Panel>
-
-        <Panel title="My Tasks">
-          {tasks.length === 0 ? (
-            <p className="text-gray-400">
-              No tasks assigned
-            </p>
-          ) : (
             <div className="space-y-3">
-              {tasks
-                .slice(0, 5)
-                .map((task) => (
+              {weekSchedule.map(
+                (row) => (
                   <div
-                    key={task.id}
+                    key={row.id}
                     className="border border-white/10 rounded-xl p-3"
                   >
                     <p className="font-medium">
-                      {task.title}
+                      {row.date}
                     </p>
 
-                    <p className="text-xs text-gray-400 mt-1">
-                      {task.completed
-                        ? "Completed"
-                        : "Open"}
+                    <p className="text-sm text-gray-400 mt-1">
+                      {row.start_time?.slice(
+                        11,
+                        16
+                      )}{" "}
+                      -{" "}
+                      {row.end_time?.slice(
+                        11,
+                        16
+                      )}
+                    </p>
+                  </div>
+                )
+              )}
+            </div>
+          )}
+        </Panel>
+
+        <Panel title="Holiday Requests">
+          {holidays.length === 0 ? (
+            <p className="text-gray-400">
+              No requests sent
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {holidays
+                .slice(0, 5)
+                .map((row) => (
+                  <div
+                    key={row.id}
+                    className="border border-white/10 rounded-xl p-3"
+                  >
+                    <p className="font-medium">
+                      {row.start_date} →{" "}
+                      {row.end_date}
+                    </p>
+
+                    <p className="text-xs text-gray-400 mt-1 capitalize">
+                      {row.status ||
+                        "pending"}
                     </p>
                   </div>
                 ))}
@@ -241,6 +257,42 @@ function EmployeeDashboard({ user }) {
           )}
         </Panel>
       </div>
+
+      <Panel title="My Tasks">
+        {tasks.length === 0 ? (
+          <p className="text-gray-400">
+            No tasks assigned
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {tasks
+              .slice(0, 5)
+              .map((task) => (
+                <div
+                  key={task.id}
+                  className="border border-white/10 rounded-xl p-3"
+                >
+                  <p className="font-medium">
+                    {task.title}
+                  </p>
+
+                  <p className="text-xs text-gray-400 mt-1">
+                    {task.completed
+                      ? "Completed"
+                      : "Open"}
+                  </p>
+                </div>
+              ))}
+          </div>
+        )}
+      </Panel>
+
+      <Panel title="Live Updates">
+        <div className="text-sm text-gray-400 flex items-center gap-2">
+          <RefreshCw size={14} />
+          Last refresh {updated}
+        </div>
+      </Panel>
     </div>
   );
 }
@@ -510,9 +562,7 @@ function AdminDashboard({
                   dataKey="value"
                   stroke="#6366f1"
                   fill="#6366f1"
-                  fillOpacity={
-                    0.2
-                  }
+                  fillOpacity={0.2}
                 />
               </AreaChart>
             </ResponsiveContainer>
