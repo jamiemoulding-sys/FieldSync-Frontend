@@ -266,18 +266,32 @@ export const taskAPI = {
     await taskAPI.getAll(),
 
   create: async (payload) => {
-    const companyId = await getCompanyId();
+  const companyId = await getCompanyId();
 
-    const { error } = await supabase
-      .from("tasks")
-      .insert({
-        ...payload,
-        company_id: companyId,
-      });
+  const { data, error } = await supabase
+    .from("tasks")
+    .insert({
+      ...payload,
+      company_id: companyId,
+    })
+    .select()
+    .single();
 
-    if (error) throw error;
-    return true;
-  },
+  if (error) throw error;
+
+  if (payload.assigned_to) {
+    await notificationAPI.create({
+      user_id: payload.assigned_to,
+      title: "New Task Assigned",
+      message:
+        payload.title ||
+        "A task was assigned to you.",
+      type: "task",
+    });
+  }
+
+  return true;
+},
 
   update: async (id, payload) => {
     const companyId = await getCompanyId();
@@ -531,18 +545,31 @@ export const scheduleAPI = {
   },
 
   create: async (payload) => {
-    const companyId = await getCompanyId();
+  const companyId = await getCompanyId();
 
-    const { error } = await supabase
-      .from("schedules")
-      .insert({
-        ...payload,
-        company_id: companyId,
-      });
+  const { data, error } = await supabase
+    .from("schedules")
+    .insert({
+      ...payload,
+      company_id: companyId,
+    })
+    .select()
+    .single();
 
-    if (error) throw error;
-    return true;
-  },
+  if (error) throw error;
+
+  if (payload.user_id) {
+    await notificationAPI.create({
+      user_id: payload.user_id,
+      title: "Shift Assigned",
+      message:
+        `You were assigned a shift for ${payload.date}`,
+      type: "schedule",
+    });
+  }
+
+  return true;
+},
 
   delete: async (id) => {
     const companyId = await getCompanyId();
@@ -580,20 +607,40 @@ export const holidayAPI = {
   },
 
   create: async (payload) => {
-    const user = await getCurrentUser();
+  const user = await getCurrentUser();
 
-    const { error } = await supabase
-      .from("holidays")
-      .insert({
-        ...payload,
-        user_id: user.id,
-        company_id: user.company_id,
-        status: "pending",
+  const { data, error } = await supabase
+    .from("holidays")
+    .insert({
+      ...payload,
+      user_id: user.id,
+      company_id: user.company_id,
+      status: "pending",
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  const staff = await userAPI.getAll();
+
+  for (const row of staff) {
+    if (
+      row.role === "admin" ||
+      row.role === "manager"
+    ) {
+      await notificationAPI.create({
+        user_id: row.id,
+        title: "Holiday Request",
+        message:
+          `${user.name} submitted holiday request.`,
+        type: "holiday",
       });
+    }
+  }
 
-    if (error) throw error;
-    return true;
-  },
+  return true;
+},
 
   getAll: async () => {
     const companyId = await getCompanyId();
@@ -611,28 +658,50 @@ export const holidayAPI = {
   },
 
   approve: async (id) => {
-    const { error } = await supabase
-      .from("holidays")
-      .update({
-        status: "approved",
-      })
-      .eq("id", id);
+  const { data, error } = await supabase
+    .from("holidays")
+    .update({
+      status: "approved",
+    })
+    .eq("id", id)
+    .select()
+    .single();
 
-    if (error) throw error;
-    return true;
-  },
+  if (error) throw error;
+
+  await notificationAPI.create({
+    user_id: data.user_id,
+    title: "Holiday Approved",
+    message:
+      "Your holiday request was approved.",
+    type: "holiday",
+  });
+
+  return true;
+},
 
   reject: async (id) => {
-    const { error } = await supabase
-      .from("holidays")
-      .update({
-        status: "rejected",
-      })
-      .eq("id", id);
+  const { data, error } = await supabase
+    .from("holidays")
+    .update({
+      status: "rejected",
+    })
+    .eq("id", id)
+    .select()
+    .single();
 
-    if (error) throw error;
-    return true;
-  },
+  if (error) throw error;
+
+  await notificationAPI.create({
+    user_id: data.user_id,
+    title: "Holiday Rejected",
+    message:
+      "Your holiday request was rejected.",
+    type: "holiday",
+  });
+
+  return true;
+},
 };
 
 /* =====================================================
@@ -641,7 +710,28 @@ ANNOUNCEMENTS
 
 export const announcementAPI = {
   getAll: async () => [],
-  create: async () => true,
+  reject: async (id) => {
+  const { data, error } = await supabase
+    .from("holidays")
+    .update({
+      status: "rejected",
+    })
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  await notificationAPI.create({
+    user_id: data.user_id,
+    title: "Holiday Rejected",
+    message:
+      "Your holiday request was rejected.",
+    type: "holiday",
+  });
+
+  return true;
+},
   delete: async () => true,
 };
 
@@ -739,6 +829,129 @@ export const billingAPI = {
         user?.subscription_status ||
         "inactive",
     };
+  },
+};
+
+// src/services/api.js
+// ADD THIS BLOCK near bottom before:
+// export default api;
+
+/* =====================================================
+NOTIFICATIONS
+REAL PRODUCTION VERSION
+===================================================== */
+
+export const notificationAPI = {
+  getAll: async () => {
+    const user = await getCurrentUser();
+
+    const { data, error } = await supabase
+      .from("notifications")
+      .select("*")
+      .eq("company_id", user.company_id)
+      .eq("user_id", user.id)
+      .order("created_at", {
+        ascending: false,
+      });
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  getUnread: async () => {
+    const user = await getCurrentUser();
+
+    const { data, error } = await supabase
+      .from("notifications")
+      .select("*")
+      .eq("company_id", user.company_id)
+      .eq("user_id", user.id)
+      .eq("read", false);
+
+    if (error) throw error;
+    return data?.length || 0;
+  },
+
+  create: async ({
+    user_id,
+    title,
+    message,
+    type = "general",
+  }) => {
+    const companyId = await getCompanyId();
+
+    const { error } = await supabase
+      .from("notifications")
+      .insert({
+        company_id: companyId,
+        user_id,
+        title,
+        message,
+        type,
+        read: false,
+      });
+
+    if (error) throw error;
+    return true;
+  },
+
+  markRead: async (id) => {
+    const user = await getCurrentUser();
+
+    const { error } = await supabase
+      .from("notifications")
+      .update({
+        read: true,
+      })
+      .eq("id", id)
+      .eq("company_id", user.company_id)
+      .eq("user_id", user.id);
+
+    if (error) throw error;
+    return true;
+  },
+
+  markAllRead: async () => {
+    const user = await getCurrentUser();
+
+    const { error } = await supabase
+      .from("notifications")
+      .update({
+        read: true,
+      })
+      .eq("company_id", user.company_id)
+      .eq("user_id", user.id)
+      .eq("read", false);
+
+    if (error) throw error;
+    return true;
+  },
+
+  delete: async (id) => {
+    const user = await getCurrentUser();
+
+    const { error } = await supabase
+      .from("notifications")
+      .delete()
+      .eq("id", id)
+      .eq("company_id", user.company_id)
+      .eq("user_id", user.id);
+
+    if (error) throw error;
+    return true;
+  },
+
+  clearAll: async () => {
+    const user = await getCurrentUser();
+
+    const { error } = await supabase
+      .from("notifications")
+      .delete()
+      .eq("company_id", user.company_id)
+      .eq("user_id", user.id);
+
+    if (error) throw error;
+    return true;
   },
 };
 

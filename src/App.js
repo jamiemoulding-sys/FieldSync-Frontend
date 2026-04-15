@@ -28,6 +28,7 @@ import HolidayRequests from "./pages/HolidayRequests";
 import Announcements from "./pages/Announcements";
 import TimeSheet from "./pages/TimeSheet";
 import WorkSession from "./pages/WorkSession";
+import Notifications from "./pages/Notifications";
 
 /* EMPLOYEE */
 import MySchedule from "./pages/MySchedule";
@@ -273,6 +274,11 @@ export default function App() {
         />
 
         {/* PRIVATE */}
+        
+        <Route
+          path="/notifications"
+          element={<Notifications />}
+         />
 
         <Route
           element={

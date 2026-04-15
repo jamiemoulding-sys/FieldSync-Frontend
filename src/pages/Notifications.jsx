@@ -1,5 +1,8 @@
-import React, { useEffect, useState } from "react";
-import { useAuth } from "../hooks/useAuth";
+import React, {
+  useEffect,
+  useState,
+} from "react";
+
 import {
   Bell,
   CheckCircle2,
@@ -8,114 +11,54 @@ import {
   CheckCheck,
 } from "lucide-react";
 
-const STORAGE_KEY = "user_notifications";
+import { notificationAPI } from "../services/api";
 
 export default function Notifications() {
-  const { user } = useAuth();
-
   const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] =
+    useState(true);
 
   useEffect(() => {
-    loadNotifications();
-  }, [user]);
+    load();
+  }, []);
 
-  function getUserKey() {
-    return `${STORAGE_KEY}_${user?.id || "guest"}`;
-  }
+  async function load() {
+    try {
+      setLoading(true);
 
-  function loadNotifications() {
-    setLoading(true);
+      const data =
+        await notificationAPI.getAll();
 
-    setTimeout(() => {
-      const saved = localStorage.getItem(
-        getUserKey()
-      );
-
-      if (saved) {
-        setRows(JSON.parse(saved));
-      } else {
-        const starter = [
-          {
-            id: 1,
-            title: "Shift Assigned",
-            message:
-              "You have been assigned a shift tomorrow.",
-            time: "2 mins ago",
-            read: false,
-          },
-          {
-            id: 2,
-            title: "Holiday Approved",
-            message:
-              "Your holiday request was approved.",
-            time: "1 hour ago",
-            read: false,
-          },
-          {
-            id: 3,
-            title: "Clock Out Reminder",
-            message:
-              "Remember to clock out after your shift.",
-            time: "Yesterday",
-            read: true,
-          },
-        ];
-
-        setRows(starter);
-
-        localStorage.setItem(
-          getUserKey(),
-          JSON.stringify(starter)
-        );
-      }
-
+      setRows(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
       setLoading(false);
-    }, 300);
+    }
   }
 
-  function saveRows(data) {
-    setRows(data);
-
-    localStorage.setItem(
-      getUserKey(),
-      JSON.stringify(data)
-    );
+  async function markRead(id) {
+    await notificationAPI.markRead(id);
+    load();
   }
 
-  function markRead(id) {
-    const updated = rows.map((item) =>
-      item.id === id
-        ? { ...item, read: true }
-        : item
-    );
-
-    saveRows(updated);
+  async function removeItem(id) {
+    await notificationAPI.delete(id);
+    load();
   }
 
-  function removeItem(id) {
-    const updated = rows.filter(
-      (item) => item.id !== id
-    );
-
-    saveRows(updated);
+  async function markAllRead() {
+    await notificationAPI.markAllRead();
+    load();
   }
 
-  function markAllRead() {
-    const updated = rows.map((item) => ({
-      ...item,
-      read: true,
-    }));
-
-    saveRows(updated);
-  }
-
-  function clearAll() {
-    saveRows([]);
+  async function clearAll() {
+    await notificationAPI.clearAll();
+    load();
   }
 
   const unread = rows.filter(
-    (item) => !item.read
+    (x) => !x.read
   ).length;
 
   if (loading) {
@@ -132,8 +75,10 @@ export default function Notifications() {
 
   return (
     <div className="space-y-6">
+
       {/* HEADER */}
       <div className="flex justify-between items-center flex-wrap gap-4">
+
         <div>
           <h1 className="text-2xl font-semibold">
             Notifications
@@ -145,6 +90,7 @@ export default function Notifications() {
         </div>
 
         <div className="flex gap-2">
+
           <div className="px-4 py-2 rounded-xl bg-indigo-600 text-sm">
             {unread} unread
           </div>
@@ -152,7 +98,9 @@ export default function Notifications() {
           {rows.length > 0 && (
             <>
               <button
-                onClick={markAllRead}
+                onClick={
+                  markAllRead
+                }
                 className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-sm"
               >
                 Mark All Read
@@ -166,11 +114,14 @@ export default function Notifications() {
               </button>
             </>
           )}
+
         </div>
+
       </div>
 
       {/* LIST */}
       <div className="space-y-4">
+
         {rows.map((item) => (
           <div
             key={item.id}
@@ -180,22 +131,28 @@ export default function Notifications() {
                 : "border-indigo-500/30 bg-[#0b1225]"
             }`}
           >
+
             <div className="flex justify-between gap-4">
+
               <div className="flex gap-3">
+
                 <Bell
                   size={18}
                   className="text-indigo-400 mt-1"
                 />
 
                 <div>
+
                   <div className="flex items-center gap-2">
+
                     <h3 className="font-medium">
                       {item.title}
                     </h3>
 
                     {!item.read && (
-                      <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                      <div className="w-2 h-2 rounded-full bg-red-500" />
                     )}
+
                   </div>
 
                   <p className="text-sm text-gray-400 mt-1">
@@ -203,46 +160,67 @@ export default function Notifications() {
                   </p>
 
                   <p className="text-xs text-gray-500 mt-2">
-                    {item.time}
+                    {new Date(
+                      item.created_at
+                    ).toLocaleString()}
                   </p>
+
                 </div>
+
               </div>
 
               <div className="flex gap-2">
+
                 {!item.read && (
                   <button
                     onClick={() =>
-                      markRead(item.id)
+                      markRead(
+                        item.id
+                      )
                     }
                     className="w-10 h-10 rounded-xl bg-green-600/20 text-green-400 flex items-center justify-center"
                   >
-                    <CheckCircle2 size={16} />
+                    <CheckCircle2
+                      size={16}
+                    />
                   </button>
                 )}
 
                 <button
                   onClick={() =>
-                    removeItem(item.id)
+                    removeItem(
+                      item.id
+                    )
                   }
                   className="w-10 h-10 rounded-xl bg-red-600/20 text-red-400 flex items-center justify-center"
                 >
-                  <Trash2 size={16} />
+                  <Trash2
+                    size={16}
+                  />
                 </button>
+
               </div>
+
             </div>
+
           </div>
         ))}
 
         {rows.length === 0 && (
           <div className="rounded-2xl border border-white/10 bg-[#020617] p-10 text-center text-gray-500">
+
             <CheckCheck
               size={28}
               className="mx-auto mb-3"
             />
+
             No notifications
+
           </div>
         )}
+
       </div>
+
     </div>
   );
 }
