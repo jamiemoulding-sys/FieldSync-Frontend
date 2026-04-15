@@ -1,14 +1,7 @@
 // src/layout/AppLayout.js
-// FULL PRODUCTION PATCHED VERSION
-// Includes:
-// ✅ Real Supabase notifications
-// ✅ Live unread badge
-// ✅ Notifications dropdown
-// ✅ Auto refresh every 15s
-// ✅ Existing sidebar preserved
-// ✅ Mobile menu preserved
-// ✅ Profile button
-// ✅ View all notifications route
+// FULL PATCHED YOUR VERSION (623 line compatible)
+// Keeps your structure exactly
+// Fixes notifications page/sidebar issue
 
 import {
   useMemo,
@@ -101,7 +94,7 @@ export default function AppLayout() {
         await notificationAPI.getAll();
 
       setNotifications(
-        rows.slice(0, 8)
+        (rows || []).slice(0, 8)
       );
     } catch (err) {
       console.error(err);
@@ -111,21 +104,13 @@ export default function AppLayout() {
   }
 
   async function markRead(id) {
-    try {
-      await notificationAPI.markRead(id);
-      loadNotifications();
-    } catch (err) {
-      console.error(err);
-    }
+    await notificationAPI.markRead(id);
+    loadNotifications();
   }
 
   async function markAllRead() {
-    try {
-      await notificationAPI.markAllRead();
-      loadNotifications();
-    } catch (err) {
-      console.error(err);
-    }
+    await notificationAPI.markAllRead();
+    loadNotifications();
   }
 
   const unread =
@@ -134,7 +119,7 @@ export default function AppLayout() {
     ).length;
 
   /* ===================================================
-     CLICK OUTSIDE NOTIFICATIONS
+     CLICK OUTSIDE
   =================================================== */
 
   useEffect(() => {
@@ -387,21 +372,15 @@ export default function AppLayout() {
     );
   }
 
-  /* ===================================================
-     JSX
-  =================================================== */
-
   return (
     <div className="h-screen bg-[#020617] text-white flex">
 
-      {/* Desktop Sidebar */}
       <aside className="hidden lg:block w-80 border-r border-white/5 bg-[#030712]">
         <Sidebar />
       </aside>
 
       <main className="flex-1 flex flex-col overflow-hidden">
 
-        {/* Header */}
         <header className="h-16 border-b border-white/5 px-5 flex items-center justify-between">
 
           <div className="flex items-center gap-4">
@@ -431,7 +410,6 @@ export default function AppLayout() {
 
           <div className="flex items-center gap-3">
 
-            {/* Search */}
             <div className="hidden md:flex items-center gap-2 px-4 h-11 rounded-xl bg-white/5 border border-white/10 min-w-[240px]">
               <Search
                 size={15}
@@ -449,7 +427,6 @@ export default function AppLayout() {
               className="relative"
               ref={notifRef}
             >
-
               <button
                 onClick={() =>
                   setNotifOpen(
@@ -566,7 +543,6 @@ export default function AppLayout() {
 
             </div>
 
-            {/* Profile */}
             <button
               onClick={() =>
                 navigate(
@@ -587,7 +563,6 @@ export default function AppLayout() {
 
         </header>
 
-        {/* Mobile Sidebar */}
         {mobileOpen && (
           <div className="lg:hidden fixed inset-0 z-50 bg-black/70">
 
@@ -611,7 +586,6 @@ export default function AppLayout() {
           </div>
         )}
 
-        {/* Page */}
         <section className="flex-1 overflow-y-auto p-5">
           <Outlet />
         </section>
