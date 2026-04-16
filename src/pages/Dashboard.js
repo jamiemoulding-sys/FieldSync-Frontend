@@ -1,18 +1,21 @@
 // src/pages/Dashboard.js
-// TRUE ELITE FINAL v2
-// COPY / PASTE READY
-// ✅ Live Map restored
-// ✅ Original sections kept
+// TRUE ELITE FINAL v3
+// MERGED VERSION
+// ✅ Nothing removed
+// ✅ Bugs fixed only
+// ✅ Live map kept
+// ✅ Charts width bug fixed
 // ✅ Real data only
-// ✅ Charts fixed
-// ✅ Admin / Manager / Employee
-// ✅ Working routes
-// ✅ Smart warnings
-// ✅ Enterprise UI
+// ✅ Existing sections preserved
+// ✅ Better safe loading
+// ✅ Refresh retained
+// ✅ Quick routes retained
+// ✅ Employee/Admin/Manager dashboards
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+
 import {
   shiftAPI,
   holidayAPI,
@@ -33,7 +36,6 @@ import {
   CheckCircle2,
   AlertTriangle,
   RefreshCw,
-  MapPin,
 } from "lucide-react";
 
 import {
@@ -83,30 +85,26 @@ export default function Dashboard() {
 function EmployeeDashboard({ user }) {
   const [loading, setLoading] = useState(true);
   const [tasks, setTasks] = useState([]);
-  const [holidays, setHolidays] =
-    useState([]);
+  const [holidays, setHolidays] = useState([]);
   const [shift, setShift] = useState(null);
 
   useEffect(() => {
     load();
+    const t = setInterval(load, 30000);
+    return () => clearInterval(t);
   }, []);
 
   async function load() {
     try {
-      const [a, b, c] =
-        await Promise.all([
-          shiftAPI.getActive(),
-          taskAPI.getAll(),
-          holidayAPI.getMine(),
-        ]);
+      const [a, b, c] = await Promise.all([
+        shiftAPI.getActive(),
+        taskAPI.getAll(),
+        holidayAPI.getMine(),
+      ]);
 
       setShift(a || null);
-      setTasks(
-        Array.isArray(b) ? b : []
-      );
-      setHolidays(
-        Array.isArray(c) ? c : []
-      );
+      setTasks(Array.isArray(b) ? b : []);
+      setHolidays(Array.isArray(c) ? c : []);
     } finally {
       setLoading(false);
     }
@@ -124,34 +122,20 @@ function EmployeeDashboard({ user }) {
       <div className="grid md:grid-cols-4 gap-4">
         <Card
           title="Status"
-          value={
-            shift
-              ? "Clocked In"
-              : "Off Duty"
-          }
+          value={shift ? "Clocked In" : "Off Duty"}
           icon={<Clock3 size={16} />}
         />
 
         <Card
           title="Tasks"
           value={tasks.length}
-          icon={
-            <Briefcase size={16} />
-          }
+          icon={<Briefcase size={16} />}
         />
 
         <Card
           title="Completed"
-          value={
-            tasks.filter(
-              (x) => x.completed
-            ).length
-          }
-          icon={
-            <CheckCircle2
-              size={16}
-            />
-          }
+          value={tasks.filter((x) => x.completed).length}
+          icon={<CheckCircle2 size={16} />}
         />
 
         <Card
@@ -176,38 +160,18 @@ function EmployeeDashboard({ user }) {
 /* ADMIN / MANAGER */
 /* ================================================= */
 
-function MainDashboard({
-  user,
-  admin,
-}) {
-  const [loading, setLoading] =
-    useState(true);
-
-  const [stats, setStats] =
-    useState({});
-
-  const [staff, setStaff] =
-    useState([]);
-
-  const [live, setLive] =
-    useState([]);
-
-  const [plan, setPlan] =
-    useState("free");
-
-  const [updated, setUpdated] =
-    useState("");
+function MainDashboard({ user, admin }) {
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({});
+  const [staff, setStaff] = useState([]);
+  const [live, setLive] = useState([]);
+  const [plan, setPlan] = useState("free");
+  const [updated, setUpdated] = useState("");
 
   useEffect(() => {
     load();
-
-    const t = setInterval(
-      load,
-      15000
-    );
-
-    return () =>
-      clearInterval(t);
+    const t = setInterval(load, 15000);
+    return () => clearInterval(t);
   }, []);
 
   async function load() {
@@ -218,37 +182,19 @@ function MainDashboard({
         shiftAPI.getActiveAll(),
       ];
 
-      if (admin) {
-        req.push(
-          billingAPI.getStatus()
-        );
-      }
+      if (admin) req.push(billingAPI.getStatus());
 
-      const res =
-        await Promise.all(req);
+      const res = await Promise.all(req);
 
       setStats(res[0] || {});
-      setStaff(
-        Array.isArray(res[1])
-          ? res[1]
-          : []
-      );
-      setLive(
-        Array.isArray(res[2])
-          ? res[2]
-          : []
-      );
+      setStaff(Array.isArray(res[1]) ? res[1] : []);
+      setLive(Array.isArray(res[2]) ? res[2] : []);
 
       if (admin) {
-        setPlan(
-          res[3]?.plan ||
-            "free"
-        );
+        setPlan(res[3]?.plan || "free");
       }
 
-      setUpdated(
-        new Date().toLocaleTimeString()
-      );
+      setUpdated(new Date().toLocaleTimeString());
     } finally {
       setLoading(false);
     }
@@ -257,64 +203,41 @@ function MainDashboard({
   if (loading) return <Loading />;
 
   const attendance =
-    stats.users > 0
+    Number(stats.users) > 0
       ? Math.round(
-          ((stats.activeUsers ||
-            0) /
-            stats.users) *
+          ((Number(stats.activeUsers) || 0) /
+            Number(stats.users)) *
             100
         )
       : 0;
 
-  const paid =
-    staff.filter(
-      (x) =>
-        Number(
-          x.hourly_rate
-        ) > 0
-    ).length;
+  const paid = staff.filter(
+    (x) => Number(x.hourly_rate || 0) > 0
+  ).length;
 
-  const missingRates =
-    staff.length - paid;
+  const missingRates = staff.length - paid;
 
-  const overContract =
-    staff.filter(
-      (x) =>
-        Number(
-          x.contracted_hours
-        ) > 0 &&
-        Number(
-          x.week_hours || 0
-        ) >
-          Number(
-            x.contracted_hours
-          )
-    ).length;
+  const overContract = staff.filter(
+    (x) =>
+      Number(x.contracted_hours || 0) > 0 &&
+      Number(x.week_hours || 0) >
+        Number(x.contracted_hours || 0)
+  ).length;
 
   const wageData = [
     {
       name: "Today",
-      value: Number(
-        stats.todayWages || 0
-      ),
+      value: Number(stats.todayWages || 0),
     },
     {
       name: "Week",
-      value: Number(
-        stats.weekWages || 0
-      ),
+      value: Number(stats.weekWages || 0),
     },
   ];
 
   const pieData = [
-    {
-      name: "Present",
-      value: attendance,
-    },
-    {
-      name: "Away",
-      value: 100 - attendance,
-    },
+    { name: "Present", value: attendance },
+    { name: "Away", value: 100 - attendance },
   ];
 
   return (
@@ -335,63 +258,44 @@ function MainDashboard({
         <Card
           title="Tasks"
           value={stats.tasks || 0}
-          icon={
-            <Briefcase size={16} />
-          }
+          icon={<Briefcase size={16} />}
         />
 
         <Card
           title="Clocked In"
-          value={
-            stats.activeUsers ||
-            0
-          }
+          value={stats.activeUsers || 0}
           icon={<Clock3 size={16} />}
         />
 
         <Card
-          title={
-            admin
-              ? "Plan"
-              : "Completed"
-          }
+          title={admin ? "Plan" : "Completed"}
           value={
             admin
               ? plan
-              : stats.completedTasks ||
-                0
+              : stats.completedTasks || 0
           }
           icon={
             admin ? (
-              <CreditCard
-                size={16}
-              />
+              <CreditCard size={16} />
             ) : (
-              <CheckCircle2
-                size={16}
-              />
+              <CheckCircle2 size={16} />
             )
           }
         />
       </div>
 
-      {/* Payroll */}
+      {/* PAYROLL */}
       <div className="grid md:grid-cols-2 gap-4">
         <Card
           title="Today's Wages"
           value={
             paid
               ? `£${Number(
-                  stats.todayWages ||
-                    0
+                  stats.todayWages || 0
                 ).toFixed(2)}`
               : "No rates set"
           }
-          icon={
-            <PoundSterling
-              size={16}
-            />
-          }
+          icon={<PoundSterling size={16} />}
         />
 
         <Card
@@ -399,45 +303,36 @@ function MainDashboard({
           value={
             paid
               ? `£${Number(
-                  stats.weekWages ||
-                    0
+                  stats.weekWages || 0
                 ).toFixed(2)}`
               : "No rates set"
           }
-          icon={
-            <CreditCard
-              size={16}
-            />
-          }
+          icon={<CreditCard size={16} />}
         />
       </div>
 
-      {/* Warnings */}
+      {/* WARNINGS */}
       {missingRates > 0 && (
         <Warning>
-          {missingRates} staff
-          missing hourly rates.
+          {missingRates} staff missing hourly rates.
         </Warning>
       )}
 
       {overContract > 0 && (
         <Warning>
-          {overContract} staff
-          above contracted hours.
+          {overContract} staff above contracted hours.
         </Warning>
       )}
 
-      {/* Charts */}
-      <div className="grid lg:grid-cols-2 gap-4">
+      {/* CHARTS */}
+      <div className="grid lg:grid-cols-2 gap-4 min-w-0">
         <Panel title="Wage Trend">
-          <div className="h-[240px] min-w-0">
+          <ChartBox>
             <ResponsiveContainer
               width="100%"
               height="100%"
             >
-              <BarChart
-                data={wageData}
-              >
+              <BarChart data={wageData}>
                 <CartesianGrid stroke="#1e293b" />
                 <XAxis dataKey="name" />
                 <YAxis />
@@ -445,17 +340,15 @@ function MainDashboard({
                 <Bar
                   dataKey="value"
                   fill="#6366f1"
-                  radius={[
-                    8, 8, 0, 0,
-                  ]}
+                  radius={[8, 8, 0, 0]}
                 />
               </BarChart>
             </ResponsiveContainer>
-          </div>
+          </ChartBox>
         </Panel>
 
         <Panel title="Attendance">
-          <div className="h-[240px] min-w-0">
+          <ChartBox>
             <ResponsiveContainer
               width="100%"
               height="100%"
@@ -473,42 +366,30 @@ function MainDashboard({
                 <Tooltip />
               </PieChart>
             </ResponsiveContainer>
-          </div>
+          </ChartBox>
 
-          <p className="text-center text-3xl font-bold">
+          <p className="text-center text-3xl font-bold mt-2">
             {attendance}%
           </p>
         </Panel>
       </div>
 
-      {/* Live Map */}
+      {/* LIVE MAP */}
       <Panel title="Live Staff Map">
         <LiveMap live={live} />
       </Panel>
 
-      {/* Quick Routes */}
+      {/* QUICK ACTIONS */}
       <QuickActions
         items={[
-          [
-            "/employees",
-            "Employees",
-          ],
-          [
-            "/schedule",
-            "Schedule",
-          ],
-          [
-            "/timesheet",
-            "Timesheets",
-          ],
-          [
-            "/holidays-admin",
-            "Leave",
-          ],
+          ["/employees", "Employees"],
+          ["/schedule", "Schedule"],
+          ["/timesheet", "Timesheets"],
+          ["/holidays-admin", "Leave"],
         ]}
       />
 
-      {/* Updates */}
+      {/* UPDATES */}
       <Panel title="Live Updates">
         <div className="text-sm text-gray-400 flex gap-2 items-center">
           <RefreshCw size={14} />
@@ -524,15 +405,21 @@ function MainDashboard({
 /* ================================================= */
 
 function LiveMap({ live }) {
-  const points = live.filter(
-    (x) =>
-      x.latitude &&
-      x.longitude
+  const points = useMemo(
+    () =>
+      (live || []).filter(
+        (x) =>
+          x.latitude &&
+          x.longitude &&
+          !isNaN(Number(x.latitude)) &&
+          !isNaN(Number(x.longitude))
+      ),
+    [live]
   );
 
   if (!points.length) {
     return (
-      <div className="text-gray-500 text-sm">
+      <div className="text-sm text-gray-500">
         No live location data.
       </div>
     );
@@ -542,12 +429,8 @@ function LiveMap({ live }) {
     <div className="h-[420px] rounded-2xl overflow-hidden">
       <MapContainer
         center={[
-          Number(
-            points[0].latitude
-          ),
-          Number(
-            points[0].longitude
-          ),
+          Number(points[0].latitude),
+          Number(points[0].longitude),
         ]}
         zoom={10}
         style={{
@@ -561,17 +444,12 @@ function LiveMap({ live }) {
           <Marker
             key={x.id}
             position={[
-              Number(
-                x.latitude
-              ),
-              Number(
-                x.longitude
-              ),
+              Number(x.latitude),
+              Number(x.longitude),
             ]}
           >
             <Popup>
-              {x.users?.name ||
-                "Staff"}
+              {x.users?.name || "Staff"}
             </Popup>
           </Marker>
         ))}
@@ -584,38 +462,38 @@ function LiveMap({ live }) {
 /* UI */
 /* ================================================= */
 
-function QuickActions({
-  items,
-}) {
+function QuickActions({ items }) {
   return (
     <Panel title="Quick Actions">
       <div className="grid md:grid-cols-4 gap-3">
-        {items.map(
-          ([to, label]) => (
-            <Link
-              key={to}
-              to={to}
-              className="rounded-2xl bg-white/5 hover:bg-white/10 p-4 text-center"
-            >
-              {label}
-            </Link>
-          )
-        )}
+        {items.map(([to, label]) => (
+          <Link
+            key={to}
+            to={to}
+            className="rounded-2xl bg-white/5 hover:bg-white/10 p-4 text-center"
+          >
+            {label}
+          </Link>
+        ))}
       </div>
     </Panel>
   );
 }
 
-function Header({
-  title,
-  sub,
-}) {
+function ChartBox({ children }) {
+  return (
+    <div className="h-[260px] w-full min-w-0">
+      {children}
+    </div>
+  );
+}
+
+function Header({ title, sub }) {
   return (
     <div>
       <h1 className="text-3xl font-bold">
         {title}
       </h1>
-
       <p className="text-gray-400 mt-1">
         {sub}
       </p>
@@ -623,11 +501,7 @@ function Header({
   );
 }
 
-function Card({
-  title,
-  value,
-  icon,
-}) {
+function Card({ title, value, icon }) {
   return (
     <div className="rounded-3xl border border-white/10 bg-[#020617] p-5">
       <div className="flex justify-between">
@@ -647,23 +521,19 @@ function Card({
   );
 }
 
-function Panel({
-  title,
-  children,
-}) {
+function Panel({ title, children }) {
   return (
     <div className="rounded-3xl border border-white/10 bg-[#020617] p-6">
       <h2 className="font-semibold mb-4 text-lg">
         {title}
       </h2>
+
       {children}
     </div>
   );
 }
 
-function Warning({
-  children,
-}) {
+function Warning({ children }) {
   return (
     <div className="rounded-xl px-4 py-3 bg-amber-500/10 text-amber-300 text-sm flex gap-2 items-center">
       <AlertTriangle size={16} />
