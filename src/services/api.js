@@ -763,8 +763,14 @@ export const announcementAPI = {
   delete: async () => true,
 };
 
+// src/services/api.js
+// PATCHES FOR NEW DASHBOARD FEATURES
+// Keep all your existing file exactly as-is.
+// ONLY replace the reportAPI block below with this upgraded one.
+
 /* =====================================================
 REPORTS
+UPGRADED AI ANALYTICS + COSTING
 ===================================================== */
 
 export const reportAPI = {
@@ -773,16 +779,170 @@ export const reportAPI = {
     const tasks = await taskAPI.getAll();
     const shifts = await shiftAPI.getAll();
 
+    const now = new Date();
+
+    const today = now.toISOString().split("T")[0];
+
+    const weekAgo = new Date();
+    weekAgo.setDate(now.getDate() - 7);
+
+    let todayWages = 0;
+    let weekWages = 0;
+
+    let lateStaff = 0;
+    let overtimeRisk = 0;
+    let earlyClockOuts = 0;
+    let lateClockOuts = 0;
+    let sicknessFlags = 0;
+
+    for (const row of shifts) {
+      const user =
+        users.find(
+          (u) => u.id === row.user_id
+        ) || {};
+
+      const rate =
+        Number(
+          user.hourly_rate ||
+          user.hour_rate ||
+          12
+        );
+
+      const start = row.clock_in_time
+        ? new Date(row.clock_in_time)
+        : null;
+
+      const end = row.clock_out_time
+        ? new Date(row.clock_out_time)
+        : new Date();
+
+      if (!start) continue;
+
+      const sec =
+        Math.floor(
+          (end - start) / 1000
+        ) -
+        Number(
+          row.total_break_seconds || 0
+        );
+
+      const hours =
+        sec > 0 ? sec / 3600 : 0;
+
+      const cost =
+        hours * rate;
+
+      const date =
+        start.toISOString().split("T")[0];
+
+      if (date === today) {
+        todayWages += cost;
+      }
+
+      if (start >= weekAgo) {
+        weekWages += cost;
+      }
+
+      /* AI Flags */
+
+      const startHour =
+        start.getHours();
+
+      const finishHour =
+        end.getHours();
+
+      if (startHour >= 9) {
+        lateStaff++;
+      }
+
+      if (hours >= 10) {
+        overtimeRisk++;
+      }
+
+      if (
+        row.clock_out_time &&
+        finishHour < 16
+      ) {
+        earlyClockOuts++;
+      }
+
+      if (
+        row.clock_out_time &&
+        finishHour >= 19
+      ) {
+        lateClockOuts++;
+      }
+    }
+
+    /* sickness pattern */
+    const holidays =
+      await holidayAPI.getAll();
+
+    sicknessFlags =
+      holidays.filter((x) =>
+        String(
+          x.reason || ""
+        ).toLowerCase().includes(
+          "sick"
+        )
+      ).length;
+
     return {
       users: users.length,
       tasks: tasks.length,
       shifts: shifts.length,
-      activeUsers: shifts.filter(
-        (x) => !x.clock_out_time
-      ).length,
-      completedTasks: tasks.filter(
-        (x) => x.completed
-      ).length,
+
+      activeUsers:
+        shifts.filter(
+          (x) =>
+            !x.clock_out_time
+        ).length,
+
+      completedTasks:
+        tasks.filter(
+          (x) => x.completed
+        ).length,
+
+      todayWages:
+        "£" +
+        todayWages.toFixed(2),
+
+      weekWages:
+        "£" +
+        weekWages.toFixed(2),
+
+      lateStaff,
+      overtimeRisk,
+      earlyClockOuts,
+      lateClockOuts,
+      sicknessFlags,
+
+      trends: [
+        {
+          label:
+            "Late Starts",
+          value:
+            lateStaff,
+        },
+        {
+          label:
+            "Overworked",
+          value:
+            overtimeRisk,
+        },
+        {
+          label:
+            "Early Finish",
+          value:
+            earlyClockOuts,
+        },
+        {
+          label:
+            "Late Finish",
+          value:
+            lateClockOuts,
+        },
+      ],
     };
   },
 
