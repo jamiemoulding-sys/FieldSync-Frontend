@@ -1,17 +1,12 @@
 // src/pages/Dashboard.js
-// FIELDSYNC PREMIUM DASHBOARD
-// FULL FIXED VERSION
-// ✅ No double sidebar
-// ✅ Real data only
-// ✅ Working wages
-// ✅ Live map
-// ✅ Cleaner layout
-// ✅ Exact premium style
-// ✅ Copy / Paste Ready
+// FIELDSYNC FINAL EXACT VERSION
+// Single Sidebar
+// Premium SaaS Layout
+// Real Data Only
+// Copy / Paste Ready
 
 import { useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
-
 import {
   userAPI,
   shiftAPI,
@@ -21,9 +16,9 @@ import {
 } from "../services/api";
 
 import {
-  Loader2,
   Search,
   Bell,
+  Loader2,
 } from "lucide-react";
 
 import {
@@ -31,7 +26,6 @@ import {
   Pie,
   Cell,
   ResponsiveContainer,
-  Tooltip,
 } from "recharts";
 
 import {
@@ -62,7 +56,7 @@ function PremiumDashboard({ user }) {
   const [live, setLive] = useState([]);
   const [leave, setLeave] = useState([]);
   const [plan, setPlan] = useState("free");
-  const [shifts, setShifts] = useState([]);
+  const [schedule, setSchedule] = useState([]);
 
   useEffect(() => {
     load();
@@ -90,7 +84,7 @@ function PremiumDashboard({ user }) {
       setLive(active || []);
       setLeave(holidays || []);
       setPlan(billing?.plan || "free");
-      setShifts(rota || []);
+      setSchedule(rota || []);
     } finally {
       setLoading(false);
     }
@@ -117,86 +111,153 @@ function PremiumDashboard({ user }) {
       ? employees - clockedIn - onLeave
       : 0;
 
-  const attendanceData = [
+  const attendance = Math.round(
+    employees
+      ? (clockedIn / employees) * 100
+      : 0
+  );
+
+  const pieData = [
     { name: "Present", value: clockedIn },
     { name: "Absent", value: absent },
     { name: "Leave", value: onLeave },
   ];
 
-  const todayWages = calcTodayWages(
+  const todayWages = getTodayWages(
     live,
     staff
   );
 
-  const weekWages = calcWeekWages(
-    staff
-  );
+  const weekWages = getWeekWages(staff);
 
-  const upcoming = shifts
+  const upcoming = schedule
     .filter((x) => x.date >= today)
-    .slice(0, 4);
+    .slice(0, 3);
 
   return (
     <div className="flex min-h-screen bg-[#020617] text-white">
-
       {/* SIDEBAR */}
-      <aside className="w-[250px] border-r border-white/5 p-6 space-y-8">
+      <aside className="w-[250px] border-r border-white/5 p-5 flex flex-col justify-between">
+        <div>
+          <div className="flex items-center gap-3 mb-8">
+            <div className="w-10 h-10 rounded-xl bg-yellow-500 text-black font-bold flex items-center justify-center">
+              F
+            </div>
 
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-indigo-600 flex items-center justify-center font-bold text-xl">
-            F
+            <div>
+              <h1 className="font-bold text-xl">
+                FieldSync
+              </h1>
+              <p className="text-xs text-gray-400">
+                Workforce Management
+              </p>
+            </div>
           </div>
 
-          <div>
-            <h1 className="font-bold text-xl">
-              FieldSync
-            </h1>
-            <p className="text-xs text-gray-400">
-              Premium
-            </p>
-          </div>
+          <Nav />
         </div>
 
-        <Nav />
+        <div className="space-y-3">
+          <div className="rounded-2xl bg-white/5 p-4">
+            <p className="font-medium">
+              {user.name}
+            </p>
+            <p className="text-sm text-gray-400">
+              {user.role}
+            </p>
+          </div>
 
-        <div className="rounded-2xl bg-white/5 p-4">
-          <p className="font-medium">
-            {user.name}
-          </p>
-          <p className="text-sm text-gray-400">
-            {user.role}
-          </p>
+          <button className="w-full py-3 rounded-2xl bg-red-600 hover:bg-red-500">
+            Sign Out
+          </button>
         </div>
       </aside>
 
       {/* MAIN */}
-      <main className="flex-1 p-8 space-y-6 overflow-auto">
+      <main className="flex-1 px-10 py-8 space-y-5 overflow-auto">
 
         {/* TOP */}
         <div className="flex justify-between items-center">
           <div>
-            <p className="text-sm text-gray-400">
-              Dashboard
-            </p>
-
-            <h1 className="text-3xl font-bold mt-1">
-              Welcome back, {user.name}
+            <h1 className="text-4xl font-bold">
+              Good morning, {user.name}
             </h1>
+
+            <p className="text-gray-400 mt-1">
+              Here's what's happening with your workforce today.
+            </p>
           </div>
 
-          <div className="flex gap-3">
-            <button className="w-11 h-11 rounded-2xl bg-white/5 flex items-center justify-center">
-              <Search size={18} />
-            </button>
+          <div className="flex gap-3 items-center">
+            <div className="bg-white/5 rounded-2xl px-4 py-3 flex gap-2 min-w-[220px]">
+              <Search size={16} />
+              <span className="text-gray-400 text-sm">
+                Search...
+              </span>
+            </div>
 
-            <button className="w-11 h-11 rounded-2xl bg-white/5 flex items-center justify-center">
+            <button className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center">
               <Bell size={18} />
             </button>
           </div>
         </div>
 
         {/* KPI */}
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-5 gap-4">
+          <Card title="Employees" value={employees} sub="Active" />
+          <Card title="Clocked In" value={clockedIn} sub="Now" />
+          <Card title="On Leave" value={onLeave} sub="Today" />
+          <Card title="Locations" value={live.length} sub="Active" />
+          <Card title="Plan" value={plan} sub="Subscription" />
+        </div>
+
+        {/* MID */}
+        <div className="grid grid-cols-2 gap-4">
+
+          {/* GRAPH */}
+          <Panel title="Today's Attendance">
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    innerRadius={80}
+                    outerRadius={110}
+                    dataKey="value"
+                  >
+                    <Cell fill="#22c55e" />
+                    <Cell fill="#ef4444" />
+                    <Cell fill="#facc15" />
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="text-center -mt-36 mb-20">
+              <h2 className="text-4xl font-bold">
+                {attendance}%
+              </h2>
+              <p className="text-gray-400">
+                Present
+              </p>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 text-sm">
+              <Mini c="bg-green-500" t="Present" v={clockedIn} />
+              <Mini c="bg-red-500" t="Absent" v={absent} />
+              <Mini c="bg-yellow-400" t="Leave" v={onLeave} />
+            </div>
+          </Panel>
+
+          {/* MAP */}
+          <Panel title="Live Map Tracking">
+            <LiveMap live={live} />
+          </Panel>
+
+        </div>
+
+        {/* LOWER */}
+        <div className="grid grid-cols-3 gap-4">
 
           <MoneyCard
             title="Today's Wages"
@@ -208,77 +269,12 @@ function PremiumDashboard({ user }) {
             value={weekWages}
           />
 
-          <Stat
-            title="Employees"
-            value={employees}
-          />
-
-          <Stat
-            title="Plan"
-            value={plan}
-          />
-        </div>
-
-        {/* MID */}
-        <div className="grid grid-cols-2 gap-4">
-
-          {/* GRAPH */}
-          <Panel title="Workforce Status">
-            <div className="h-[340px]">
-              <ResponsiveContainer
-                width="100%"
-                height="100%"
-              >
-                <PieChart>
-                  <Pie
-                    data={attendanceData}
-                    dataKey="value"
-                    innerRadius={80}
-                    outerRadius={115}
-                  >
-                    <Cell fill="#22c55e" />
-                    <Cell fill="#ef4444" />
-                    <Cell fill="#facc15" />
-                  </Pie>
-
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-
-            <div className="grid grid-cols-3 gap-3 mt-4">
-              <Mini
-                label="Present"
-                value={clockedIn}
-                color="bg-green-500"
-              />
-              <Mini
-                label="Absent"
-                value={absent}
-                color="bg-red-500"
-              />
-              <Mini
-                label="Leave"
-                value={onLeave}
-                color="bg-yellow-400"
-              />
-            </div>
-          </Panel>
-
-          {/* MAP */}
-          <Panel title="Live Staff Map">
-            <LiveMap live={live} />
-          </Panel>
-        </div>
-
-        {/* LOWER */}
-        <div className="grid grid-cols-1">
           <Panel title="Upcoming Schedule">
             <div className="space-y-4">
               {upcoming.map((x) => (
                 <div
                   key={x.id}
-                  className="flex justify-between border-b border-white/5 pb-3"
+                  className="flex justify-between border-b border-white/5 pb-2"
                 >
                   <span>
                     {x.title || "Shift"}
@@ -297,8 +293,8 @@ function PremiumDashboard({ user }) {
               )}
             </div>
           </Panel>
-        </div>
 
+        </div>
       </main>
     </div>
   );
@@ -306,52 +302,9 @@ function PremiumDashboard({ user }) {
 
 /* ================================================= */
 
-function calcTodayWages(live, staff) {
-  let total = 0;
-
-  live.forEach((x) => {
-    const worker = staff.find(
-      (u) => u.id === x.user_id
-    );
-
-    const rate = Number(
-      worker?.hourly_rate || 0
-    );
-
-    if (!rate) return;
-
-    const start = new Date(
-      x.clock_in_time
-    );
-
-    const hours =
-      (Date.now() - start) / 3600000;
-
-    total += rate * hours;
-  });
-
-  return total.toFixed(2);
-}
-
-function calcWeekWages(staff) {
-  const total = staff.reduce(
-    (sum, x) =>
-      sum +
-      Number(x.week_hours || 0) *
-        Number(x.hourly_rate || 0),
-    0
-  );
-
-  return total.toFixed(2);
-}
-
-/* ================================================= */
-
 function LiveMap({ live }) {
   const points = live.filter(
-    (x) =>
-      x.latitude &&
-      x.longitude
+    (x) => x.latitude && x.longitude
   );
 
   const center = points.length
@@ -362,7 +315,7 @@ function LiveMap({ live }) {
     : [51.5072, -0.1276];
 
   return (
-    <div className="h-[420px] rounded-2xl overflow-hidden">
+    <div className="h-[390px] rounded-2xl overflow-hidden">
       <MapContainer
         center={center}
         zoom={11}
@@ -393,14 +346,56 @@ function LiveMap({ live }) {
 
 /* ================================================= */
 
+function getTodayWages(live, staff) {
+  let total = 0;
+
+  live.forEach((x) => {
+    const user = staff.find(
+      (u) => u.id === x.user_id
+    );
+
+    const rate = Number(
+      user?.hourly_rate || 0
+    );
+
+    if (!rate) return;
+
+    const start = new Date(
+      x.clock_in_time
+    );
+
+    const hrs =
+      (Date.now() - start) / 3600000;
+
+    total += rate * hrs;
+  });
+
+  return total.toFixed(2);
+}
+
+function getWeekWages(staff) {
+  let total = 0;
+
+  staff.forEach((x) => {
+    total +=
+      Number(x.week_hours || 0) *
+      Number(x.hourly_rate || 0);
+  });
+
+  return total.toFixed(2);
+}
+
+/* ================================================= */
+
 function Nav() {
   const items = [
     "Dashboard",
     "Employees",
     "Schedule",
     "Locations",
-    "Holiday",
+    "Holiday Requests",
     "Timesheet",
+    "Profile",
     "Reports",
     "Billing",
   ];
@@ -410,7 +405,7 @@ function Nav() {
       {items.map((x, i) => (
         <div
           key={x}
-          className={`px-4 py-3 rounded-2xl cursor-pointer ${
+          className={`px-4 py-3 rounded-2xl ${
             i === 0
               ? "bg-indigo-600"
               : "hover:bg-white/5"
@@ -423,16 +418,20 @@ function Nav() {
   );
 }
 
-function Stat({ title, value }) {
+function Card({ title, value, sub }) {
   return (
-    <div className="rounded-3xl bg-white/5 p-6">
+    <div className="rounded-3xl bg-white/5 p-5">
       <p className="text-sm text-gray-400">
         {title}
       </p>
 
-      <h2 className="text-4xl font-bold mt-4">
+      <h2 className="text-4xl font-bold mt-3">
         {value}
       </h2>
+
+      <p className="text-sm text-gray-500 mt-2">
+        {sub}
+      </p>
     </div>
   );
 }
@@ -447,6 +446,10 @@ function MoneyCard({ title, value }) {
       <h2 className="text-4xl font-bold mt-4">
         £{value}
       </h2>
+
+      <p className="text-sm text-gray-500 mt-2">
+        Estimated payroll cost
+      </p>
     </div>
   );
 }
@@ -454,29 +457,26 @@ function MoneyCard({ title, value }) {
 function Panel({ title, children }) {
   return (
     <div className="rounded-3xl bg-white/5 p-6">
-      <h2 className="font-semibold text-lg mb-5">
+      <h2 className="font-semibold text-xl mb-5">
         {title}
       </h2>
+
       {children}
     </div>
   );
 }
 
-function Mini({
-  label,
-  value,
-  color,
-}) {
+function Mini({ c, t, v }) {
   return (
     <div className="flex items-center gap-2">
       <div
-        className={`w-3 h-3 rounded-full ${color}`}
+        className={`w-3 h-3 rounded-full ${c}`}
       />
       <span className="text-gray-400">
-        {label}
+        {t}
       </span>
       <span className="ml-auto">
-        {value}
+        {v}
       </span>
     </div>
   );
@@ -484,7 +484,7 @@ function Mini({
 
 function Loading() {
   return (
-    <div className="p-10 flex gap-2 text-gray-400 items-center">
+    <div className="p-10 text-gray-400 flex gap-2 items-center">
       <Loader2
         size={16}
         className="animate-spin"
