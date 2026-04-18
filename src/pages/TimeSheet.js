@@ -1,17 +1,4 @@
 // src/pages/TimeSheet.js
-// TRUE ELITE FINAL VERSION
-// COPY / PASTE READY
-//
-// ✅ Keeps all existing features
-// ✅ Real contracted hours insights
-// ✅ Real wage calculations (if hourly_rate exists)
-// ✅ Missing pay warnings
-// ✅ Better overtime logic
-// ✅ Cleaner filters
-// ✅ Export CSV improved
-// ✅ Safer live force out
-// ✅ No feature removals
-
 import React, { useEffect, useMemo, useState } from "react";
 import { reportAPI, userAPI, shiftAPI } from "../services/api";
 import HomeButton from "../components/HomeButton";
@@ -74,10 +61,13 @@ export default function TimeSheet() {
         : [];
 
       data = data.filter((row) => {
-        if (!row.clock_in_time) return false;
+        if (!row.clock_in_time)
+          return false;
 
         const day =
-          row.clock_in_time.split("T")[0];
+          row.clock_in_time.split(
+            "T"
+          )[0];
 
         const dateMatch =
           day >= fromDate &&
@@ -85,20 +75,26 @@ export default function TimeSheet() {
 
         const employeeMatch =
           employee
-            ? row.user_id === employee
+            ? row.user_id ===
+              employee
             : true;
 
         return (
-          dateMatch && employeeMatch
+          dateMatch &&
+          employeeMatch
         );
       });
 
       setRows(data);
       setStaff(
-        Array.isArray(users) ? users : []
+        Array.isArray(users)
+          ? users
+          : []
       );
       setActive(
-        Array.isArray(live) ? live : []
+        Array.isArray(live)
+          ? live
+          : []
       );
     } catch (err) {
       console.error(err);
@@ -107,10 +103,20 @@ export default function TimeSheet() {
     }
   }
 
+  function getUser(id) {
+    return (
+      staff.find(
+        (u) => u.id === id
+      ) || {}
+    );
+  }
+
   function formatDate(v) {
     if (!v) return "-";
 
-    return new Date(v).toLocaleDateString(
+    return new Date(
+      v
+    ).toLocaleDateString(
       "en-GB"
     );
   }
@@ -118,7 +124,9 @@ export default function TimeSheet() {
   function formatTime(v) {
     if (!v) return "-";
 
-    return new Date(v).toLocaleTimeString(
+    return new Date(
+      v
+    ).toLocaleTimeString(
       "en-GB",
       {
         hour: "2-digit",
@@ -132,7 +140,8 @@ export default function TimeSheet() {
     end,
     breakSecs = 0
   ) {
-    if (!start || !end) return 0;
+    if (!start || !end)
+      return 0;
 
     const h =
       (new Date(end) -
@@ -145,27 +154,28 @@ export default function TimeSheet() {
 
   function overtime(hours) {
     return hours > 8
-      ? (hours - 8).toFixed(2)
+      ? (
+          hours - 8
+        ).toFixed(2)
       : "0.00";
-  }
-
-  function getUser(id) {
-    return (
-      staff.find((u) => u.id === id) || {}
-    );
   }
 
   const filtered = useMemo(() => {
     return rows.filter((r) => {
-      const user = getUser(r.user_id);
+      const user =
+        getUser(r.user_id);
 
       return (
-        (user.name || "")
+        (
+          user.name || ""
+        )
           .toLowerCase()
           .includes(
             search.toLowerCase()
           ) ||
-        (user.email || "")
+        (
+          user.email || ""
+        )
           .toLowerCase()
           .includes(
             search.toLowerCase()
@@ -189,61 +199,82 @@ export default function TimeSheet() {
 
   const totalOT = filtered
     .reduce((sum, r) => {
-      const h = calcHours(
-        r.clock_in_time,
-        r.clock_out_time,
-        r.total_break_seconds
-      );
+      const h =
+        calcHours(
+          r.clock_in_time,
+          r.clock_out_time,
+          r.total_break_seconds
+        );
 
       return (
         sum +
-        Number(overtime(h))
+        Number(
+          overtime(h)
+        )
       );
     }, 0)
     .toFixed(2);
 
   const totalWages = filtered
     .reduce((sum, r) => {
-      const user = getUser(r.user_id);
+      const user =
+        getUser(r.user_id);
 
-      const rate = Number(
-        user.hourly_rate || 0
+      const rate =
+        Number(
+          user.hourly_rate ||
+            0
+        );
+
+      const h =
+        calcHours(
+          r.clock_in_time,
+          r.clock_out_time,
+          r.total_break_seconds
+        );
+
+      return (
+        sum + h * rate
       );
-
-      const h = calcHours(
-        r.clock_in_time,
-        r.clock_out_time,
-        r.total_break_seconds
-      );
-
-      return sum + h * rate;
     }, 0)
     .toFixed(2);
 
   const overContractCount =
     staff.filter((u) => {
-      const contract = Number(
-        u.contracted_hours || 0
-      );
-
-      if (!contract) return false;
-
-      const worked = filtered
-        .filter(
-          (r) => r.user_id === u.id
-        )
-        .reduce(
-          (sum, r) =>
-            sum +
-            calcHours(
-              r.clock_in_time,
-              r.clock_out_time,
-              r.total_break_seconds
-            ),
-          0
+      const contract =
+        Number(
+          u.contracted_hours ||
+            0
         );
 
-      return worked > contract;
+      if (!contract)
+        return false;
+
+      const worked =
+        filtered
+          .filter(
+            (r) =>
+              r.user_id ===
+              u.id
+          )
+          .reduce(
+            (
+              sum,
+              r
+            ) =>
+              sum +
+              calcHours(
+                r.clock_in_time,
+                r.clock_out_time,
+                r.total_break_seconds
+              ),
+            0
+          );
+
+      return (
+        worked >
+        contract
+      );
     }).length;
 
   async function forceOut(id) {
@@ -264,7 +295,6 @@ export default function TimeSheet() {
 
       await loadData();
     } catch (err) {
-      console.error(err);
       alert("Failed");
     } finally {
       setSaving(false);
@@ -272,29 +302,28 @@ export default function TimeSheet() {
   }
 
   function exportCSV() {
-    const csv = [
-      [
-        "Employee",
-        "Date",
-        "In",
-        "Out",
-        "Hours",
-        "OT",
-        "Wages",
-      ],
-      ...filtered.map((r) => {
+    const csvRows =
+      filtered.map((r) => {
         const user =
-          getUser(r.user_id);
+          getUser(
+            r.user_id
+          );
 
-        const h = calcHours(
-          r.clock_in_time,
-          r.clock_out_time,
-          r.total_break_seconds
-        );
+        const h =
+          calcHours(
+            r.clock_in_time,
+            r.clock_out_time,
+            r.total_break_seconds
+          );
 
-        const rate = Number(
-          user.hourly_rate || 0
-        );
+        const rate =
+          Number(
+            user.hourly_rate ||
+              0
+          );
+
+        const wage =
+          h * rate;
 
         return [
           user.name || "",
@@ -309,25 +338,55 @@ export default function TimeSheet() {
           ),
           h.toFixed(2),
           overtime(h),
-          (h * rate).toFixed(2),
+          wage.toFixed(2),
         ];
-      }),
+      });
+
+    csvRows.push([]);
+    csvRows.push([
+      "TOTALS",
+      "",
+      "",
+      "",
+      totalHours,
+      totalOT,
+      totalWages,
+    ]);
+
+    const csv = [
+      [
+        "Employee",
+        "Date",
+        "Clock In",
+        "Clock Out",
+        "Hours",
+        "OT",
+        "Wages",
+      ],
+      ...csvRows,
     ]
-      .map((x) => x.join(","))
+      .map((x) =>
+        x.join(",")
+      )
       .join("\n");
 
-    const blob = new Blob([csv], {
-      type: "text/csv",
-    });
+    const blob =
+      new Blob([csv], {
+        type: "text/csv",
+      });
 
     const url =
-      URL.createObjectURL(blob);
+      URL.createObjectURL(
+        blob
+      );
 
     const a =
-      document.createElement("a");
+      document.createElement(
+        "a"
+      );
 
     a.href = url;
-    a.download = "timesheets.csv";
+    a.download = `Timesheets_${fromDate}_to_${toDate}.csv`;
     a.click();
   }
 
@@ -338,7 +397,8 @@ export default function TimeSheet() {
           size={16}
           className="animate-spin"
         />
-        Loading timesheets...
+        Loading
+        timesheets...
       </div>
     );
   }
@@ -354,13 +414,16 @@ export default function TimeSheet() {
           </h1>
 
           <p className="text-sm text-gray-400">
-            Payroll & worked hours
+            Payroll &
+            worked hours
           </p>
         </div>
 
         <div className="flex gap-2">
           <button
-            onClick={exportCSV}
+            onClick={
+              exportCSV
+            }
             className="px-4 py-2 rounded-xl bg-indigo-600"
           >
             <Download size={16} />
@@ -372,16 +435,21 @@ export default function TimeSheet() {
 
       {/* KPI */}
       <div className="grid md:grid-cols-5 gap-4">
-
         <Card
           title="Staff"
-          value={staff.length}
-          icon={<Users size={16} />}
+          value={
+            staff.length
+          }
+          icon={
+            <Users size={16} />
+          }
         />
 
         <Card
           title="Entries"
-          value={filtered.length}
+          value={
+            filtered.length
+          }
           icon={
             <CalendarDays size={16} />
           }
@@ -389,8 +457,12 @@ export default function TimeSheet() {
 
         <Card
           title="Hours"
-          value={totalHours}
-          icon={<Clock3 size={16} />}
+          value={
+            totalHours
+          }
+          icon={
+            <Clock3 size={16} />
+          }
         />
 
         <Card
@@ -408,27 +480,34 @@ export default function TimeSheet() {
             <PoundSterling size={16} />
           }
         />
-
       </div>
 
-      {/* INSIGHT */}
-      {overContractCount > 0 && (
+      {/* WARNING */}
+      {overContractCount >
+        0 && (
         <div className="rounded-xl bg-amber-500/10 text-amber-300 px-4 py-3 text-sm flex gap-2 items-center">
           <Briefcase size={16} />
-          {overContractCount} staff currently over contracted hours in selected period.
+          {
+            overContractCount
+          }{" "}
+          staff over
+          contracted
+          hours.
         </div>
       )}
 
-      {/* LIVE STAFF */}
+      {/* LIVE */}
       <div className="rounded-2xl border border-white/10 bg-[#020617] p-5 space-y-4">
-
         <h3 className="font-medium">
-          Live Active Staff
+          Live Active
+          Staff
         </h3>
 
-        {active.length === 0 && (
+        {active.length ===
+          0 && (
           <p className="text-gray-500">
-            Nobody clocked in
+            Nobody
+            clocked in
           </p>
         )}
 
@@ -438,38 +517,50 @@ export default function TimeSheet() {
             className="border border-white/10 rounded-xl p-4 space-y-3"
           >
             <p className="font-medium">
-              {s.users?.name ||
+              {s.users
+                ?.name ||
                 "Unknown"}
             </p>
 
             <input
               type="datetime-local"
               value={
-                finishTimes[s.id] ||
-                ""
+                finishTimes[
+                  s.id
+                ] || ""
               }
-              onChange={(e) =>
-                setFinishTimes({
-                  ...finishTimes,
-                  [s.id]:
-                    e.target.value,
-                })
+              onChange={(
+                e
+              ) =>
+                setFinishTimes(
+                  {
+                    ...finishTimes,
+                    [s.id]:
+                      e
+                        .target
+                        .value,
+                  }
+                )
               }
               className="w-full px-4 py-3 rounded-xl bg-[#0f172a]"
             />
 
             <button
-              disabled={saving}
+              disabled={
+                saving
+              }
               onClick={() =>
-                forceOut(s.id)
+                forceOut(
+                  s.id
+                )
               }
               className="w-full py-3 rounded-xl bg-red-600"
             >
-              Force Clock Out
+              Force
+              Clock Out
             </button>
           </div>
         ))}
-
       </div>
 
       {/* FILTERS */}
@@ -477,10 +568,13 @@ export default function TimeSheet() {
 
         <input
           type="date"
-          value={fromDate}
+          value={
+            fromDate
+          }
           onChange={(e) =>
             setFromDate(
-              e.target.value
+              e.target
+                .value
             )
           }
           className="px-4 py-3 rounded-xl bg-[#020617]"
@@ -491,17 +585,21 @@ export default function TimeSheet() {
           value={toDate}
           onChange={(e) =>
             setToDate(
-              e.target.value
+              e.target
+                .value
             )
           }
           className="px-4 py-3 rounded-xl bg-[#020617]"
         />
 
         <select
-          value={employee}
+          value={
+            employee
+          }
           onChange={(e) =>
             setEmployee(
-              e.target.value
+              e.target
+                .value
             )
           }
           className="px-4 py-3 rounded-xl bg-[#020617]"
@@ -510,14 +608,20 @@ export default function TimeSheet() {
             All Staff
           </option>
 
-          {staff.map((u) => (
-            <option
-              key={u.id}
-              value={u.id}
-            >
-              {u.name}
-            </option>
-          ))}
+          {staff.map(
+            (u) => (
+              <option
+                key={
+                  u.id
+                }
+                value={
+                  u.id
+                }
+              >
+                {u.name}
+              </option>
+            )
+          )}
         </select>
 
         <div className="relative">
@@ -527,10 +631,13 @@ export default function TimeSheet() {
           />
 
           <input
-            value={search}
+            value={
+              search
+            }
             onChange={(e) =>
               setSearch(
-                e.target.value
+                e.target
+                  .value
               )
             }
             placeholder="Search..."
@@ -539,17 +646,17 @@ export default function TimeSheet() {
         </div>
 
         <button
-          onClick={loadData}
+          onClick={
+            loadData
+          }
           className="rounded-xl bg-white/5"
         >
           Refresh
         </button>
-
       </div>
 
       {/* TABLE */}
       <div className="rounded-2xl border border-white/10 bg-[#020617] overflow-auto">
-
         <table className="w-full min-w-[1100px] text-sm">
 
           <thead className="bg-white/5 text-gray-400">
@@ -582,9 +689,11 @@ export default function TimeSheet() {
           </thead>
 
           <tbody>
-
             {filtered.map(
-              (row, i) => {
+              (
+                row,
+                i
+              ) => {
                 const user =
                   getUser(
                     row.user_id
@@ -606,7 +715,9 @@ export default function TimeSheet() {
 
                 return (
                   <motion.tr
-                    key={row.id}
+                    key={
+                      row.id
+                    }
                     initial={{
                       opacity: 0,
                       y: 8,
@@ -646,7 +757,9 @@ export default function TimeSheet() {
                     </td>
 
                     <td className="p-4">
-                      {h.toFixed(2)}
+                      {h.toFixed(
+                        2
+                      )}
                     </td>
 
                     <td className="p-4 text-amber-400">
@@ -670,7 +783,8 @@ export default function TimeSheet() {
                         </span>
                       ) : (
                         <span className="text-red-400">
-                          Open Shift
+                          Open
+                          Shift
                         </span>
                       )}
                     </td>
@@ -678,11 +792,9 @@ export default function TimeSheet() {
                 );
               }
             )}
-
           </tbody>
 
         </table>
-
       </div>
 
     </div>
