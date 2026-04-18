@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { holidayAPI, scheduleAPI } from "../services/api";
 import { motion } from "framer-motion";
+
 import {
   CalendarDays,
   CheckCircle2,
@@ -11,6 +12,8 @@ import {
   Plus,
   HeartPulse,
   AlertTriangle,
+  Trash2,
+  User,
 } from "lucide-react";
 
 export default function HolidayRequests() {
@@ -30,22 +33,27 @@ export default function HolidayRequests() {
 
   const today = new Date();
 
-  const [currentMonth, setCurrentMonth] =
-    useState(
-      new Date(
-        today.getFullYear(),
-        today.getMonth(),
-        1
-      )
-    );
+  const [currentMonth, setCurrentMonth] = useState(
+    new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      1
+    )
+  );
 
   useEffect(() => {
     load();
+
+    const timer = setInterval(() => {
+      load(false);
+    }, 30000);
+
+    return () => clearInterval(timer);
   }, []);
 
-  async function load() {
+  async function load(showLoader = true) {
     try {
-      setLoading(true);
+      if (showLoader) setLoading(true);
 
       const data =
         await holidayAPI.getAll();
@@ -63,7 +71,6 @@ export default function HolidayRequests() {
     }
   }
 
-  /* FIXED APPROVE / REJECT */
   async function updateStatus(
     id,
     status
@@ -75,10 +82,27 @@ export default function HolidayRequests() {
         await holidayAPI.reject(id);
       }
 
-      await load();
+      await load(false);
     } catch (err) {
       console.error(err);
       alert("Failed to update");
+    }
+  }
+
+  async function deleteLeave(id) {
+    if (
+      !window.confirm(
+        "Delete this leave request?"
+      )
+    )
+      return;
+
+    try {
+      await holidayAPI.delete(id);
+      await load(false);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to delete");
     }
   }
 
@@ -132,7 +156,7 @@ export default function HolidayRequests() {
         status: "approved",
       });
 
-      await load();
+      await load(false);
     } catch (err) {
       console.error(err);
       alert("Failed to save");
@@ -141,9 +165,7 @@ export default function HolidayRequests() {
 
   const filtered =
     requests.filter((r) => {
-      if (
-        filter === "all"
-      )
+      if (filter === "all")
         return true;
 
       return (
@@ -294,9 +316,10 @@ export default function HolidayRequests() {
 
   return (
     <div className="space-y-6">
+      {/* HEADER */}
       <div className="flex justify-between items-center flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">
+          <h1 className="text-3xl font-semibold">
             Leave Manager
           </h1>
 
@@ -345,6 +368,7 @@ export default function HolidayRequests() {
         </div>
       </div>
 
+      {/* STATS */}
       <div className="grid md:grid-cols-4 gap-4">
         <StatCard
           title="Total"
@@ -389,6 +413,93 @@ export default function HolidayRequests() {
         />
       </div>
 
+      {/* CALENDAR */}
+      <div className="rounded-2xl border border-white/10 bg-[#020617] p-5">
+        <div className="flex justify-between items-center mb-4">
+          <button
+            onClick={() =>
+              changeMonth(-1)
+            }
+            className="p-2 rounded-xl bg-[#0f172a]"
+          >
+            <ChevronLeft size={16} />
+          </button>
+
+          <h2 className="font-semibold text-lg">
+            {currentMonth.toLocaleString(
+              "default",
+              {
+                month:
+                  "long",
+              }
+            )}{" "}
+            {currentMonth.getFullYear()}
+          </h2>
+
+          <button
+            onClick={() =>
+              changeMonth(1)
+            }
+            className="p-2 rounded-xl bg-[#0f172a]"
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-7 gap-2">
+          {days.map((day) => {
+            const items =
+              getRequestsForDay(
+                day
+              );
+
+            return (
+              <div
+                key={day}
+                className="rounded-xl bg-[#0f172a] p-2 min-h-[120px]"
+              >
+                <div className="text-xs text-gray-400 mb-2">
+                  {day.getDate()}
+                </div>
+
+                <div className="space-y-1">
+                  {items
+                    .slice(
+                      0,
+                      3
+                    )
+                    .map(
+                      (
+                        item
+                      ) => (
+                        <div
+                          key={
+                            item.id
+                          }
+                          className={`text-[10px] px-2 py-1 rounded flex items-center gap-1 ${getTypeStyle(
+                            item.type
+                          )}`}
+                          title={`${item.name} - ${item.status}`}
+                        >
+                          {getTypeIcon(
+                            item.type
+                          )}
+                          <span className="truncate">
+                            {
+                              item.name
+                            }
+                          </span>
+                        </div>
+                      )
+                    )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* TABLE */}
       <div className="rounded-2xl border border-white/10 overflow-hidden bg-[#020617]">
         <table className="w-full text-sm">
           <thead className="bg-white/5 text-gray-400">
@@ -406,7 +517,7 @@ export default function HolidayRequests() {
                 Status
               </th>
               <th className="p-4 text-left">
-                Action
+                Actions
               </th>
             </tr>
           </thead>
@@ -434,12 +545,21 @@ export default function HolidayRequests() {
                   }}
                   className="border-t border-white/5"
                 >
-                  <td className="p-4">
-                    {r.name}
+                  <td className="p-4 font-medium">
+                    <div className="flex items-center gap-2">
+                      <User size={14} />
+                      {r.name}
+                    </div>
                   </td>
 
-                  <td className="p-4 capitalize">
-                    {r.type}
+                  <td className="p-4">
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs capitalize ${getTypeStyle(
+                        r.type
+                      )}`}
+                    >
+                      {r.type}
+                    </span>
                   </td>
 
                   <td className="p-4 text-gray-400">
@@ -461,38 +581,52 @@ export default function HolidayRequests() {
                   </td>
 
                   <td className="p-4">
-                    {r.status ===
-                    "pending" ? (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() =>
-                            updateStatus(
-                              r.id,
-                              "approved"
-                            )
-                          }
-                          className="px-3 py-1 rounded-lg bg-green-600 text-xs"
-                        >
-                          Approve
-                        </button>
+                    <div className="flex gap-2 flex-wrap">
+                      {r.status ===
+                        "pending" && (
+                        <>
+                          <button
+                            onClick={() =>
+                              updateStatus(
+                                r.id,
+                                "approved"
+                              )
+                            }
+                            className="px-3 py-1 rounded-lg bg-green-600 text-xs"
+                          >
+                            Approve
+                          </button>
 
-                        <button
-                          onClick={() =>
-                            updateStatus(
-                              r.id,
-                              "rejected"
-                            )
+                          <button
+                            onClick={() =>
+                              updateStatus(
+                                r.id,
+                                "rejected"
+                              )
+                            }
+                            className="px-3 py-1 rounded-lg bg-red-600 text-xs"
+                          >
+                            Reject
+                          </button>
+                        </>
+                      )}
+
+                      <button
+                        onClick={() =>
+                          deleteLeave(
+                            r.id
+                          )
+                        }
+                        className="px-3 py-1 rounded-lg bg-gray-700 text-xs flex items-center gap-1"
+                      >
+                        <Trash2
+                          size={
+                            12
                           }
-                          className="px-3 py-1 rounded-lg bg-red-600 text-xs"
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    ) : (
-                      <span className="text-gray-500 text-xs">
-                        Complete
-                      </span>
-                    )}
+                        />
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </motion.tr>
               )
@@ -500,6 +634,104 @@ export default function HolidayRequests() {
           </tbody>
         </table>
       </div>
+
+      {/* MODAL */}
+      {openModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#020617] border border-white/10 rounded-2xl p-6 w-full max-w-md space-y-4">
+            <h2 className="text-xl font-semibold">
+              Add Leave
+            </h2>
+
+            <input
+              placeholder="Employee Name"
+              value={form.name}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  name:
+                    e.target.value,
+                })
+              }
+              className="w-full px-4 py-3 rounded-xl bg-[#0f172a]"
+            />
+
+            <select
+              value={form.type}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  type:
+                    e.target.value,
+                })
+              }
+              className="w-full px-4 py-3 rounded-xl bg-[#0f172a]"
+            >
+              <option value="holiday">
+                Holiday
+              </option>
+              <option value="sickness">
+                Sickness
+              </option>
+              <option value="unauthorised">
+                Unauthorised
+              </option>
+            </select>
+
+            <input
+              type="date"
+              value={
+                form.start_date
+              }
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  start_date:
+                    e.target.value,
+                })
+              }
+              className="w-full px-4 py-3 rounded-xl bg-[#0f172a]"
+            />
+
+            <input
+              type="date"
+              value={
+                form.end_date
+              }
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  end_date:
+                    e.target.value,
+                })
+              }
+              className="w-full px-4 py-3 rounded-xl bg-[#0f172a]"
+            />
+
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={
+                  createLeave
+                }
+                className="bg-indigo-600 rounded-xl py-3"
+              >
+                Save
+              </button>
+
+              <button
+                onClick={() =>
+                  setOpenModal(
+                    false
+                  )
+                }
+                className="bg-gray-700 rounded-xl py-3"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
