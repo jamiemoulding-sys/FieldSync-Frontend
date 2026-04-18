@@ -407,11 +407,13 @@ function MainDashboard({ user, admin }) {
 /* MAP */
 /* ================================================= */
 
-/* =============================================== */
-/* REPLACE ONLY YOUR LiveMap() FUNCTION */
-/* Keeps everything else unchanged */
-/* Shows map ALWAYS even when nobody clocked in */
-/* =============================================== */
+/* ============================================== */
+/* REPLACE ONLY LiveMap() */
+/* Fixes:
+   ✅ No marker when nobody clocked in
+   ✅ Click marker shows FULL employee name
+   ✅ Cleaner map fallback
+============================================== */
 
 function LiveMap({ live }) {
   const points = (live || []).filter(
@@ -422,10 +424,9 @@ function LiveMap({ live }) {
       !isNaN(Number(x.longitude))
   );
 
-  /* DEFAULT UK CENTER */
-  const defaultCenter = [51.8892, 0.9042]; // Colchester area
+  const defaultCenter = [51.8892, 0.9042]; // Colchester
 
-  const mapCenter = points.length
+  const center = points.length
     ? [
         Number(points[0].latitude),
         Number(points[0].longitude),
@@ -435,8 +436,8 @@ function LiveMap({ live }) {
   return (
     <div className="h-[420px] w-full rounded-2xl overflow-hidden border border-white/10">
       <MapContainer
-        center={mapCenter}
-        zoom={points.length ? 11 : 8}
+        center={center}
+        zoom={points.length ? 12 : 9}
         scrollWheelZoom={true}
         style={{
           height: "100%",
@@ -444,30 +445,40 @@ function LiveMap({ live }) {
         }}
       >
         <TileLayer
-          attribution="&copy; OpenStreetMap"
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution="&copy; OpenStreetMap"
         />
 
-        {points.map((x) => (
+        {points.map((staff) => (
           <Marker
-            key={x.id}
+            key={staff.id}
             position={[
-              Number(x.latitude),
-              Number(x.longitude),
+              Number(staff.latitude),
+              Number(staff.longitude),
             ]}
           >
             <Popup>
-              {x.users?.name || "Staff"}
+              <div className="font-semibold">
+                {staff.users?.name ||
+                  staff.name ||
+                  "Unknown Staff"}
+              </div>
+
+              <div className="text-xs text-gray-500 mt-1">
+                Currently clocked in
+              </div>
             </Popup>
           </Marker>
         ))}
-
-        {!points.length && (
-          <Marker position={defaultCenter}>
-            <Popup>No staff clocked in</Popup>
-          </Marker>
-        )}
       </MapContainer>
+
+      {!points.length && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="bg-black/60 px-4 py-2 rounded-xl text-sm text-white">
+            No staff currently clocked in
+          </div>
+        </div>
+      )}
     </div>
   );
 }
