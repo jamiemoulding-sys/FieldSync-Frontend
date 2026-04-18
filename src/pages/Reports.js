@@ -1,6 +1,6 @@
 // src/pages/Reports.js
-// FINAL 100% PRODUCTION VERSION
-// real data only / safer / cleaner / no fake stats
+// FINAL TRIAL ACCESS VERSION
+// 14 day trial includes all premium features
 
 import {
   useEffect,
@@ -51,10 +51,19 @@ export default function Reports() {
   const [rows, setRows] =
     useState([]);
 
+  /* FIXED ACCESS LOGIC */
+  const trialActive =
+    user?.trial_end &&
+    new Date(user.trial_end) >
+      new Date();
+
   const isPaid =
     user?.isPro === true ||
     user?.subscription_status ===
       "active";
+
+  const hasAccess =
+    isPaid || trialActive;
 
   useEffect(() => {
     if (authLoading) return;
@@ -135,7 +144,8 @@ export default function Reports() {
     end,
     breakSecs = 0
   ) {
-    if (!start || !end) return 0;
+    if (!start || !end)
+      return 0;
 
     const hrs =
       (new Date(end) -
@@ -177,6 +187,17 @@ export default function Reports() {
             0) /
             summary.users) *
             100
+        )
+      : 0;
+
+  const trialDaysLeft =
+    trialActive
+      ? Math.ceil(
+          (new Date(
+            user.trial_end
+          ) -
+            new Date()) /
+            86400000
         )
       : 0;
 
@@ -231,15 +252,20 @@ export default function Reports() {
     URL.revokeObjectURL(url);
   }
 
-  if (authLoading) return null;
+  if (authLoading)
+    return null;
 
-  if (!user || user.role !== "admin") {
+  if (
+    !user ||
+    user.role !== "admin"
+  ) {
     return (
       <Center text="Admins only." />
     );
   }
 
-  if (!isPaid) {
+  /* BLOCK ONLY AFTER TRIAL ENDS */
+  if (!hasAccess) {
     return (
       <div className="flex justify-center items-center h-[70vh]">
         <div className="max-w-md w-full rounded-3xl border border-white/10 bg-[#020617] p-8 text-center">
@@ -253,9 +279,10 @@ export default function Reports() {
           </h1>
 
           <p className="text-sm text-gray-400 mt-3">
-            Reports are
-            available on paid
-            plans.
+            Your free trial has
+            ended. Upgrade to
+            continue using
+            Reports.
           </p>
 
           <button
@@ -285,6 +312,19 @@ export default function Reports() {
 
   return (
     <div className="space-y-6">
+
+      {/* TRIAL BANNER */}
+      {trialActive && (
+        <div className="rounded-2xl bg-green-500/10 border border-green-500/30 p-4 text-green-300">
+          Free Trial Active •{" "}
+          {trialDaysLeft} day
+          {trialDaysLeft !== 1
+            ? "s"
+            : ""}{" "}
+          remaining • Full
+          premium access
+        </div>
+      )}
 
       {/* HEADER */}
       <div className="flex justify-between gap-4 flex-wrap items-center">

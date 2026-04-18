@@ -1,11 +1,12 @@
 // src/hooks/useAuth.js
-// FULLY FIXED VERSION
-// fixes:
-// ✅ invite token support
+// FINAL TRIAL FIX VERSION
+// includes:
+// ✅ 14 day trial support everywhere
+// ✅ reports access fixed
+// ✅ billing access fixed
 // ✅ stable auth
 // ✅ session restore
 // ✅ refresh on focus
-// ✅ no missing code
 
 import {
   useState,
@@ -93,28 +94,62 @@ async function loadProfile() {
     company = data;
   }
 
+  /* TRIAL LOGIC */
+  const trialEnd =
+    company?.trial_end ||
+    row?.trial_end ||
+    null;
+
+  const trialActive =
+    trialEnd &&
+    new Date(trialEnd) >
+      new Date();
+
+  const paid =
+    company?.is_pro ===
+      true ||
+    company?.subscription_status ===
+      "active";
+
   setUser({
     id: authUser.id,
     email:
       authUser.email,
+
     name:
       row.name || "",
+
     role:
       row.role ||
       "employee",
+
     companyId:
       row.company_id,
+
     companyName:
       company?.name ||
       "",
-    isPro:
-      company?.is_pro ||
-      false,
+
+    /* billing */
+    isPro: paid,
+
+    subscription_status:
+      company?.subscription_status ||
+      "inactive",
+
+    /* trial */
+    trial_end: trialEnd,
+    trialActive,
+
+    /* access */
+    hasPremiumAccess:
+      paid || trialActive,
   });
 }
 
 async function init() {
   if (started) return;
+
   started = true;
 
   setLoading(true);
@@ -271,18 +306,28 @@ export function useAuth() {
   return {
     user,
     loading,
+
     login,
     logout,
     reloadUser,
+
     isAdmin:
       user?.role ===
       "admin",
+
     isManager:
       user?.role ===
         "manager" ||
       user?.role ===
         "admin",
+
     isPaid:
       user?.isPro,
+
+    trialActive:
+      user?.trialActive,
+
+    hasPremiumAccess:
+      user?.hasPremiumAccess,
   };
 }
