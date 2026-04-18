@@ -1,12 +1,14 @@
 // src/pages/Schedule.jsx
-// COMPLETE UPGRADED FINAL VERSION
+// COMPLETE MERGED FINAL VERSION
 // COPY / PASTE READY
 // ✅ Nothing removed
+// ✅ Keeps 700+ line structure
 // ✅ From / To range scheduling
 // ✅ One click Mon-Fri scheduling
 // ✅ Multi staff tickbox scheduling
-// ✅ Duplicate prevention
+// ✅ Duplicate same employee same day prevention
 // ✅ Overlap prevention
+// ✅ Hover tooltip shows scheduled hours
 // ✅ Silent refresh (no flashing)
 // ✅ Global + individual calendars
 // ✅ Holidays replace shifts
@@ -125,14 +127,8 @@ export default function Schedule() {
 
   function dateStr(day) {
     const y = day.getFullYear();
-    const m = String(day.getMonth() + 1).padStart(
-      2,
-      "0"
-    );
-    const d = String(day.getDate()).padStart(
-      2,
-      "0"
-    );
+    const m = String(day.getMonth() + 1).padStart(2, "0");
+    const d = String(day.getDate()).padStart(2, "0");
 
     return `${y}-${m}-${d}`;
   }
@@ -199,6 +195,8 @@ export default function Schedule() {
         x.user_id === userId &&
         x.date === date
     );
+
+    if (existing.length > 0) return true;
 
     const newStart = new Date(
       `${date}T${form.start}:00`
@@ -419,6 +417,7 @@ export default function Schedule() {
           <h1 className="text-3xl font-semibold">
             Schedule
           </h1>
+
           <p className="text-sm text-gray-400">
             Premium rota management
           </p>
@@ -467,9 +466,7 @@ export default function Schedule() {
 
         <Card
           title="Wage Cost"
-          value={`£${wageTotal.toFixed(
-            2
-          )}`}
+          value={`£${wageTotal.toFixed(2)}`}
           icon={
             <PoundSterling size={16} />
           }
@@ -573,17 +570,14 @@ export default function Schedule() {
                     setSelectedStaff(
                       selectedStaff.filter(
                         (x) =>
-                          x !==
-                          u.id
+                          x !== u.id
                       )
                     );
                   } else {
-                    setSelectedStaff(
-                      [
-                        ...selectedStaff,
-                        u.id,
-                      ]
-                    );
+                    setSelectedStaff([
+                      ...selectedStaff,
+                      u.id,
+                    ]);
                   }
                 }}
               />
@@ -595,9 +589,7 @@ export default function Schedule() {
         <div className="grid md:grid-cols-2 gap-3">
           <button
             onClick={() =>
-              createShiftRange(
-                false
-              )
+              createShiftRange(false)
             }
             className="rounded-xl bg-indigo-600 py-3"
           >
@@ -606,9 +598,7 @@ export default function Schedule() {
 
           <button
             onClick={() =>
-              createShiftRange(
-                true
-              )
+              createShiftRange(true)
             }
             className="rounded-xl bg-emerald-600 py-3"
           >
@@ -644,9 +634,23 @@ export default function Schedule() {
           const shifts =
             shiftsForDay(day);
 
+          const tooltip = shifts
+            .map(
+              (s) =>
+                `${s.name} ${s.start_time?.slice(
+                  11,
+                  16
+                )}-${s.end_time?.slice(
+                  11,
+                  16
+                )}`
+            )
+            .join("\n");
+
           return (
             <button
               key={dateStr(day)}
+              title={tooltip}
               onClick={() =>
                 setSelectedDay(day)
               }
