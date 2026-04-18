@@ -138,45 +138,7 @@ function MainDashboard({ user }) {
     <div className="flex min-h-screen bg-[#020617] text-white">
 
       {/* ONLY SIDEBAR */}
-      <aside className="w-[250px] border-r border-white/5 p-5 flex flex-col justify-between">
-
-        <div>
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-xl bg-yellow-500 text-black font-bold flex items-center justify-center">
-              F
-            </div>
-
-            <div>
-              <h1 className="font-bold text-xl">
-                FieldSync
-              </h1>
-
-              <p className="text-xs text-gray-400">
-                Workforce Management
-              </p>
-            </div>
-          </div>
-
-          <Nav />
-        </div>
-
-        <div className="space-y-3">
-          <div className="rounded-2xl bg-white/5 p-4">
-            <p className="font-medium">
-              {user.name}
-            </p>
-
-            <p className="text-sm text-gray-400">
-              {user.role}
-            </p>
-          </div>
-
-          <button className="w-full py-3 rounded-2xl bg-red-600 hover:bg-red-500">
-            Sign Out
-          </button>
-        </div>
-
-      </aside>
+      
 
       {/* MAIN CONTENT */}
       <main className="flex-1 px-8 py-7 space-y-5 overflow-auto">
