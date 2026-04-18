@@ -20,10 +20,10 @@ import {
 import {
   CalendarDays,
   Users,
+  PoundSterling,
   Plus,
   RefreshCw,
   Trash2,
-  PoundSterling,
 } from "lucide-react";
 
 const localizer = momentLocalizer(moment);
@@ -38,7 +38,7 @@ export default function Schedule() {
   const [view, setView] = useState("month");
   const [date, setDate] = useState(new Date());
 
-  const [showCreate, setShowCreate] = useState(false);
+  const [showModal, setShowModal] = useState(false);
 
   const [form, setForm] = useState({
     user_id: "",
@@ -58,10 +58,10 @@ export default function Schedule() {
       if (show) setLoading(true);
 
       const [
-        schedRes,
-        holRes,
-        usersRes,
-        locRes,
+        shifts,
+        holidays,
+        staff,
+        locs,
       ] = await Promise.all([
         scheduleAPI.getAll(),
         holidayAPI.getAll(),
@@ -69,12 +69,12 @@ export default function Schedule() {
         locationAPI.getAll(),
       ]);
 
-      const safeUsers = Array.isArray(usersRes)
-        ? usersRes
+      const safeUsers = Array.isArray(staff)
+        ? staff
         : [];
 
-      const safeLocs = Array.isArray(locRes)
-        ? locRes
+      const safeLocs = Array.isArray(locs)
+        ? locs
         : [];
 
       setUsers(safeUsers);
@@ -82,84 +82,108 @@ export default function Schedule() {
 
       const userMap = {};
       const rateMap = {};
+      const locMap = {};
 
       safeUsers.forEach((u) => {
         userMap[u.id] =
-          u.name || u.email || "Employee";
+          u.name || u.email || "Staff";
 
         rateMap[u.id] = Number(
           u.hourly_rate || 0
         );
       });
 
-      const locMap = {};
-
       safeLocs.forEach((l) => {
-        locMap[l.id] = l.name;
+        locMap[l.id] =
+          l.name || "Location";
       });
 
-      const shifts = (
-        Array.isArray(schedRes)
-          ? schedRes
+      const shiftEvents = (
+        Array.isArray(shifts)
+          ? shifts
           : []
       ).map((s) => {
-        const isOpen =
+        const open =
           s.is_open ||
           !s.user_id;
 
-        const title = isOpen
-          ? `OPEN SHIFT • ${
-              locMap[s.location_id] ||
-              "Location"
-            }`
-          : `${userMap[s.user_id]} • ${
-              moment(
-                s.start_time
-              ).format("HH:mm")
-            }-${moment(
-              s.end_time
-            ).format("HH:mm")} • ${
-              locMap[s.location_id] ||
-              "Location"
+        const start =
+          new Date(
+            s.start_time
+          );
+
+        const end =
+          new Date(
+            s.end_time
+          );
+
+        const title = open
+          ? `OPEN • ${
+              locMap[
+                s.location_id
+              ] || ""
+            } • ${moment(
+              start
+            ).format(
+              "HH:mm"
+            )}-${moment(
+              end
+            ).format(
+              "HH:mm"
+            )}`
+          : `${
+              userMap[
+                s.user_id
+              ] || "Staff"
+            } • ${moment(
+              start
+            ).format(
+              "HH:mm"
+            )}-${moment(
+              end
+            ).format(
+              "HH:mm"
+            )} • ${
+              locMap[
+                s.location_id
+              ] || ""
             }`;
 
         return {
           id: s.id,
-          type: isOpen
+          type: open
             ? "open"
             : "shift",
-          user_id: s.user_id,
+          user_id:
+            s.user_id,
+          start,
+          end,
           title,
-          start: new Date(
-            s.start_time
-          ),
-          end: new Date(
-            s.end_time
-          ),
-          overtime:
-            s.overtime || false,
           hourly_rate:
-            rateMap[s.user_id] || 0,
+            rateMap[
+              s.user_id
+            ] || 0,
+          overtime:
+            s.overtime ||
+            false,
         };
       });
 
-      const holidays = (
-        Array.isArray(holRes)
-          ? holRes
+      const holidayEvents = (
+        Array.isArray(
+          holidays
+        )
+          ? holidays
           : []
       )
         .filter(
           (h) =>
-            h.status === "approved"
+            h.status ===
+            "approved"
         )
         .map((h) => ({
           id: `h-${h.id}`,
           type: "holiday",
-          title: `${
-            h.name ||
-            userMap[h.user_id] ||
-            "Employee"
-          } • HOLIDAY`,
           start: new Date(
             h.start_date +
               "T00:00:00"
@@ -168,11 +192,18 @@ export default function Schedule() {
             h.end_date +
               "T23:59:59"
           ),
+          title: `${
+            h.name ||
+            userMap[
+              h.user_id
+            ] ||
+            "Staff"
+          } • HOLIDAY`,
         }));
 
       setEvents([
-        ...shifts,
-        ...holidays,
+        ...shiftEvents,
+        ...holidayEvents,
       ]);
     } catch (err) {
       console.error(err);
@@ -181,26 +212,37 @@ export default function Schedule() {
     }
   }
 
-  function styleEvent(event) {
-    if (event.type === "holiday") {
+  function eventStyleGetter(
+    event
+  ) {
+    if (
+      event.type ===
+      "holiday"
+    ) {
       return {
         style: {
           background:
             "#16a34a",
           border: "none",
-          borderRadius: "8px",
+          borderRadius:
+            "8px",
         },
       };
     }
 
-    if (event.type === "open") {
+    if (
+      event.type ===
+      "open"
+    ) {
       return {
         style: {
           background:
             "#f59e0b",
+          color:
+            "#111827",
           border: "none",
-          borderRadius: "8px",
-          color: "#111",
+          borderRadius:
+            "8px",
           fontWeight: 700,
         },
       };
@@ -213,37 +255,48 @@ export default function Schedule() {
             ? "#dc2626"
             : "#6366f1",
         border: "none",
-        borderRadius: "8px",
+        borderRadius:
+          "8px",
       },
     };
   }
 
-  async function createShift(e) {
+  async function createShift(
+    e
+  ) {
     e.preventDefault();
 
     try {
       await scheduleAPI.create({
-        user_id: form.is_open
-          ? null
-          : form.user_id,
+        user_id:
+          form.is_open
+            ? null
+            : form.user_id,
         location_id:
           form.location_id,
         date: moment(
           form.start
-        ).format("YYYY-MM-DD"),
-        start_time: form.start,
-        end_time: form.end,
+        ).format(
+          "YYYY-MM-DD"
+        ),
+        start_time:
+          form.start,
+        end_time:
+          form.end,
         is_open:
           form.is_open,
         overtime:
           form.overtime,
       });
 
-      setShowCreate(false);
+      setShowModal(
+        false
+      );
 
       setForm({
         user_id: "",
-        location_id: "",
+        location_id:
+          "",
         start: "",
         end: "",
         is_open: false,
@@ -253,9 +306,55 @@ export default function Schedule() {
       loadData(false);
     } catch {
       alert(
-        "Failed to create shift"
+        "Failed to save shift"
       );
     }
+  }
+
+  async function moveShift({
+    event,
+    start,
+    end,
+  }) {
+    if (
+      event.type ===
+      "holiday"
+    )
+      return;
+
+    await scheduleAPI.update(
+      event.id,
+      {
+        start_time:
+          start,
+        end_time: end,
+      }
+    );
+
+    loadData(false);
+  }
+
+  async function resizeShift({
+    event,
+    start,
+    end,
+  }) {
+    if (
+      event.type ===
+      "holiday"
+    )
+      return;
+
+    await scheduleAPI.update(
+      event.id,
+      {
+        start_time:
+          start,
+        end_time: end,
+      }
+    );
+
+    loadData(false);
   }
 
   async function deleteShift(
@@ -281,77 +380,71 @@ export default function Schedule() {
     loadData(false);
   }
 
-  async function onDrop({
-    event,
-    start,
-    end,
-  }) {
-    if (
-      event.type ===
-      "holiday"
-    )
-      return;
-
-    await scheduleAPI.update(
-      event.id,
-      {
-        start_time: start,
-        end_time: end,
-      }
-    );
-
-    loadData(false);
-  }
-
-  async function onResize({
-    event,
-    start,
-    end,
-  }) {
-    if (
-      event.type ===
-      "holiday"
-    )
-      return;
-
-    await scheduleAPI.update(
-      event.id,
-      {
-        start_time: start,
-        end_time: end,
-      }
-    );
-
-    loadData(false);
-  }
-
-  const visibleEvents =
-    useMemo(
-      () =>
-        events.filter((e) =>
-          moment(e.start).isSame(
+  const monthEvents =
+    useMemo(() => {
+      return events.filter(
+        (e) =>
+          moment(
+            e.start
+          ).isSame(
             date,
             "month"
           )
-        ),
-      [events, date]
-    );
+      );
+    }, [events, date]);
 
-  const monthWage =
-    visibleEvents
+  const totalShifts =
+    monthEvents.filter(
+      (e) =>
+        e.type ===
+          "shift" ||
+        e.type ===
+          "open"
+    ).length;
+
+  const totalHours =
+    monthEvents
       .filter(
-        (x) =>
-          x.type ===
+        (e) =>
+          e.type ===
           "shift"
       )
       .reduce(
-        (sum, x) => {
+        (
+          sum,
+          e
+        ) =>
+          sum +
+          moment(
+            e.end
+          ).diff(
+            moment(
+              e.start
+            ),
+            "minutes"
+          ) /
+            60,
+        0
+      );
+
+  const wages =
+    monthEvents
+      .filter(
+        (e) =>
+          e.type ===
+          "shift"
+      )
+      .reduce(
+        (
+          sum,
+          e
+        ) => {
           const hrs =
             moment(
-              x.end
+              e.end
             ).diff(
               moment(
-                x.start
+                e.start
               ),
               "minutes"
             ) / 60;
@@ -359,16 +452,21 @@ export default function Schedule() {
           return (
             sum +
             hrs *
-              x.hourly_rate
+              e.hourly_rate
           );
         },
         0
       );
 
+  const weekFormats = {
+    dayFormat:
+      "ddd DD",
+  };
+
   if (loading) {
     return (
       <div className="text-gray-400">
-        Loading...
+        Loading schedule...
       </div>
     );
   }
@@ -381,19 +479,20 @@ export default function Schedule() {
           <h1 className="text-3xl font-semibold">
             Schedule
           </h1>
-
           <p className="text-sm text-gray-400">
-            Full planner
+            Smart rota planner
           </p>
         </div>
 
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2">
 
           <button
             onClick={() =>
-              loadData(false)
+              loadData(
+                false
+              )
             }
-            className="px-4 py-2 rounded-xl bg-white/5"
+            className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10"
           >
             <RefreshCw
               size={16}
@@ -402,15 +501,16 @@ export default function Schedule() {
 
           <button
             onClick={() =>
-              setShowCreate(
+              setShowModal(
                 true
               )
             }
-            className="px-4 py-2 rounded-xl bg-indigo-600"
+            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 flex items-center gap-2"
           >
             <Plus
               size={16}
             />
+            Add Shift
           </button>
 
         </div>
@@ -419,76 +519,77 @@ export default function Schedule() {
       <div className="grid md:grid-cols-3 gap-4">
 
         <Card
-          title="Staff"
-          value={users.length}
+          title="Monthly Shifts"
+          value={
+            totalShifts
+          }
           icon={
-            <Users
-              size={16}
-            />
+            <CalendarDays size={16} />
           }
         />
 
         <Card
-          title="Events"
-          value={events.length}
+          title="Monthly Hours"
+          value={totalHours.toFixed(
+            1
+          )}
           icon={
-            <CalendarDays
-              size={16}
-            />
+            <Users size={16} />
           }
         />
 
         <Card
-          title="Month Wage"
-          value={`£${monthWage.toFixed(
+          title="Monthly Wage"
+          value={`£${wages.toFixed(
             2
           )}`}
           icon={
-            <PoundSterling
-              size={16}
-            />
+            <PoundSterling size={16} />
           }
         />
 
       </div>
 
-      <div className="rounded-2xl border border-white/10 bg-[#020617] p-4 overflow-hidden">
+      <div className="rounded-2xl border border-white/10 bg-[#020617] p-4 overflow-hidden schedule-wrap">
 
         <DnDCalendar
           localizer={
             localizer
           }
           events={events}
-          startAccessor="start"
-          endAccessor="end"
           date={date}
           onNavigate={
             setDate
           }
           view={view}
           onView={setView}
+          startAccessor="start"
+          endAccessor="end"
           selectable
-          resizable
           popup
+          resizable
           views={[
             Views.MONTH,
             Views.WEEK,
-            Views.DAY,
-            Views.AGENDA,
           ]}
-          defaultView="month"
+          toolbar
+          step={60}
+          timeslots={1}
           style={{
             height:
-              "82vh",
+              "80vh",
           }}
+          formats={
+            weekFormats
+          }
           eventPropGetter={
-            styleEvent
+            eventStyleGetter
           }
           onEventDrop={
-            onDrop
+            moveShift
           }
           onEventResize={
-            onResize
+            resizeShift
           }
           onDoubleClickEvent={
             deleteShift
@@ -505,11 +606,15 @@ export default function Schedule() {
             e.type !==
             "holiday"
           }
+          components={{
+            timeGutterHeader:
+              () => null,
+          }}
         />
 
       </div>
 
-      {showCreate && (
+      {showModal && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
 
           <div className="w-full max-w-lg bg-[#020617] border border-white/10 rounded-2xl p-6">
@@ -526,10 +631,10 @@ export default function Schedule() {
             >
 
               <select
+                required
                 value={
                   form.location_id
                 }
-                required
                 onChange={(
                   e
                 ) =>
@@ -584,7 +689,7 @@ export default function Schedule() {
                   className="w-full bg-[#0f172a] text-white rounded-xl px-4 py-3"
                 >
                   <option value="">
-                    Select Employee
+                    Select Staff
                   </option>
 
                   {users.map(
@@ -608,10 +713,10 @@ export default function Schedule() {
 
               <input
                 type="datetime-local"
+                required
                 value={
                   form.start
                 }
-                required
                 onChange={(
                   e
                 ) =>
@@ -627,10 +732,10 @@ export default function Schedule() {
 
               <input
                 type="datetime-local"
+                required
                 value={
                   form.end
                 }
-                required
                 onChange={(
                   e
                 ) =>
@@ -684,32 +789,66 @@ export default function Schedule() {
                 Overtime
               </label>
 
-              <button className="w-full py-3 rounded-xl bg-indigo-600">
-                Save
+              <button className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500">
+                Save Shift
               </button>
 
               <button
                 type="button"
                 onClick={() =>
-                  setShowCreate(
+                  setShowModal(
                     false
                   )
                 }
-                className="w-full py-3 rounded-xl bg-white/5"
+                className="w-full py-3 rounded-xl bg-white/5 hover:bg-white/10"
               >
                 Cancel
               </button>
 
             </form>
 
-            <p className="text-xs text-gray-500 mt-4">
-              Double click shift to delete.
-            </p>
-
           </div>
 
         </div>
       )}
+
+      <style>{`
+        .schedule-wrap .rbc-off-range-bg{
+          background: transparent !important;
+        }
+
+        .schedule-wrap .rbc-today{
+          background: rgba(99,102,241,.12) !important;
+        }
+
+        .schedule-wrap .rbc-header{
+          padding:10px;
+          border-color:rgba(255,255,255,.08);
+        }
+
+        .schedule-wrap .rbc-time-gutter,
+        .schedule-wrap .rbc-time-header-gutter{
+          display:none;
+        }
+
+        .schedule-wrap .rbc-time-content{
+          border-top:1px solid rgba(255,255,255,.08);
+        }
+
+        .schedule-wrap .rbc-timeslot-group{
+          min-height:60px;
+          border-color:rgba(255,255,255,.04);
+        }
+
+        .schedule-wrap .rbc-label{
+          display:none;
+        }
+
+        .schedule-wrap .rbc-event{
+          padding:4px 8px;
+          font-size:12px;
+        }
+      `}</style>
 
     </div>
   );
