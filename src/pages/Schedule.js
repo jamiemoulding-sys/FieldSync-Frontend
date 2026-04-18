@@ -23,7 +23,6 @@ import {
   PoundSterling,
   Plus,
   RefreshCw,
-  Trash2,
 } from "lucide-react";
 
 const localizer = momentLocalizer(moment);
@@ -47,6 +46,10 @@ export default function Schedule() {
     end: "",
     is_open: false,
     overtime: false,
+
+    bulk_from: "",
+    bulk_to: "",
+    bulk_days: "mon-fri",
   });
 
   useEffect(() => {
@@ -57,17 +60,13 @@ export default function Schedule() {
     try {
       if (show) setLoading(true);
 
-      const [
-        shifts,
-        holidays,
-        staff,
-        locs,
-      ] = await Promise.all([
-        scheduleAPI.getAll(),
-        holidayAPI.getAll(),
-        userAPI.getAll(),
-        locationAPI.getAll(),
-      ]);
+      const [shifts, holidays, staff, locs] =
+        await Promise.all([
+          scheduleAPI.getAll(),
+          holidayAPI.getAll(),
+          userAPI.getAll(),
+          locationAPI.getAll(),
+        ]);
 
       const safeUsers = Array.isArray(staff)
         ? staff
@@ -98,78 +97,50 @@ export default function Schedule() {
           l.name || "Location";
       });
 
-      const shiftEvents = (
+      const shiftRows = (
         Array.isArray(shifts)
           ? shifts
           : []
       ).map((s) => {
-        const open =
-          s.is_open ||
-          !s.user_id;
-
         const start =
-          new Date(
-            s.start_time
-          );
+          new Date(s.start_time);
 
         const end =
-          new Date(
-            s.end_time
-          );
+          new Date(s.end_time);
 
-        const title = open
-          ? `OPEN • ${
-              locMap[
-                s.location_id
-              ] || ""
-            } • ${moment(
-              start
-            ).format(
-              "HH:mm"
-            )}-${moment(
-              end
-            ).format(
-              "HH:mm"
-            )}`
-          : `${
-              userMap[
-                s.user_id
-              ] || "Staff"
-            } • ${moment(
-              start
-            ).format(
-              "HH:mm"
-            )}-${moment(
-              end
-            ).format(
-              "HH:mm"
-            )} • ${
-              locMap[
-                s.location_id
-              ] || ""
-            }`;
+        const isOpen =
+          s.is_open || !s.user_id;
+
+        const employee =
+          userMap[s.user_id] ||
+          "OPEN";
+
+        const hours = `${moment(
+          start
+        ).format("H:mm")} - ${moment(
+          end
+        ).format("H:mm")}`;
 
         return {
           id: s.id,
-          type: open
+          type: isOpen
             ? "open"
             : "shift",
-          user_id:
-            s.user_id,
           start,
           end,
-          title,
-          hourly_rate:
-            rateMap[
-              s.user_id
-            ] || 0,
-          overtime:
-            s.overtime ||
-            false,
+          user_id: s.user_id,
+          title: `${employee} • ${hours}`,
+          resource: {
+            hourly_rate:
+              rateMap[s.user_id] ||
+              0,
+            overtime:
+              s.overtime,
+          },
         };
       });
 
-      const holidayEvents = (
+      const holidayRows = (
         Array.isArray(
           holidays
         )
@@ -197,24 +168,20 @@ export default function Schedule() {
             userMap[
               h.user_id
             ] ||
-            "Staff"
+            "Holiday"
           } • HOLIDAY`,
         }));
 
       setEvents([
-        ...shiftEvents,
-        ...holidayEvents,
+        ...shiftRows,
+        ...holidayRows,
       ]);
-    } catch (err) {
-      console.error(err);
     } finally {
       setLoading(false);
     }
   }
 
-  function eventStyleGetter(
-    event
-  ) {
+  function styleEvent(event) {
     if (
       event.type ===
       "holiday"
@@ -238,8 +205,7 @@ export default function Schedule() {
         style: {
           background:
             "#f59e0b",
-          color:
-            "#111827",
+          color: "#111",
           border: "none",
           borderRadius:
             "8px",
@@ -251,7 +217,8 @@ export default function Schedule() {
     return {
       style: {
         background:
-          event.overtime
+          event.resource
+            ?.overtime
             ? "#dc2626"
             : "#6366f1",
         border: "none",
@@ -266,52 +233,108 @@ export default function Schedule() {
   ) {
     e.preventDefault();
 
-    try {
-      await scheduleAPI.create({
-        user_id:
-          form.is_open
-            ? null
-            : form.user_id,
-        location_id:
-          form.location_id,
-        date: moment(
-          form.start
-        ).format(
-          "YYYY-MM-DD"
-        ),
-        start_time:
-          form.start,
-        end_time:
-          form.end,
-        is_open:
-          form.is_open,
-        overtime:
-          form.overtime,
-      });
+    await scheduleAPI.create({
+      user_id:
+        form.is_open
+          ? null
+          : form.user_id,
+      location_id:
+        form.location_id,
+      date: moment(
+        form.start
+      ).format(
+        "YYYY-MM-DD"
+      ),
+      start_time:
+        form.start,
+      end_time: form.end,
+      is_open:
+        form.is_open,
+      overtime:
+        form.overtime,
+    });
 
-      setShowModal(
-        false
-      );
+    setShowModal(false);
+    loadData(false);
+  }
 
-      setForm({
-        user_id: "",
-        location_id:
-          "",
-        start: "",
-        end: "",
-        is_open: false,
-        overtime: false,
-      });
+  async function createBulk() {
+    if (
+      !form.bulk_from ||
+      !form.bulk_to ||
+      !form.location_id ||
+      !form.start ||
+      !form.end
+    )
+      return;
 
-      loadData(false);
-    } catch {
-      alert(
-        "Failed to save shift"
+    let current = moment(
+      form.bulk_from
+    );
+
+    const end = moment(
+      form.bulk_to
+    );
+
+    while (
+      current.isSameOrBefore(
+        end,
+        "day"
+      )
+    ) {
+      const dow =
+        current.day();
+
+      const allowed =
+        form.bulk_days ===
+        "all"
+          ? true
+          : dow >= 1 &&
+            dow <= 5;
+
+      if (allowed) {
+        await scheduleAPI.create({
+          user_id:
+            form.is_open
+              ? null
+              : form.user_id,
+          location_id:
+            form.location_id,
+          date: current.format(
+            "YYYY-MM-DD"
+          ),
+          start_time: `${current.format(
+            "YYYY-MM-DD"
+          )}T${moment(
+            form.start
+          ).format(
+            "HH:mm"
+          )}`,
+          end_time: `${current.format(
+            "YYYY-MM-DD"
+          )}T${moment(
+            form.end
+          ).format(
+            "HH:mm"
+          )}`,
+          is_open:
+            form.is_open,
+          overtime:
+            form.overtime,
+        });
+      }
+
+      current.add(
+        1,
+        "day"
       );
     }
+
+    setShowModal(false);
+    loadData(false);
   }
 
-  async function moveShift({
+  async function moveEvent({
     event,
     start,
     end,
@@ -334,53 +357,7 @@ export default function Schedule() {
     loadData(false);
   }
 
-  async function resizeShift({
-    event,
-    start,
-    end,
-  }) {
-    if (
-      event.type ===
-      "holiday"
-    )
-      return;
-
-    await scheduleAPI.update(
-      event.id,
-      {
-        start_time:
-          start,
-        end_time: end,
-      }
-    );
-
-    loadData(false);
-  }
-
-  async function deleteShift(
-    event
-  ) {
-    if (
-      event.type ===
-      "holiday"
-    )
-      return;
-
-    if (
-      !window.confirm(
-        "Delete shift?"
-      )
-    )
-      return;
-
-    await scheduleAPI.delete(
-      event.id
-    );
-
-    loadData(false);
-  }
-
-  const monthEvents =
+  const monthRows =
     useMemo(() => {
       return events.filter(
         (e) =>
@@ -389,79 +366,62 @@ export default function Schedule() {
           ).isSame(
             date,
             "month"
-          )
+          ) &&
+          e.type !==
+            "holiday"
       );
     }, [events, date]);
 
-  const totalShifts =
-    monthEvents.filter(
-      (e) =>
-        e.type ===
-          "shift" ||
-        e.type ===
-          "open"
-    ).length;
+  const shifts =
+    monthRows.length;
 
-  const totalHours =
-    monthEvents
-      .filter(
-        (e) =>
+  const hours =
+    monthRows.reduce(
+      (
+        sum,
+        e
+      ) =>
+        sum +
+        moment(
+          e.end
+        ).diff(
+          e.start,
+          "minutes"
+        ) /
+          60,
+      0
+    );
+
+  const wages =
+    monthRows.reduce(
+      (
+        sum,
+        e
+      ) => {
+        if (
           e.type ===
-          "shift"
-      )
-      .reduce(
-        (
-          sum,
-          e
-        ) =>
-          sum +
+          "open"
+        )
+          return sum;
+
+        const hrs =
           moment(
             e.end
           ).diff(
-            moment(
-              e.start
-            ),
+            e.start,
             "minutes"
-          ) /
-            60,
-        0
-      );
+          ) / 60;
 
-  const wages =
-    monthEvents
-      .filter(
-        (e) =>
-          e.type ===
-          "shift"
-      )
-      .reduce(
-        (
-          sum,
-          e
-        ) => {
-          const hrs =
-            moment(
-              e.end
-            ).diff(
-              moment(
-                e.start
-              ),
-              "minutes"
-            ) / 60;
-
-          return (
-            sum +
-            hrs *
-              e.hourly_rate
-          );
-        },
-        0
-      );
-
-  const weekFormats = {
-    dayFormat:
-      "ddd DD",
-  };
+        return (
+          sum +
+          hrs *
+            (e.resource
+              ?.hourly_rate ||
+              0)
+        );
+      },
+      0
+    );
 
   if (loading) {
     return (
@@ -479,6 +439,7 @@ export default function Schedule() {
           <h1 className="text-3xl font-semibold">
             Schedule
           </h1>
+
           <p className="text-sm text-gray-400">
             Smart rota planner
           </p>
@@ -492,7 +453,7 @@ export default function Schedule() {
                 false
               )
             }
-            className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10"
+            className="px-4 py-2 rounded-xl bg-white/5"
           >
             <RefreshCw
               size={16}
@@ -505,7 +466,7 @@ export default function Schedule() {
                 true
               )
             }
-            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 flex items-center gap-2"
+            className="px-4 py-2 rounded-xl bg-indigo-600 flex items-center gap-2"
           >
             <Plus
               size={16}
@@ -520,9 +481,7 @@ export default function Schedule() {
 
         <Card
           title="Monthly Shifts"
-          value={
-            totalShifts
-          }
+          value={shifts}
           icon={
             <CalendarDays size={16} />
           }
@@ -530,7 +489,7 @@ export default function Schedule() {
 
         <Card
           title="Monthly Hours"
-          value={totalHours.toFixed(
+          value={hours.toFixed(
             1
           )}
           icon={
@@ -550,7 +509,7 @@ export default function Schedule() {
 
       </div>
 
-      <div className="rounded-2xl border border-white/10 bg-[#020617] p-4 overflow-hidden schedule-wrap">
+      <div className="rounded-2xl border border-white/10 bg-[#020617] p-4 schedule-wrap">
 
         <DnDCalendar
           localizer={
@@ -565,50 +524,30 @@ export default function Schedule() {
           onView={setView}
           startAccessor="start"
           endAccessor="end"
-          selectable
-          popup
-          resizable
           views={[
             Views.MONTH,
             Views.WEEK,
           ]}
-          toolbar
+          popup
+          selectable
+          resizable
           step={60}
           timeslots={1}
           style={{
             height:
-              "80vh",
+              "82vh",
           }}
-          formats={
-            weekFormats
-          }
-          eventPropGetter={
-            eventStyleGetter
-          }
           onEventDrop={
-            moveShift
+            moveEvent
           }
           onEventResize={
-            resizeShift
+            moveEvent
           }
-          onDoubleClickEvent={
-            deleteShift
-          }
-          draggableAccessor={(
-            e
-          ) =>
-            e.type !==
-            "holiday"
-          }
-          resizableAccessor={(
-            e
-          ) =>
-            e.type !==
-            "holiday"
+          eventPropGetter={
+            styleEvent
           }
           components={{
-            timeGutterHeader:
-              () => null,
+            week: WeekListView,
           }}
         />
 
@@ -617,21 +556,15 @@ export default function Schedule() {
       {showModal && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
 
-          <div className="w-full max-w-lg bg-[#020617] border border-white/10 rounded-2xl p-6">
+          <div className="w-full max-w-xl bg-[#020617] border border-white/10 rounded-2xl p-6">
 
             <h2 className="text-lg font-semibold mb-4">
-              Add Shift
+              Add Shift / Bulk
             </h2>
 
-            <form
-              onSubmit={
-                createShift
-              }
-              className="space-y-4"
-            >
+            <div className="grid md:grid-cols-2 gap-3 mb-3">
 
               <select
-                required
                 value={
                   form.location_id
                 }
@@ -645,10 +578,10 @@ export default function Schedule() {
                         .value,
                   })
                 }
-                className="w-full bg-[#0f172a] text-white rounded-xl px-4 py-3"
+                className="bg-[#0f172a] text-white rounded-xl px-4 py-3"
               >
                 <option value="">
-                  Select Location
+                  Location
                 </option>
 
                 {locations.map(
@@ -663,57 +596,52 @@ export default function Schedule() {
                         l.id
                       }
                     >
-                      {
-                        l.name
-                      }
+                      {l.name}
                     </option>
                   )
                 )}
               </select>
 
-              {!form.is_open && (
-                <select
-                  value={
-                    form.user_id
-                  }
-                  onChange={(
-                    e
-                  ) =>
-                    setForm({
-                      ...form,
-                      user_id:
-                        e.target
-                          .value,
-                    })
-                  }
-                  className="w-full bg-[#0f172a] text-white rounded-xl px-4 py-3"
-                >
-                  <option value="">
-                    Select Staff
-                  </option>
+              <select
+                value={
+                  form.user_id
+                }
+                onChange={(
+                  e
+                ) =>
+                  setForm({
+                    ...form,
+                    user_id:
+                      e.target
+                        .value,
+                  })
+                }
+                className="bg-[#0f172a] text-white rounded-xl px-4 py-3"
+              >
+                <option value="">
+                  Staff
+                </option>
 
-                  {users.map(
-                    (
-                      u
-                    ) => (
-                      <option
-                        key={
-                          u.id
-                        }
-                        value={
-                          u.id
-                        }
-                      >
-                        {u.name}
-                      </option>
-                    )
-                  )}
-                </select>
-              )}
+                {users.map(
+                  (
+                    u
+                  ) => (
+                    <option
+                      key={
+                        u.id
+                      }
+                      value={
+                        u.id
+                      }
+                    >
+                      {u.name}
+                    </option>
+                  )
+                )}
+              </select>
 
               <input
                 type="datetime-local"
-                required
                 value={
                   form.start
                 }
@@ -727,12 +655,11 @@ export default function Schedule() {
                         .value,
                   })
                 }
-                className="w-full bg-[#0f172a] text-white rounded-xl px-4 py-3"
+                className="bg-[#0f172a] text-white rounded-xl px-4 py-3"
               />
 
               <input
                 type="datetime-local"
-                required
                 value={
                   form.end
                 }
@@ -746,66 +673,107 @@ export default function Schedule() {
                         .value,
                   })
                 }
-                className="w-full bg-[#0f172a] text-white rounded-xl px-4 py-3"
+                className="bg-[#0f172a] text-white rounded-xl px-4 py-3"
               />
 
-              <label className="flex gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={
-                    form.is_open
-                  }
-                  onChange={(
-                    e
-                  ) =>
-                    setForm({
-                      ...form,
-                      is_open:
-                        e.target
-                          .checked,
-                    })
-                  }
-                />
-                Open Shift
-              </label>
+            </div>
 
-              <label className="flex gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={
-                    form.overtime
-                  }
-                  onChange={(
-                    e
-                  ) =>
-                    setForm({
-                      ...form,
-                      overtime:
-                        e.target
-                          .checked,
-                    })
-                  }
-                />
-                Overtime
-              </label>
+            <div className="grid md:grid-cols-3 gap-3 mb-3">
 
-              <button className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500">
-                Save Shift
+              <input
+                type="date"
+                value={
+                  form.bulk_from
+                }
+                onChange={(
+                  e
+                ) =>
+                  setForm({
+                    ...form,
+                    bulk_from:
+                      e.target
+                        .value,
+                  })
+                }
+                className="bg-[#0f172a] text-white rounded-xl px-4 py-3"
+              />
+
+              <input
+                type="date"
+                value={
+                  form.bulk_to
+                }
+                onChange={(
+                  e
+                ) =>
+                  setForm({
+                    ...form,
+                    bulk_to:
+                      e.target
+                        .value,
+                  })
+                }
+                className="bg-[#0f172a] text-white rounded-xl px-4 py-3"
+              />
+
+              <select
+                value={
+                  form.bulk_days
+                }
+                onChange={(
+                  e
+                ) =>
+                  setForm({
+                    ...form,
+                    bulk_days:
+                      e.target
+                        .value,
+                  })
+                }
+                className="bg-[#0f172a] text-white rounded-xl px-4 py-3"
+              >
+                <option value="mon-fri">
+                  Mon - Fri
+                </option>
+                <option value="all">
+                  All Days
+                </option>
+              </select>
+
+            </div>
+
+            <div className="space-y-2">
+
+              <button
+                onClick={
+                  createShift
+                }
+                className="w-full py-3 rounded-xl bg-indigo-600"
+              >
+                Add Single Shift
               </button>
 
               <button
-                type="button"
+                onClick={
+                  createBulk
+                }
+                className="w-full py-3 rounded-xl bg-emerald-600"
+              >
+                Add Bulk Shifts
+              </button>
+
+              <button
                 onClick={() =>
                   setShowModal(
                     false
                   )
                 }
-                className="w-full py-3 rounded-xl bg-white/5 hover:bg-white/10"
+                className="w-full py-3 rounded-xl bg-white/5"
               >
                 Cancel
               </button>
 
-            </form>
+            </div>
 
           </div>
 
@@ -814,34 +782,16 @@ export default function Schedule() {
 
       <style>{`
         .schedule-wrap .rbc-off-range-bg{
-          background: transparent !important;
+          background:transparent!important;
         }
 
         .schedule-wrap .rbc-today{
-          background: rgba(99,102,241,.12) !important;
+          background:rgba(99,102,241,.10)!important;
         }
 
         .schedule-wrap .rbc-header{
-          padding:10px;
+          padding:12px;
           border-color:rgba(255,255,255,.08);
-        }
-
-        .schedule-wrap .rbc-time-gutter,
-        .schedule-wrap .rbc-time-header-gutter{
-          display:none;
-        }
-
-        .schedule-wrap .rbc-time-content{
-          border-top:1px solid rgba(255,255,255,.08);
-        }
-
-        .schedule-wrap .rbc-timeslot-group{
-          min-height:60px;
-          border-color:rgba(255,255,255,.04);
-        }
-
-        .schedule-wrap .rbc-label{
-          display:none;
         }
 
         .schedule-wrap .rbc-event{
@@ -854,6 +804,65 @@ export default function Schedule() {
   );
 }
 
+function WeekListView({
+  date,
+  events,
+}) {
+  const start = moment(date).startOf(
+    "week"
+  );
+
+  const days = Array.from(
+    { length: 7 },
+    (_, i) =>
+      start
+        .clone()
+        .add(i, "day")
+  );
+
+  return (
+    <div className="grid grid-cols-7 gap-2 h-full p-2">
+      {days.map((day) => {
+        const rows =
+          events.filter((e) =>
+            moment(
+              e.start
+            ).isSame(
+              day,
+              "day"
+            )
+          );
+
+        return (
+          <div
+            key={day.format()}
+            className="bg-[#0f172a] rounded-xl p-2 overflow-auto"
+          >
+            <div className="font-semibold text-sm mb-2">
+              {day.format(
+                "ddd DD"
+              )}
+            </div>
+
+            <div className="space-y-2">
+              {rows.map(
+                (r) => (
+                  <div
+                    key={r.id}
+                    className="text-xs rounded-lg px-2 py-2 bg-white/5"
+                  >
+                    {r.title}
+                  </div>
+                )
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function Card({
   title,
   value,
@@ -861,7 +870,7 @@ function Card({
 }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-[#020617] p-4">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between">
         <p className="text-xs text-gray-400">
           {title}
         </p>
