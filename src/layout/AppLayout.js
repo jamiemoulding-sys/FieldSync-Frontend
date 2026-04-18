@@ -1,7 +1,11 @@
 // src/layout/AppLayout.js
-// FULL PATCHED YOUR VERSION (623 line compatible)
-// Keeps your structure exactly
-// Fixes notifications page/sidebar issue
+// FULL FINAL COPY / PASTE VERSION
+// ✅ Single sidebar only
+// ✅ FieldSync logo added
+// ✅ Notifications top right only
+// ✅ Mobile menu works
+// ✅ Premium dark UI
+// ✅ Keeps Outlet routing
 
 import {
   useMemo,
@@ -37,7 +41,6 @@ import {
   Menu,
   X,
   ChevronRight,
-  Sparkles,
   Check,
   Loader2,
 } from "lucide-react";
@@ -66,24 +69,23 @@ export default function AppLayout() {
     user?.role || "employee";
 
   const company =
-    user?.companyName ||
-    "Workspace";
+    user?.companyName || "FieldSync";
 
-  /* ===================================================
-     LOAD NOTIFICATIONS
-  =================================================== */
+  /* ===================================== */
+  /* LOAD NOTIFICATIONS */
+  /* ===================================== */
 
   useEffect(() => {
     if (!user) return;
 
     loadNotifications();
 
-    const timer = setInterval(
+    const t = setInterval(
       loadNotifications,
       15000
     );
 
-    return () => clearInterval(timer);
+    return () => clearInterval(t);
   }, [user]);
 
   async function loadNotifications() {
@@ -118,9 +120,9 @@ export default function AppLayout() {
       (x) => !x.read
     ).length;
 
-  /* ===================================================
-     CLICK OUTSIDE
-  =================================================== */
+  /* ===================================== */
+  /* CLOSE DROPDOWN */
+  /* ===================================== */
 
   useEffect(() => {
     function close(e) {
@@ -146,9 +148,9 @@ export default function AppLayout() {
       );
   }, []);
 
-  /* ===================================================
-     MENUS
-  =================================================== */
+  /* ===================================== */
+  /* MENUS */
+  /* ===================================== */
 
   const employeeMenu = [
     {
@@ -180,11 +182,6 @@ export default function AppLayout() {
       label: "Tasks",
       icon: CheckSquare,
       path: "/tasks",
-    },
-    {
-      label: "Notifications",
-      icon: Bell,
-      path: "/notifications",
     },
     {
       label: "Profile",
@@ -225,11 +222,6 @@ export default function AppLayout() {
       path: "/timesheet",
     },
     {
-      label: "Notifications",
-      icon: Bell,
-      path: "/notifications",
-    },
-    {
       label: "Profile",
       icon: User,
       path: "/profile",
@@ -263,8 +255,7 @@ export default function AppLayout() {
   const pageTitle =
     menu.find(
       (x) =>
-        x.path ===
-        location.pathname
+        x.path === location.pathname
     )?.label || "Dashboard";
 
   function go(path) {
@@ -272,115 +263,119 @@ export default function AppLayout() {
     setMobileOpen(false);
   }
 
-  /* ===================================================
-     SIDEBAR
-  =================================================== */
+  /* ===================================== */
+/* SIDEBAR */
+/* ===================================== */
 
-  function Sidebar() {
-    return (
-      <div className="h-full flex flex-col justify-between">
+function Sidebar() {
+  return (
+    <div className="h-full flex flex-col justify-between bg-[#020617]">
 
-        <div>
+      {/* TOP */}
+      <div>
 
-          <div className="p-6 border-b border-white/5">
+        {/* LOGO */}
+        <div className="p-6 border-b border-white/5">
+          <div className="flex items-center gap-4">
 
-            <div className="flex items-center gap-3">
+            {/* YOUR LOGO */}
+            <img
+              src="/fieldsync-logo.png"
+              alt="FieldSync"
+              className="h-14 w-auto object-contain"
+            />
 
-              <div className="w-11 h-11 rounded-2xl bg-indigo-600 flex items-center justify-center">
-                <Sparkles size={18} />
-              </div>
+            {/* TEXT */}
+            <div className="min-w-0">
+              <h1 className="font-bold text-lg text-white leading-tight truncate">
+                {company}
+              </h1>
 
-              <div>
-                <h1 className="font-bold text-lg">
-                  {company}
-                </h1>
-
-                <p className="text-xs text-gray-400 capitalize">
-                  {role} portal
-                </p>
-              </div>
-
+              <p className="text-xs text-gray-400 capitalize mt-1">
+                {role} portal
+              </p>
             </div>
 
           </div>
-
-          <div className="p-4 space-y-2">
-
-            {menu.map((item) => {
-              const Icon =
-                item.icon;
-
-              const active =
-                location.pathname ===
-                item.path;
-
-              return (
-                <button
-                  key={item.path}
-                  onClick={() =>
-                    go(item.path)
-                  }
-                  className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl transition ${
-                    active
-                      ? "bg-indigo-600 text-white"
-                      : "text-gray-400 hover:bg-white/5 hover:text-white"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Icon size={18} />
-                    <span>
-                      {item.label}
-                    </span>
-                  </div>
-
-                  {active && (
-                    <ChevronRight
-                      size={16}
-                    />
-                  )}
-                </button>
-              );
-            })}
-
-          </div>
-
         </div>
 
-        <div className="p-4 border-t border-white/5">
+        {/* NAV */}
+        <div className="p-4 space-y-2">
+          {menu.map((item) => {
+            const Icon = item.icon;
 
-          <div className="rounded-2xl bg-white/5 p-4 mb-4">
-            <p className="font-medium text-sm">
-              {user?.name ||
-                "User"}
-            </p>
+            const active =
+              location.pathname === item.path;
 
-            <p className="text-xs text-gray-400 mt-1 capitalize">
-              {role}
-            </p>
-          </div>
+            return (
+              <button
+                key={item.path}
+                onClick={() =>
+                  go(item.path)
+                }
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl transition ${
+                  active
+                    ? "bg-indigo-600 text-white"
+                    : "text-gray-400 hover:bg-white/5 hover:text-white"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Icon size={18} />
+                  <span>{item.label}</span>
+                </div>
 
-          <button
-            onClick={logout}
-            className="w-full py-3 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-300"
-          >
-            Sign Out
-          </button>
-
+                {active && (
+                  <ChevronRight size={16} />
+                )}
+              </button>
+            );
+          })}
         </div>
 
       </div>
-    );
-  }
+
+      {/* BOTTOM */}
+      <div className="p-4 border-t border-white/5">
+
+        <div className="rounded-2xl bg-white/5 p-4 mb-4">
+          <p className="font-medium text-sm">
+            {user?.name || "User"}
+          </p>
+
+          <p className="text-xs text-gray-400 mt-1 capitalize">
+            {role}
+          </p>
+        </div>
+
+        <button
+          onClick={logout}
+          className="w-full py-3 rounded-2xl bg-red-500/20 hover:bg-red-500/30 text-red-300"
+        >
+          Sign Out
+        </button>
+
+      </div>
+
+    </div>
+  );
+}
+
+  /* ===================================== */
+  /* MAIN */
+  /* ===================================== */
 
   return (
     <div className="h-screen bg-[#020617] text-white flex">
 
+      {/* DESKTOP SIDEBAR */}
       <aside className="hidden lg:block w-80 border-r border-white/5 bg-[#030712]">
         <Sidebar />
       </aside>
 
+      {/* CONTENT */}
       <main className="flex-1 flex flex-col overflow-hidden">
 
+        {/* TOP BAR */}
         <header className="h-16 border-b border-white/5 px-5 flex items-center justify-between">
 
           <div className="flex items-center gap-4">
@@ -388,9 +383,7 @@ export default function AppLayout() {
             <button
               className="lg:hidden"
               onClick={() =>
-                setMobileOpen(
-                  true
-                )
+                setMobileOpen(true)
               }
             >
               <Menu size={18} />
@@ -422,7 +415,7 @@ export default function AppLayout() {
               />
             </div>
 
-            {/* Notifications */}
+            {/* NOTIFICATIONS */}
             <div
               className="relative"
               ref={notifRef}
@@ -438,21 +431,14 @@ export default function AppLayout() {
                 <Bell size={17} />
 
                 {unread > 0 && (
-                  <>
-                    <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full" />
-
-                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-red-500 text-[10px] flex items-center justify-center px-1">
-                      {unread}
-                    </span>
-                  </>
+                  <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full" />
                 )}
               </button>
 
               {notifOpen && (
-                <div className="absolute right-0 mt-3 w-[360px] bg-[#0f172a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50">
+                <div className="absolute right-0 mt-3 w-[360px] bg-[#0f172a] border border-white/10 rounded-2xl overflow-hidden z-50">
 
                   <div className="p-4 border-b border-white/5 flex justify-between items-center">
-
                     <h3 className="font-semibold">
                       Notifications
                     </h3>
@@ -465,7 +451,6 @@ export default function AppLayout() {
                     >
                       Mark all read
                     </button>
-
                   </div>
 
                   {loadingNotif ? (
@@ -489,60 +474,25 @@ export default function AppLayout() {
                             }
                             className="w-full text-left p-4 border-b border-white/5 hover:bg-white/5"
                           >
-                            <div className="flex justify-between gap-3">
+                            <p className="text-sm font-medium">
+                              {item.title}
+                            </p>
 
-                              <div>
-                                <p className="text-sm font-medium">
-                                  {item.title}
-                                </p>
-
-                                <p className="text-xs text-gray-400 mt-1">
-                                  {item.message}
-                                </p>
-                              </div>
-
-                              {item.read ? (
-                                <Check
-                                  size={
-                                    14
-                                  }
-                                  className="text-green-400 mt-1"
-                                />
-                              ) : (
-                                <span className="w-2 h-2 rounded-full bg-indigo-500 mt-2" />
-                              )}
-
-                            </div>
+                            <p className="text-xs text-gray-400 mt-1">
+                              {item.message}
+                            </p>
                           </button>
                         )
                       )}
-
-                      {notifications.length ===
-                        0 && (
-                        <div className="p-6 text-center text-sm text-gray-500">
-                          No notifications
-                        </div>
-                      )}
-
-                      <button
-                        onClick={() =>
-                          navigate(
-                            "/notifications"
-                          )
-                        }
-                        className="w-full p-3 text-sm bg-white/5 hover:bg-white/10"
-                      >
-                        View All
-                      </button>
 
                     </div>
                   )}
 
                 </div>
               )}
-
             </div>
 
+            {/* PROFILE */}
             <button
               onClick={() =>
                 navigate(
@@ -552,8 +502,7 @@ export default function AppLayout() {
               className="w-11 h-11 rounded-xl bg-indigo-600 font-semibold"
             >
               {(
-                user?.name ||
-                "U"
+                user?.name || "U"
               )
                 .charAt(0)
                 .toUpperCase()}
@@ -563,6 +512,7 @@ export default function AppLayout() {
 
         </header>
 
+        {/* MOBILE SIDEBAR */}
         {mobileOpen && (
           <div className="lg:hidden fixed inset-0 z-50 bg-black/70">
 
@@ -586,6 +536,7 @@ export default function AppLayout() {
           </div>
         )}
 
+        {/* PAGE CONTENT */}
         <section className="flex-1 overflow-y-auto p-5">
           <Outlet />
         </section>

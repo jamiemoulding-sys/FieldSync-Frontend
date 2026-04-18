@@ -141,7 +141,7 @@ function MainDashboard({ user }) {
       
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 px-8 py-7 space-y-5 overflow-auto">
+      <main className="px-8 py-7 space-y-5">
 
         {/* TOPBAR */}
         <div className="flex justify-between items-center">
