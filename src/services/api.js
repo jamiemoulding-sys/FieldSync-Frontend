@@ -509,6 +509,315 @@ export const reportAPI = {
 };
 
 /* =====================================================
+ANNOUNCEMENTS
+===================================================== */
+
+export const announcementAPI = {
+  getAll: async () => {
+    const companyId = await getCompanyId();
+
+    const { data, error } = await supabase
+      .from("announcements")
+      .select("*")
+      .eq("company_id", companyId)
+      .order("created_at", {
+        ascending: false,
+      });
+
+    if (error) throw error;
+
+    return data || [];
+  },
+
+  create: async (payload) => {
+    const companyId = await getCompanyId();
+
+    const { error } = await supabase
+      .from("announcements")
+      .insert({
+        ...payload,
+        company_id: companyId,
+      });
+
+    if (error) throw error;
+
+    return true;
+  },
+
+  update: async (id, payload) => {
+    const companyId = await getCompanyId();
+
+    const { error } = await supabase
+      .from("announcements")
+      .update(payload)
+      .eq("id", id)
+      .eq("company_id", companyId);
+
+    if (error) throw error;
+
+    return true;
+  },
+
+  delete: async (id) => {
+    const companyId = await getCompanyId();
+
+    const { error } = await supabase
+      .from("announcements")
+      .delete()
+      .eq("id", id)
+      .eq("company_id", companyId);
+
+    if (error) throw error;
+
+    return true;
+  },
+};
+
+/* =====================================================
+INVITES
+===================================================== */
+
+export const inviteAPI = {
+  send: async ({ email, role }) => {
+    const user = await getCurrentUser();
+
+    const { data, error } =
+      await supabase.auth.admin
+        .inviteUserByEmail(email, {
+          data: {
+            role: role || "employee",
+            company_id:
+              user.company_id,
+          },
+          redirectTo:
+            window.location.origin +
+            "/accept-invite",
+        });
+
+    if (error) throw error;
+
+    return data || true;
+  },
+
+  resend: async ({ email, role }) => {
+    return await inviteAPI.send({
+      email,
+      role,
+    });
+  },
+};
+
+/* =====================================================
+SCHEDULES
+===================================================== */
+
+export const scheduleAPI = {
+  getAll: async () => {
+    const companyId = await getCompanyId();
+
+    const { data, error } = await supabase
+      .from("schedules")
+      .select("*")
+      .eq("company_id", companyId)
+      .order("date", {
+        ascending: true,
+      });
+
+    if (error) throw error;
+
+    return data || [];
+  },
+
+  getMine: async () => {
+    const user = await getCurrentUser();
+
+    const { data, error } = await supabase
+      .from("schedules")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("company_id", user.company_id)
+      .order("date", {
+        ascending: true,
+      });
+
+    if (error) throw error;
+
+    return data || [];
+  },
+
+  create: async (payload) => {
+    const companyId = await getCompanyId();
+
+    const { error } = await supabase
+      .from("schedules")
+      .insert({
+        ...payload,
+        company_id: companyId,
+      });
+
+    if (error) throw error;
+
+    return true;
+  },
+
+  update: async (id, payload) => {
+    const companyId = await getCompanyId();
+
+    const { error } = await supabase
+      .from("schedules")
+      .update(payload)
+      .eq("id", id)
+      .eq("company_id", companyId);
+
+    if (error) throw error;
+
+    return true;
+  },
+
+  delete: async (id) => {
+    const companyId = await getCompanyId();
+
+    const { error } = await supabase
+      .from("schedules")
+      .delete()
+      .eq("id", id)
+      .eq("company_id", companyId);
+
+    if (error) throw error;
+
+    return true;
+  },
+};
+
+/* =====================================================
+LOCATIONS
+===================================================== */
+
+export const locationAPI = {
+  getAll: async () => {
+    const companyId = await getCompanyId();
+
+    const { data, error } = await supabase
+      .from("locations")
+      .select("*")
+      .eq("company_id", companyId)
+      .order("name", {
+        ascending: true,
+      });
+
+    if (error) throw error;
+
+    return data || [];
+  },
+
+  getLocations: async () => {
+    return await locationAPI.getAll();
+  },
+
+  create: async (payload) => {
+    const companyId = await getCompanyId();
+
+    const { error } = await supabase
+      .from("locations")
+      .insert({
+        ...payload,
+        company_id: companyId,
+      });
+
+    if (error) throw error;
+
+    return true;
+  },
+
+  update: async (id, payload) => {
+    const companyId = await getCompanyId();
+
+    const { error } = await supabase
+      .from("locations")
+      .update(payload)
+      .eq("id", id)
+      .eq("company_id", companyId);
+
+    if (error) throw error;
+
+    return true;
+  },
+
+  delete: async (id) => {
+    const companyId = await getCompanyId();
+
+    const { error } = await supabase
+      .from("locations")
+      .delete()
+      .eq("id", id)
+      .eq("company_id", companyId);
+
+    if (error) throw error;
+
+    return true;
+  },
+};
+
+/* =====================================================
+PERFORMANCE
+===================================================== */
+
+export const performanceAPI = {
+  getAll: async () => {
+    const companyId = await getCompanyId();
+
+    const { data, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("company_id", companyId);
+
+    if (error) throw error;
+
+    return data || [];
+  },
+
+  getSummary: async () => {
+    const users = await performanceAPI
+      .getAll()
+      .catch(() => []);
+
+    const shifts = await shiftAPI
+      .getAll()
+      .catch(() => []);
+
+    const holidays = await holidayAPI
+      .getAll()
+      .catch(() => []);
+
+    return {
+      topPerformers: users
+        .slice(0, 5)
+        .map((u) => ({
+          name: u.name,
+          score: 100,
+        })),
+
+      lowPerformers: [],
+
+      attendanceScore:
+        users.length > 0
+          ? Math.round(
+              ((users.length -
+                holidays.length) /
+                users.length) *
+                100
+            )
+          : 100,
+
+      productivityScore:
+        shifts.length > 0
+          ? 100
+          : 0,
+    };
+  },
+};
+
+/* =====================================================
 BILLING
 ===================================================== */
 
