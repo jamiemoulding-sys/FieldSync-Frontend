@@ -1,6 +1,6 @@
 // src/hooks/useAuth.js
 // FINAL MERGED VERSION
-// keeps EVERYTHING + merges trial fixes
+// keeps EVERYTHING + adds plan protection
 // ✅ no removals
 // ✅ reports unlock during trial
 // ✅ billing works
@@ -8,6 +8,7 @@
 // ✅ session restore
 // ✅ refresh on focus
 // ✅ premium access helper
+// ✅ starter / pro / business helpers
 
 import {
   useState,
@@ -100,11 +101,11 @@ async function loadProfile() {
   =============================== */
 
   const trialEnd =
-  company?.trial_ends_at ||
-  company?.trial_end ||
-  row?.trial_ends_at ||
-  row?.trial_end ||
-  null;
+    company?.trial_ends_at ||
+    company?.trial_end ||
+    row?.trial_ends_at ||
+    row?.trial_end ||
+    null;
 
   const trialActive =
     !!trialEnd &&
@@ -122,12 +123,18 @@ async function loadProfile() {
   const hasPremiumAccess =
     paid || trialActive;
 
+  const currentPlan =
+    company?.current_plan ||
+    row?.current_plan ||
+    "starter";
+
   /* ===============================
      FINAL USER OBJECT
   =============================== */
 
   setUser({
     id: authUser.id,
+
     email:
       authUser.email,
 
@@ -160,6 +167,9 @@ async function loadProfile() {
       trialEnd,
 
     trialActive,
+
+    /* plan */
+    currentPlan,
 
     /* access */
     hasPremiumAccess,
@@ -352,6 +362,23 @@ export function useAuth() {
 
     hasPremiumAccess:
       user?.hasPremiumAccess,
+
+    /* NEW PLAN HELPERS */
+    plan:
+      user?.currentPlan ||
+      "starter",
+
+    isStarter:
+      user?.currentPlan ===
+      "starter",
+
+    isProPlan:
+      user?.currentPlan ===
+      "pro",
+
+    isBusiness:
+      user?.currentPlan ===
+      "business",
   };
 }
 

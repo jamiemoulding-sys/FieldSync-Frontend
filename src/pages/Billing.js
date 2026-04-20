@@ -1,10 +1,17 @@
 // src/pages/Billing.js
-// FULL FIXED VERSION
-// ✅ 14 day trial unlocks ALL premium features
-// ✅ Proper trial countdown
-// ✅ Better status handling
-// ✅ No fake lockouts during trial
-// ✅ Production safe
+// TRUE MERGED FINAL VERSION
+// ✅ Original logic preserved
+// ✅ Stripe checkout preserved
+// ✅ Portal preserved
+// ✅ Trial countdown preserved
+// ✅ Current plan logic preserved
+// ✅ Cancelled handling preserved
+// ✅ New founders pricing banner
+// ✅ Extra staff pricing added
+// ✅ ROI / money saved section
+// ✅ Stronger SaaS conversion copy
+// ✅ Premium upgraded UI
+// ✅ Copy / paste ready
 
 import {
   useEffect,
@@ -29,6 +36,12 @@ import {
   Loader2,
   AlertCircle,
   Clock3,
+  ArrowUpRight,
+  TrendingUp,
+  PoundSterling,
+  Timer,
+  MapPin,
+  Briefcase,
 } from "lucide-react";
 
 export default function Billing() {
@@ -130,13 +143,15 @@ export default function Billing() {
       badge: "Small Teams",
       icon: <Users size={18} />,
       featured: false,
-      staff: "Up to 5 staff",
+      staff: "5 staff included",
+      extra: "+ £7 per extra staff",
       features: [
         "Scheduling",
-        "Clock in/out",
+        "Clock in / out",
         "Holiday requests",
         "Reports",
         "Timesheets",
+        "Notifications",
       ],
     },
     {
@@ -146,12 +161,15 @@ export default function Billing() {
       badge: "Most Popular",
       icon: <Crown size={18} />,
       featured: true,
-      staff: "Up to 15 staff",
+      staff: "15 staff included",
+      extra: "+ £8 per extra staff",
       features: [
         "Everything in Starter",
         "Advanced reports",
-        "Timesheets",
+        "Premium scheduling",
         "Priority support",
+        "Team analytics",
+        "Auto reminders",
       ],
     },
     {
@@ -163,12 +181,15 @@ export default function Billing() {
         <Building2 size={18} />
       ),
       featured: false,
-      staff: "Up to 30 staff",
+      staff: "30 staff included",
+      extra: "+ £10 per extra staff",
       features: [
         "Everything in Pro",
         "Multi-site tools",
         "Dedicated support",
         "Enterprise tools",
+        "Custom workflows",
+        "Priority onboarding",
       ],
     },
   ];
@@ -193,14 +214,10 @@ export default function Billing() {
     new Date(trialEnd) >
       new Date();
 
-  // THIS IS THE IMPORTANT FIX
   const hasPremiumAccess =
     currentStatus ===
       "active" ||
     trialActive;
-
-  const active =
-    hasPremiumAccess;
 
   const trialDaysLeft =
     trialActive
@@ -215,7 +232,7 @@ export default function Billing() {
 
   const headerText = useMemo(() => {
     if (trialActive) {
-      return `14 DAY TRIAL ACTIVE • ${trialDaysLeft} DAYS LEFT • ALL FEATURES UNLOCKED`;
+      return `14 DAY TRIAL ACTIVE • ${trialDaysLeft} DAYS LEFT`;
     }
 
     if (
@@ -224,6 +241,13 @@ export default function Billing() {
       currentPlan
     ) {
       return `${currentPlan.toUpperCase()} ACTIVE`;
+    }
+
+    if (
+      currentStatus ===
+      "canceled"
+    ) {
+      return "Subscription Cancelled";
     }
 
     return "No Active Plan";
@@ -262,9 +286,9 @@ export default function Billing() {
           </h1>
 
           <p className="text-gray-400 mt-4 max-w-2xl mx-auto">
-            Manage plans,
-            invoices and
-            premium access.
+            Affordable workforce
+            management built for
+            growing companies.
           </p>
 
           <div className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-green-500/10 text-green-400 font-medium flex-wrap justify-center">
@@ -275,13 +299,26 @@ export default function Billing() {
           {trialActive && (
             <div className="mt-4 text-sm text-indigo-300 flex justify-center items-center gap-2">
               <Clock3 size={14} />
-              Trial users can use
-              Reports,
-              Timesheets,
-              Premium Scheduling,
-              All Tools.
+              Full premium access
+              during trial.
             </div>
           )}
+
+          {trialActive &&
+            trialDaysLeft <= 3 && (
+              <div className="mt-4 text-sm text-yellow-300">
+                Trial ending soon —
+                upgrade now to keep
+                access.
+              </div>
+            )}
+
+          <div className="mt-6 rounded-2xl bg-yellow-500/10 border border-yellow-500/20 px-4 py-3 text-yellow-300 text-sm">
+            First 6 months signups
+            lock in these prices for
+            life while subscription
+            remains active.
+          </div>
 
           <div className="mt-6 flex justify-center gap-3 flex-wrap">
 
@@ -312,7 +349,7 @@ export default function Billing() {
                   className="animate-spin"
                 />
               ) : (
-                <CreditCard
+                <ArrowUpRight
                   size={16}
                 />
               )}
@@ -329,35 +366,39 @@ export default function Billing() {
         <Alert text={error} />
       )}
 
-      {/* FEATURES */}
-      <div className="grid md:grid-cols-3 gap-4">
+      {/* WHY CHOOSE */}
+      <div className="grid md:grid-cols-4 gap-4">
 
         <Feature
           icon={
-            <BarChart3
-              size={18}
-            />
+            <Timer size={18} />
           }
-          title="Reports"
-          text="Unlocked during trial."
+          title="Save Admin Time"
+          text="Reduce rota, payroll and chasing staff admin every week."
         />
 
         <Feature
           icon={
-            <Zap size={18} />
+            <PoundSterling size={18} />
           }
-          title="Automation"
-          text="Unlocked during trial."
+          title="Reduce Lost Money"
+          text="Less lateness, missed shifts and no-shows."
         />
 
         <Feature
           icon={
-            <Shield
-              size={18}
-            />
+            <MapPin size={18} />
           }
-          title="Premium Tools"
-          text="Unlocked during trial."
+          title="Easy Locations"
+          text="Add job sites fast with map links for staff."
+        />
+
+        <Feature
+          icon={
+            <TrendingUp size={18} />
+          }
+          title="Grow Faster"
+          text="Automated systems let you scale easier."
         />
 
       </div>
@@ -385,7 +426,7 @@ export default function Billing() {
               }`}
             >
 
-              <div className="rounded-3xl border border-white/10 bg-[#020617] p-6">
+              <div className="rounded-3xl border border-white/10 bg-[#020617] p-6 h-full">
 
                 <div className="flex items-center gap-2 text-indigo-400 text-sm">
                   {plan.icon}
@@ -406,6 +447,10 @@ export default function Billing() {
 
                 <p className="text-green-400 text-sm mt-2">
                   {plan.staff}
+                </p>
+
+                <p className="text-xs text-gray-500 mt-1">
+                  {plan.extra}
                 </p>
 
                 <div className="mt-5 space-y-2">
@@ -494,6 +539,35 @@ export default function Billing() {
 
       </div>
 
+      {/* ROI SECTION */}
+      <div className="grid md:grid-cols-3 gap-4">
+
+        <ROI
+          icon={
+            <Briefcase size={18} />
+          }
+          title="Save 10+ Admin Hours"
+          text="Managers save time weekly using auto schedules & tracking."
+        />
+
+        <ROI
+          icon={
+            <Clock3 size={18} />
+          }
+          title="Reduce Late Starts"
+          text="Staff see live schedules and locations instantly."
+        />
+
+        <ROI
+          icon={
+            <BarChart3 size={18} />
+          }
+          title="Better Decisions"
+          text="Reports show labour usage, attendance and trends."
+        />
+
+      </div>
+
     </div>
   );
 }
@@ -508,6 +582,28 @@ function Feature({
   return (
     <div className="rounded-2xl border border-white/10 bg-[#020617] p-5">
       <div className="text-indigo-400">
+        {icon}
+      </div>
+
+      <h3 className="font-medium mt-3">
+        {title}
+      </h3>
+
+      <p className="text-sm text-gray-400 mt-2">
+        {text}
+      </p>
+    </div>
+  );
+}
+
+function ROI({
+  icon,
+  title,
+  text,
+}) {
+  return (
+    <div className="rounded-2xl border border-green-500/20 bg-green-500/5 p-5">
+      <div className="text-green-400">
         {icon}
       </div>
 
@@ -545,6 +641,7 @@ function Center({
           className="animate-spin"
         />
       )}
+
       {text}
     </div>
   );

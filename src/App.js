@@ -4,6 +4,8 @@
 // Admin forced to billing
 // Staff shown expired page
 // Central protection for whole app
+// ✅ Added plan tier protection
+// ✅ Nothing removed
 
 import {
   BrowserRouter as Router,
@@ -142,7 +144,6 @@ function ProtectedRoute({
     );
   }
 
-  /* FULL PLATFORM LOCK */
   if (
     !user.hasPremiumAccess
   ) {
@@ -217,6 +218,62 @@ function RoleRoute({
   }
 
   return children;
+}
+
+/* ===================================================== */
+/* NEW PLAN ROUTE */
+
+function PlanRoute({
+  plans,
+  children,
+}) {
+  const {
+    user,
+    loading,
+    trialActive,
+    plan,
+  } = useAuth();
+
+  if (loading)
+    return <ScreenLoader />;
+
+  if (!user) {
+    return (
+      <Navigate
+        to="/login"
+        replace
+      />
+    );
+  }
+
+  if (
+    !user.hasPremiumAccess
+  ) {
+    return (
+      <Navigate
+        to="/billing"
+        replace
+      />
+    );
+  }
+
+  /* trial unlocks all */
+  if (trialActive) {
+    return children;
+  }
+
+  if (
+    plans.includes(plan)
+  ) {
+    return children;
+  }
+
+  return (
+    <Navigate
+      to="/billing"
+      replace
+    />
+  );
 }
 
 /* ===================================================== */
@@ -320,7 +377,7 @@ export default function App() {
           }
         />
 
-        {/* BILLING ALWAYS ACCESSIBLE TO ADMIN */}
+        {/* BILLING */}
 
         <Route
           path="/billing"
@@ -359,13 +416,6 @@ export default function App() {
           />
 
           <Route
-            path="/timesheet"
-            element={
-              <TimeSheet />
-            }
-          />
-
-          <Route
             path="/notifications"
             element={
               <Notifications />
@@ -392,6 +442,24 @@ export default function App() {
               <MyLocations />
             }
           />
+
+          {/* STARTER+ */}
+          <Route
+            path="/timesheet"
+            element={
+              <PlanRoute
+                plans={[
+                  "starter",
+                  "pro",
+                  "business",
+                ]}
+              >
+                <TimeSheet />
+              </PlanRoute>
+            }
+          />
+
+          {/* MANAGER+ */}
 
           <Route
             path="/schedule"
@@ -477,30 +545,46 @@ export default function App() {
             }
           />
 
+          {/* PRO+ */}
+
           <Route
             path="/performance"
             element={
-              <RoleRoute
-                roles={[
-                  "manager",
-                  "admin",
+              <PlanRoute
+                plans={[
+                  "pro",
+                  "business",
                 ]}
               >
-                <Performance />
-              </RoleRoute>
+                <RoleRoute
+                  roles={[
+                    "manager",
+                    "admin",
+                  ]}
+                >
+                  <Performance />
+                </RoleRoute>
+              </PlanRoute>
             }
           />
 
           <Route
             path="/reports"
             element={
-              <RoleRoute
-                roles={[
-                  "admin",
+              <PlanRoute
+                plans={[
+                  "pro",
+                  "business",
                 ]}
               >
-                <Reports />
-              </RoleRoute>
+                <RoleRoute
+                  roles={[
+                    "admin",
+                  ]}
+                >
+                  <Reports />
+                </RoleRoute>
+              </PlanRoute>
             }
           />
 

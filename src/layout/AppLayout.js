@@ -6,6 +6,9 @@
 // ✅ Mobile menu works
 // ✅ Premium dark UI
 // ✅ Keeps Outlet routing
+// ✅ Added plan visibility locks
+// ✅ Trial shows all pages
+// ✅ Upgrade prompts
 
 import {
   useMemo,
@@ -41,15 +44,21 @@ import {
   Menu,
   X,
   ChevronRight,
-  Check,
   Loader2,
+  Crown,
+  Lock,
 } from "lucide-react";
 
 export default function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const { user, logout } = useAuth();
+  const {
+    user,
+    logout,
+    plan,
+    trialActive,
+  } = useAuth();
 
   const [mobileOpen, setMobileOpen] =
     useState(false);
@@ -70,6 +79,25 @@ export default function AppLayout() {
 
   const company =
     user?.companyName || "FieldSync";
+
+  /* ===================================== */
+  /* PLAN ACCESS */
+  /* ===================================== */
+
+  function canUse(required) {
+    if (trialActive) return true;
+
+    const levels = {
+      starter: 1,
+      pro: 2,
+      business: 3,
+    };
+
+    return (
+      levels[plan || "starter"] >=
+      levels[required]
+    );
+  }
 
   /* ===================================== */
   /* LOAD NOTIFICATIONS */
@@ -220,6 +248,7 @@ export default function AppLayout() {
       label: "Timesheet",
       icon: ClipboardList,
       path: "/timesheet",
+      plan: "starter",
     },
     {
       label: "Profile",
@@ -234,6 +263,7 @@ export default function AppLayout() {
       label: "Reports",
       icon: BarChart3,
       path: "/reports",
+      plan: "pro",
     },
     {
       label: "Billing",
@@ -242,7 +272,7 @@ export default function AppLayout() {
     },
   ];
 
-  const menu = useMemo(() => {
+  let menu = useMemo(() => {
     if (role === "admin")
       return adminMenu;
 
@@ -251,6 +281,11 @@ export default function AppLayout() {
 
     return employeeMenu;
   }, [role]);
+
+  menu = menu.filter((item) => {
+    if (!item.plan) return true;
+    return canUse(item.plan);
+  });
 
   const pageTitle =
     menu.find(
@@ -264,101 +299,132 @@ export default function AppLayout() {
   }
 
   /* ===================================== */
-/* SIDEBAR */
-/* ===================================== */
+  /* SIDEBAR */
+  /* ===================================== */
 
-function Sidebar() {
-  return (
-    <div className="h-full flex flex-col justify-between bg-[#020617]">
+  function Sidebar() {
+    return (
+      <div className="h-full flex flex-col justify-between bg-[#020617]">
 
-      {/* TOP */}
-      <div>
+        <div>
+          {/* LOGO */}
+          <div className="p-6 border-b border-white/5">
+            <div className="flex items-center gap-4">
 
-        {/* LOGO */}
-        <div className="p-6 border-b border-white/5">
-          <div className="flex items-center gap-4">
+              <img
+                src="/fieldsync-logo.png"
+                alt="FieldSync"
+                className="h-14 w-auto object-contain"
+              />
 
-            {/* YOUR LOGO */}
-            <img
-              src="/fieldsync-logo.png"
-              alt="FieldSync"
-              className="h-14 w-auto object-contain"
-            />
+              <div className="min-w-0">
+                <h1 className="font-bold text-lg text-white leading-tight truncate">
+                  {company}
+                </h1>
 
-            {/* TEXT */}
-            <div className="min-w-0">
-              <h1 className="font-bold text-lg text-white leading-tight truncate">
-                {company}
-              </h1>
+                <p className="text-xs text-gray-400 capitalize mt-1">
+                  {role} portal
+                </p>
+              </div>
 
-              <p className="text-xs text-gray-400 capitalize mt-1">
-                {role} portal
-              </p>
             </div>
+          </div>
 
+          {/* PLAN BAR */}
+          <div className="px-4 pt-4">
+            <div className="rounded-2xl bg-indigo-600/10 border border-indigo-500/20 p-4">
+              <div className="flex items-center gap-2 text-indigo-300 text-sm">
+                <Crown size={15} />
+                {trialActive
+                  ? "Trial Active"
+                  : `${plan} plan`}
+              </div>
+
+              {!trialActive &&
+                plan ===
+                  "starter" && (
+                  <button
+                    onClick={() =>
+                      go(
+                        "/billing"
+                      )
+                    }
+                    className="mt-3 text-xs text-white bg-indigo-600 px-3 py-2 rounded-xl"
+                  >
+                    Upgrade
+                  </button>
+                )}
+            </div>
+          </div>
+
+          {/* NAV */}
+          <div className="p-4 space-y-2">
+            {menu.map((item) => {
+              const Icon = item.icon;
+
+              const active =
+                location.pathname ===
+                item.path;
+
+              return (
+                <button
+                  key={item.path}
+                  onClick={() =>
+                    go(item.path)
+                  }
+                  className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl transition ${
+                    active
+                      ? "bg-indigo-600 text-white"
+                      : "text-gray-400 hover:bg-white/5 hover:text-white"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon size={18} />
+                    <span>
+                      {item.label}
+                    </span>
+                  </div>
+
+                  {active ? (
+                    <ChevronRight size={16} />
+                  ) : (
+                    item.plan &&
+                    !trialActive && (
+                      <Lock
+                        size={14}
+                      />
+                    )
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* NAV */}
-        <div className="p-4 space-y-2">
-          {menu.map((item) => {
-            const Icon = item.icon;
+        {/* BOTTOM */}
+        <div className="p-4 border-t border-white/5">
 
-            const active =
-              location.pathname === item.path;
+          <div className="rounded-2xl bg-white/5 p-4 mb-4">
+            <p className="font-medium text-sm">
+              {user?.name || "User"}
+            </p>
 
-            return (
-              <button
-                key={item.path}
-                onClick={() =>
-                  go(item.path)
-                }
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl transition ${
-                  active
-                    ? "bg-indigo-600 text-white"
-                    : "text-gray-400 hover:bg-white/5 hover:text-white"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Icon size={18} />
-                  <span>{item.label}</span>
-                </div>
+            <p className="text-xs text-gray-400 mt-1 capitalize">
+              {role}
+            </p>
+          </div>
 
-                {active && (
-                  <ChevronRight size={16} />
-                )}
-              </button>
-            );
-          })}
+          <button
+            onClick={logout}
+            className="w-full py-3 rounded-2xl bg-red-500/20 hover:bg-red-500/30 text-red-300"
+          >
+            Sign Out
+          </button>
+
         </div>
-
       </div>
-
-      {/* BOTTOM */}
-      <div className="p-4 border-t border-white/5">
-
-        <div className="rounded-2xl bg-white/5 p-4 mb-4">
-          <p className="font-medium text-sm">
-            {user?.name || "User"}
-          </p>
-
-          <p className="text-xs text-gray-400 mt-1 capitalize">
-            {role}
-          </p>
-        </div>
-
-        <button
-          onClick={logout}
-          className="w-full py-3 rounded-2xl bg-red-500/20 hover:bg-red-500/30 text-red-300"
-        >
-          Sign Out
-        </button>
-
-      </div>
-
-    </div>
-  );
-}
+    );
+  }
 
   /* ===================================== */
   /* MAIN */
@@ -367,7 +433,7 @@ function Sidebar() {
   return (
     <div className="h-screen bg-[#020617] text-white flex">
 
-      {/* DESKTOP SIDEBAR */}
+      {/* DESKTOP */}
       <aside className="hidden lg:block w-80 border-r border-white/5 bg-[#030712]">
         <Sidebar />
       </aside>
@@ -462,7 +528,6 @@ function Sidebar() {
                     </div>
                   ) : (
                     <div className="max-h-[420px] overflow-y-auto">
-
                       {notifications.map(
                         (item) => (
                           <button
@@ -475,16 +540,19 @@ function Sidebar() {
                             className="w-full text-left p-4 border-b border-white/5 hover:bg-white/5"
                           >
                             <p className="text-sm font-medium">
-                              {item.title}
+                              {
+                                item.title
+                              }
                             </p>
 
                             <p className="text-xs text-gray-400 mt-1">
-                              {item.message}
+                              {
+                                item.message
+                              }
                             </p>
                           </button>
                         )
                       )}
-
                     </div>
                   )}
 
@@ -512,7 +580,7 @@ function Sidebar() {
 
         </header>
 
-        {/* MOBILE SIDEBAR */}
+        {/* MOBILE */}
         {mobileOpen && (
           <div className="lg:hidden fixed inset-0 z-50 bg-black/70">
 
@@ -536,7 +604,7 @@ function Sidebar() {
           </div>
         )}
 
-        {/* PAGE CONTENT */}
+        {/* PAGE */}
         <section className="flex-1 overflow-y-auto p-5">
           <Outlet />
         </section>

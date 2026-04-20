@@ -839,6 +839,40 @@ export const billingAPI = {
     return res.data;
   },
 
+  setPlan: async (plan) => {
+  const companyId = await getCompanyId();
+
+  const { error } = await supabase
+    .from("companies")
+    .update({
+      current_plan: plan,
+      subscription_status: "active",
+      is_pro: true,
+    })
+    .eq("id", companyId);
+
+  if (error) throw error;
+
+  return true;
+},
+
+cancel: async () => {
+  const companyId = await getCompanyId();
+
+  const { error } = await supabase
+    .from("companies")
+    .update({
+      subscription_status: "inactive",
+      is_pro: false,
+    })
+    .eq("id", companyId);
+
+  if (error) throw error;
+
+  if (error) throw error;
+  return true;
+},
+
   getStatus: async () => {
     const companyId = await getCompanyId();
 
@@ -851,15 +885,32 @@ export const billingAPI = {
     if (error) throw error;
 
     return {
-      plan: data?.current_plan,
-      status:
-        data?.subscription_status,
-      trial_ends_at:
-        data?.trial_ends_at,
-      trial_end:
-        data?.trial_end,
-      is_pro: data?.is_pro,
-    };
+  plan: data?.current_plan || "starter",
+  status: data?.subscription_status || "inactive",
+  trial_ends_at: data?.trial_ends_at,
+  trial_end: data?.trial_end,
+  is_pro: data?.is_pro,
+
+  canUseReports: ["pro", "business"].includes(
+    data?.current_plan
+  ),
+
+  canUsePerformance: ["business"].includes(
+    data?.current_plan
+  ),
+
+  canUseAdvancedScheduling: [
+    "pro",
+    "business",
+  ].includes(data?.current_plan),
+
+  maxEmployees:
+    data?.current_plan === "starter"
+      ? 5
+      : data?.current_plan === "pro"
+      ? 15
+      : 30,
+};
   },
 };
 
