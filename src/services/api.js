@@ -187,7 +187,7 @@ export const userAPI = {
 };
 
 /* =====================================================
-TASKS
+TASKS (ENTERPRISE UPGRADE)
 ===================================================== */
 
 export const taskAPI = {
@@ -196,29 +196,39 @@ export const taskAPI = {
 
     const { data, error } = await supabase
       .from("tasks")
-      .select("*")
+      .select(`
+        *,
+        assigned_user:users(name),
+        location:locations(name),
+        completions:task_completions(
+          id,
+          user_id,
+          completed_at,
+          users(name)
+        )
+      `)
       .eq("company_id", companyId)
-      .order("created_at", {
-        ascending: false,
-      });
+      .order("created_at", { ascending: false });
 
     if (error) throw error;
-
     return data || [];
   },
 
   create: async (payload) => {
     const companyId = await getCompanyId();
+    const user = await getCurrentUser();
 
     const { error } = await supabase
       .from("tasks")
       .insert({
         ...payload,
         company_id: companyId,
+        created_by: user.id,
+        status: payload.status || "todo",
+        completed: false,
       });
 
     if (error) throw error;
-
     return true;
   },
 
@@ -232,7 +242,6 @@ export const taskAPI = {
       .eq("company_id", companyId);
 
     if (error) throw error;
-
     return true;
   },
 
@@ -246,8 +255,75 @@ export const taskAPI = {
       .eq("company_id", companyId);
 
     if (error) throw error;
+    return true;
+  },
+
+  /* =========================
+     CLAIM TASK (open tasks)
+  ========================= */
+
+  claimTask: async (taskId) => {
+    const user = await getCurrentUser();
+
+    const { error } = await supabase
+      .from("tasks")
+      .update({
+        assigned_to: user.id,
+        status: "progress",
+      })
+      .eq("id", taskId);
+
+    if (error) throw error;
+    return true;
+  },
+
+  /* =========================
+     COMPLETE TASK (AUDIT SAFE)
+  ========================= */
+
+  completeTask: async (taskId) => {
+    const user = await getCurrentUser();
+
+    // 1. mark task done
+    const { error: updateError } = await supabase
+      .from("tasks")
+      .update({
+        status: "done",
+        completed: true,
+      })
+      .eq("id", taskId);
+
+    if (updateError) throw updateError;
+
+    // 2. log completion (this is key)
+    const { error: logError } = await supabase
+      .from("task_completions")
+      .insert({
+        task_id: taskId,
+        user_id: user.id,
+        completed_at: new Date().toISOString(),
+      });
+
+    if (logError) throw logError;
 
     return true;
+  },
+
+  /* =========================
+     GET MY TASKS
+  ========================= */
+
+  getMine: async () => {
+    const user = await getCurrentUser();
+
+    const { data, error } = await supabase
+      .from("tasks")
+      .select("*")
+      .or(`assigned_to.eq.${user.id},assigned_to.is.null`)
+      .eq("company_id", user.company_id);
+
+    if (error) throw error;
+    return data || [];
   },
 };
 
