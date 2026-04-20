@@ -1,6 +1,6 @@
 // src/pages/Tasks.jsx
-// TASKS V2 FULL ENTERPRISE VERSION
-// Route Planning + Claim Task + Multi Staff + Complete Logs
+// TASKS V3 PREMIUM VERSION
+// Multi Staff + Multi Route Stops + Claim + Complete + Better Dropdowns
 
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -8,16 +8,18 @@ import {
   userAPI,
   locationAPI,
 } from "../services/api";
+
 import { useAuth } from "../hooks/useAuth";
 
 import {
   Plus,
-  Loader2,
   Search,
+  Loader2,
+  X,
   CheckCircle2,
+  Trash2,
   MapPin,
   User,
-  X,
 } from "lucide-react";
 
 export default function Tasks() {
@@ -49,8 +51,6 @@ export default function Tasks() {
     description: "",
     assigned_users: [],
     route_locations: [],
-    due_date: "",
-    priority: "normal",
   });
 
   useEffect(() => {
@@ -74,6 +74,8 @@ export default function Tasks() {
       setTasks(taskRows || []);
       setUsers(userRows || []);
       setLocations(locationRows || []);
+    } catch (err) {
+      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -81,6 +83,8 @@ export default function Tasks() {
 
   async function createTask(e) {
     e.preventDefault();
+
+    if (!form.title.trim()) return;
 
     try {
       setSaving(true);
@@ -93,16 +97,23 @@ export default function Tasks() {
           form.assigned_users,
         route_locations:
           form.route_locations,
-        due_date:
-          form.due_date || null,
-        priority:
-          form.priority,
         status: "todo",
         completed: false,
       });
 
       setShowModal(false);
+
+      setForm({
+        title: "",
+        description: "",
+        assigned_users: [],
+        route_locations: [],
+      });
+
       loadData();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to create");
     } finally {
       setSaving(false);
     }
@@ -111,8 +122,6 @@ export default function Tasks() {
   async function claimTask(task) {
     await taskAPI.update(task.id, {
       claimed_by: user.id,
-      claimed_at:
-        new Date().toISOString(),
       status: "progress",
     });
 
@@ -124,19 +133,56 @@ export default function Tasks() {
       completed: true,
       status: "done",
       completed_by: user.id,
-      completed_at:
-        new Date().toISOString(),
     });
 
     loadData();
   }
 
   async function deleteTask(id) {
-    if (!window.confirm("Delete task?"))
+    if (!window.confirm("Delete?"))
       return;
 
     await taskAPI.delete(id);
     loadData();
+  }
+
+  function toggleUser(id) {
+    const exists =
+      form.assigned_users.includes(id);
+
+    setForm({
+      ...form,
+      assigned_users: exists
+        ? form.assigned_users.filter(
+            (x) => x !== id
+          )
+        : [
+            ...form.assigned_users,
+            id,
+          ],
+    });
+  }
+
+  function addStop(id) {
+    if (!id) return;
+
+    setForm({
+      ...form,
+      route_locations: [
+        ...form.route_locations,
+        id,
+      ],
+    });
+  }
+
+  function removeStop(id) {
+    setForm({
+      ...form,
+      route_locations:
+        form.route_locations.filter(
+          (x, i) => i !== id
+        ),
+    });
   }
 
   const filtered = useMemo(() => {
@@ -152,7 +198,7 @@ export default function Tasks() {
 
   if (loading) {
     return (
-      <div className="text-gray-400 flex gap-2">
+      <div className="flex gap-2 text-gray-400">
         <Loader2
           size={16}
           className="animate-spin"
@@ -165,14 +211,16 @@ export default function Tasks() {
   return (
     <div className="space-y-6">
 
+      {/* HEADER */}
       <div className="flex justify-between items-center">
 
         <div>
           <h1 className="text-2xl font-semibold">
             Tasks
           </h1>
+
           <p className="text-sm text-gray-400">
-            Jobs / Routes / Tasks
+            Route Jobs / Work Orders
           </p>
         </div>
 
@@ -181,22 +229,25 @@ export default function Tasks() {
             onClick={() =>
               setShowModal(true)
             }
-            className="px-4 py-2 rounded-xl bg-indigo-600"
+            className="px-4 py-2 rounded-xl bg-indigo-600 flex gap-2 items-center"
           >
             <Plus size={16} />
+            New Task
           </button>
         )}
       </div>
 
+      {/* SEARCH */}
       <input
-        placeholder="Search..."
         value={search}
         onChange={(e) =>
           setSearch(e.target.value)
         }
+        placeholder="Search..."
         className="w-full px-4 py-3 rounded-xl bg-[#020617] border border-white/10"
       />
 
+      {/* TASK LIST */}
       <div className="grid gap-4">
 
         {filtered.map((task) => (
@@ -217,31 +268,53 @@ export default function Tasks() {
                 </p>
               </div>
 
-              {task.completed ? (
+              {task.completed && (
                 <CheckCircle2 className="text-green-500" />
-              ) : null}
+              )}
+
             </div>
 
-            {/* Assigned */}
+            {/* STAFF */}
             <div className="text-xs text-gray-400">
-              {task.assigned_users?.length
-                ? `Assigned: ${task.assigned_users.length}`
+              {task.assigned_users
+                ?.length
+                ? `Assigned Staff: ${task.assigned_users.length}`
                 : "Open Task"}
             </div>
 
-            {/* Route */}
+            {/* ROUTE */}
             {task.route_locations
               ?.length > 0 && (
-              <div className="text-xs text-indigo-300">
-                Route Stops:{" "}
-                {
-                  task.route_locations
-                    .length
-                }
+              <div className="space-y-1">
+                {task.route_locations.map(
+                  (stop, i) => {
+                    const loc =
+                      locations.find(
+                        (x) =>
+                          String(
+                            x.id
+                          ) ===
+                          String(
+                            stop
+                          )
+                      );
+
+                    return (
+                      <div
+                        key={i}
+                        className="text-xs text-indigo-300"
+                      >
+                        {i + 1}.{" "}
+                        {loc?.name ||
+                          "Location"}
+                      </div>
+                    );
+                  }
+                )}
               </div>
             )}
 
-            {/* Actions */}
+            {/* ACTIONS */}
             <div className="flex gap-2 flex-wrap">
 
               {!task.claimed_by &&
@@ -279,8 +352,9 @@ export default function Tasks() {
                       task.id
                     )
                   }
-                  className="px-3 py-2 rounded-lg bg-red-600 text-sm"
+                  className="px-3 py-2 rounded-lg bg-red-600 text-sm flex gap-1 items-center"
                 >
+                  <Trash2 size={12} />
                   Delete
                 </button>
               )}
@@ -300,7 +374,7 @@ export default function Tasks() {
 
             <div className="flex justify-between">
               <h2 className="text-lg font-semibold">
-                New Task
+                Create Task
               </h2>
 
               <button
@@ -320,7 +394,7 @@ export default function Tasks() {
               <input
                 required
                 placeholder="Title"
-                className="w-full px-4 py-3 rounded-xl bg-white/5"
+                value={form.title}
                 onChange={(e) =>
                   setForm({
                     ...form,
@@ -328,11 +402,14 @@ export default function Tasks() {
                       e.target.value,
                   })
                 }
+                className="w-full px-4 py-3 rounded-xl bg-white/5"
               />
 
               <textarea
                 placeholder="Description"
-                className="w-full px-4 py-3 rounded-xl bg-white/5"
+                value={
+                  form.description
+                }
                 onChange={(e) =>
                   setForm({
                     ...form,
@@ -340,68 +417,117 @@ export default function Tasks() {
                       e.target.value,
                   })
                 }
+                className="w-full px-4 py-3 rounded-xl bg-white/5"
               />
 
-              <select
-                className="w-full px-4 py-3 rounded-xl bg-white/5"
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    assigned_users:
+              {/* STAFF */}
+              <div>
+                <p className="text-sm mb-2">
+                  Assign Staff
+                </p>
+
+                <div className="grid gap-2 max-h-40 overflow-y-auto">
+
+                  {users.map((u) => (
+                    <button
+                      type="button"
+                      key={u.id}
+                      onClick={() =>
+                        toggleUser(
+                          u.id
+                        )
+                      }
+                      className={`px-3 py-2 rounded-lg text-left ${
+                        form.assigned_users.includes(
+                          u.id
+                        )
+                          ? "bg-indigo-600"
+                          : "bg-white/5"
+                      }`}
+                    >
+                      {u.name ||
+                        u.email}
+                    </button>
+                  ))}
+
+                </div>
+              </div>
+
+              {/* ROUTES */}
+              <div>
+                <p className="text-sm mb-2">
+                  Add Route Stops
+                </p>
+
+                <select
+                  onChange={(e) =>
+                    addStop(
                       e.target.value
-                        ? [
-                            e.target
-                              .value,
-                          ]
-                        : [],
-                  })
-                }
-              >
-                <option value="">
-                  Open Task
-                </option>
-
-                {users.map((u) => (
-                  <option
-                    key={u.id}
-                    value={u.id}
-                  >
-                    {u.name}
+                    )
+                  }
+                  className="w-full px-4 py-3 rounded-xl bg-white/5"
+                >
+                  <option value="">
+                    Select location
                   </option>
-                ))}
-              </select>
 
-              <select
-                className="w-full px-4 py-3 rounded-xl bg-white/5"
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    route_locations:
-                      e.target.value
-                        ? [
-                            {
-                              id:
-                                e.target
-                                  .value,
-                            },
-                          ]
-                        : [],
-                  })
-                }
-              >
-                <option value="">
-                  No Route
-                </option>
+                  {locations.map((l) => (
+                    <option
+                      key={l.id}
+                      value={l.id}
+                    >
+                      {l.name ||
+                        `Location ${l.id}`}
+                    </option>
+                  ))}
+                </select>
 
-                {locations.map((l) => (
-                  <option
-                    key={l.id}
-                    value={l.id}
-                  >
-                    {l.name}
-                  </option>
-                ))}
-              </select>
+                <div className="mt-3 space-y-2">
+
+                  {form.route_locations.map(
+                    (
+                      id,
+                      i
+                    ) => {
+                      const loc =
+                        locations.find(
+                          (x) =>
+                            String(
+                              x.id
+                            ) ===
+                            String(
+                              id
+                            )
+                        );
+
+                      return (
+                        <div
+                          key={i}
+                          className="flex justify-between px-3 py-2 rounded-lg bg-white/5"
+                        >
+                          <span>
+                            {i + 1}.{" "}
+                            {loc?.name ||
+                              "Location"}
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              removeStop(
+                                i
+                              )
+                            }
+                          >
+                            X
+                          </button>
+                        </div>
+                      );
+                    }
+                  )}
+
+                </div>
+              </div>
 
               <button
                 disabled={saving}
