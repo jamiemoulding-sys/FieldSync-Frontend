@@ -1,22 +1,18 @@
 // src/pages/Billing.js
-// BILLING V4
-// ✅ Cancel Anytime explained
-// ✅ Current month access explained
-// ✅ Delete company account section
-// ✅ Better trust / conversions
-// ✅ Stripe portal kept
-// ✅ Logout added
-// ✅ Premium UI
-// ✅ Copy / paste ready
+// BILLING V5 FULL MERGED VERSION
+// ✅ Keeps all V4 features
+// ✅ Safe delete modal
+// ✅ Type confirmation required
+// ✅ No accidental delete risk
+// ✅ Cancel anytime wording
+// ✅ Logout included
+// ✅ Stripe portal ready
+// ✅ Full copy/paste ready
 
 import {
   useEffect,
   useState,
 } from "react";
-
-import {
-  useNavigate,
-} from "react-router-dom";
 
 import {
   billingAPI,
@@ -43,12 +39,10 @@ import {
   Trash2,
   LogOut,
   PoundSterling,
+  X,
 } from "lucide-react";
 
 export default function Billing() {
-  const navigate =
-    useNavigate();
-
   const { logout } =
     useAuth();
 
@@ -66,6 +60,15 @@ export default function Billing() {
 
   const [error, setError] =
     useState("");
+
+  const [showDeleteModal, setShowDeleteModal] =
+    useState(false);
+
+  const [confirmText, setConfirmText] =
+    useState("");
+
+  const [deleteLoading, setDeleteLoading] =
+    useState(false);
 
   useEffect(() => {
     loadBilling();
@@ -133,16 +136,32 @@ export default function Billing() {
   }
 
   function deleteCompany() {
-    const ok =
-      window.confirm(
-        "Delete company account permanently?\n\nThis should remove all users, schedules and data."
+    setShowDeleteModal(true);
+    setConfirmText("");
+  }
+
+  async function confirmDeleteCompany() {
+    try {
+      setDeleteLoading(true);
+
+      // CONNECT BACKEND DELETE ENDPOINT HERE
+      // await accountAPI.deleteCompany();
+
+      await new Promise((r) =>
+        setTimeout(r, 1500)
       );
 
-    if (!ok) return;
+      alert(
+        "Connect backend delete endpoint."
+      );
 
-    alert(
-      "Connect this button to your backend delete endpoint."
-    );
+    } catch {
+      setError(
+        "Delete failed"
+      );
+    } finally {
+      setDeleteLoading(false);
+    }
   }
 
   const currentPlan =
@@ -251,12 +270,12 @@ export default function Billing() {
             <div>
               <div className="inline-flex gap-2 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-sm items-center">
                 <Sparkles size={14} />
-                Billing V4
+                Billing V5
               </div>
 
               <h1 className="text-4xl font-semibold mt-4">
-                Plans built to
-                save time & money
+                Plans built to save
+                time & money
               </h1>
 
               <p className="text-gray-400 mt-4 max-w-2xl">
@@ -273,16 +292,12 @@ export default function Billing() {
                 onClick={loadBilling}
                 className="px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/15 flex gap-2 items-center"
               >
-                <RefreshCw
-                  size={16}
-                />
+                <RefreshCw size={16} />
                 Refresh
               </button>
 
               <button
-                onClick={
-                  openPortal
-                }
+                onClick={openPortal}
                 className="px-4 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 flex gap-2 items-center"
               >
                 {portalLoading ? (
@@ -302,9 +317,7 @@ export default function Billing() {
                 onClick={logout}
                 className="px-4 py-3 rounded-2xl bg-red-500/20 text-red-300 hover:bg-red-500/30 flex gap-2 items-center"
               >
-                <LogOut
-                  size={16}
-                />
+                <LogOut size={16} />
                 Logout
               </button>
 
@@ -351,9 +364,7 @@ export default function Billing() {
       </div>
 
       {error && (
-        <ErrorBox
-          text={error}
-        />
+        <ErrorBox text={error} />
       )}
 
       {/* SAVINGS */}
@@ -537,18 +548,108 @@ export default function Billing() {
         </p>
 
         <button
-          onClick={
-            deleteCompany
-          }
+          onClick={deleteCompany}
           className="mt-5 px-5 py-3 rounded-2xl bg-red-600 hover:bg-red-500 flex gap-2 items-center"
         >
-          <Trash2
-            size={16}
-          />
+          <Trash2 size={16} />
           Delete Account
         </button>
 
       </div>
+
+      {/* SAFE DELETE MODAL */}
+
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center px-4">
+
+          <div className="max-w-lg w-full rounded-3xl border border-red-500/20 bg-[#020617] p-6">
+
+            <div className="flex justify-between items-center">
+
+              <h2 className="text-xl font-semibold text-red-300">
+                Confirm Permanent Delete
+              </h2>
+
+              <button
+                onClick={() =>
+                  setShowDeleteModal(false)
+                }
+                className="text-gray-400 hover:text-white"
+              >
+                <X size={18} />
+              </button>
+
+            </div>
+
+            <p className="text-sm text-gray-400 mt-4">
+              This cannot be undone.
+              Users, schedules,
+              shifts and company data
+              will be removed forever.
+            </p>
+
+            <div className="mt-5 rounded-2xl bg-red-500/10 border border-red-500/20 p-4 text-sm text-red-300">
+              Type:
+              <span className="font-semibold ml-2">
+                DELETE MY COMPANY
+              </span>
+            </div>
+
+            <input
+              value={confirmText}
+              onChange={(e) =>
+                setConfirmText(
+                  e.target.value
+                )
+              }
+              placeholder="Type confirmation text"
+              className="w-full mt-4 bg-white/5 border border-white/10 rounded-2xl px-4 py-3"
+            />
+
+            <div className="flex gap-3 mt-6">
+
+              <button
+                onClick={() =>
+                  setShowDeleteModal(false)
+                }
+                className="flex-1 py-3 rounded-2xl bg-white/10 hover:bg-white/15"
+              >
+                Cancel
+              </button>
+
+              <button
+                disabled={
+                  confirmText !==
+                    "DELETE MY COMPANY" ||
+                  deleteLoading
+                }
+                onClick={
+                  confirmDeleteCompany
+                }
+                className="flex-1 py-3 rounded-2xl bg-red-600 hover:bg-red-500 disabled:opacity-40 flex items-center justify-center gap-2"
+              >
+                {deleteLoading ? (
+                  <>
+                    <Loader2
+                      size={16}
+                      className="animate-spin"
+                    />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={16} />
+                    Permanently Delete
+                  </>
+                )}
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+      )}
 
     </div>
   );
