@@ -202,27 +202,18 @@ TASKS (ENTERPRISE UPGRADE)
 
 export const taskAPI = {
   getAll: async () => {
-    const companyId = await getCompanyId();
+  const companyId = await getCompanyId();
 
-    const { data, error } = await supabase
-      .from("tasks")
-      .select(`
-        *,
-        assigned_user:users(name),
-        location:locations(name),
-        completions:task_completions(
-          id,
-          user_id,
-          completed_at,
-          users(name)
-        )
-      `)
-      .eq("company_id", companyId)
-      .order("created_at", { ascending: false });
+  const { data, error } = await supabase
+    .from("tasks")
+    .select("*")
+    .eq("company_id", companyId)
+    .order("created_at", { ascending: false });
 
-    if (error) throw error;
-    return data || [];
-  },
+  if (error) throw error;
+
+  return data || [];
+},
 
   create: async (payload) => {
     const companyId = await getCompanyId();
