@@ -1,12 +1,10 @@
 // src/pages/Performance.js
-// FULL FIX FINAL
-// ✅ Nothing removed
-// ✅ Only lock screen if no access
-// ✅ Existing analytics kept
-// ✅ Existing layout kept
-// ✅ Trial users allowed
-// ✅ Business plan unlock
-// ✅ Cleaner access logic
+// FULL FIX FINAL UNLOCKED
+// ✅ ALL plans get ALL features
+// ✅ No subscription lock
+// ✅ Only employee limit differs by plan
+// ✅ Existing UI preserved
+// ✅ Full analytics kept
 // ✅ Production ready
 
 import {
@@ -16,9 +14,6 @@ import {
 } from "react";
 
 import { performanceAPI } from "../services/api";
-import { useAuth } from "../hooks/useAuth";
-import { useNavigate } from "react-router-dom";
-
 import { motion } from "framer-motion";
 
 import {
@@ -30,14 +25,10 @@ import {
   Search,
   RefreshCw,
   Star,
-  Crown,
   Loader2,
 } from "lucide-react";
 
 export default function Performance() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-
   const [data, setData] = useState([]);
   const [loading, setLoading] =
     useState(true);
@@ -70,30 +61,6 @@ export default function Performance() {
       setLoading(false);
     }
   }
-
-  /* ACCESS */
-
-  const trialEnd =
-    user?.trial_end ||
-    user?.company?.trial_end ||
-    user?.company?.trial_ends_at;
-
-  const trialActive =
-    trialEnd &&
-    new Date(trialEnd) >
-      new Date();
-
-  const plan =
-    user?.company?.current_plan ||
-    user?.company?.plan ||
-    user?.current_plan ||
-    "";
-
-  const hasAccess =
-    trialActive ||
-    plan === "business";
-
-  /* FILTER */
 
   const processed = useMemo(() => {
     let rows = [...data];
@@ -180,53 +147,8 @@ export default function Performance() {
     );
   }
 
-  /* LOCK ONLY */
-
-  if (!hasAccess) {
-    return (
-      <div className="flex justify-center items-center h-[70vh]">
-        <div className="max-w-md w-full rounded-3xl border border-white/10 bg-[#020617] p-8 text-center">
-
-          <div className="w-16 h-16 rounded-2xl bg-indigo-500/15 text-indigo-400 flex items-center justify-center mx-auto mb-5">
-            <Crown size={26} />
-          </div>
-
-          <h1 className="text-2xl font-semibold">
-            Business Plan Required
-          </h1>
-
-          <p className="text-sm text-gray-400 mt-3">
-            Performance analytics
-            are available on the
-            Business plan.
-          </p>
-
-          <button
-            onClick={() =>
-              navigate(
-                "/billing"
-              )
-            }
-            className="mt-6 w-full py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500"
-          >
-            Upgrade Plan
-          </button>
-
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
-
-      {trialActive && (
-        <div className="rounded-2xl bg-green-500/10 border border-green-500/30 p-4 text-green-300">
-          Trial Active • Full
-          Business features
-          unlocked
-        </div>
-      )}
 
       {/* HEADER */}
       <div className="flex justify-between items-center flex-wrap gap-4">
@@ -237,8 +159,7 @@ export default function Performance() {
           </h1>
 
           <p className="text-sm text-gray-400">
-            Team productivity
-            insights & rankings
+            Team productivity insights & rankings
           </p>
         </div>
 
@@ -279,13 +200,11 @@ export default function Performance() {
                   <p className="text-sm text-gray-400 mt-1">
                     {
                       topPerformer.total_shifts
-                    }{" "}
-                    shifts •{" "}
+                    } shifts •{" "}
                     {Number(
                       topPerformer.hours_worked ||
                         0
-                    ).toFixed(1)}{" "}
-                    hrs
+                    ).toFixed(1)} hrs
                   </p>
                 </div>
 
