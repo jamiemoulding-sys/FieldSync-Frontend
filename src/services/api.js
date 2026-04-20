@@ -783,31 +783,21 @@ INVITES
 
 export const inviteAPI = {
   send: async ({ email, role }) => {
-    const user = await getCurrentUser();
-
-    const { data, error } =
-      await supabase.auth.admin
-        .inviteUserByEmail(email, {
-          data: {
-            role: role || "employee",
-            company_id:
-              user.company_id,
-          },
-          redirectTo:
-            window.location.origin +
-            "/accept-invite",
-        });
-
-    if (error) throw error;
-
-    return data || true;
-  },
-
-  resend: async ({ email, role }) => {
-    return await inviteAPI.send({
+    const res = await api.post("/invite", {
       email,
       role,
     });
+
+    return res.data;
+  },
+
+  resend: async ({ email, role }) => {
+    const res = await api.post("/invite", {
+      email,
+      role,
+    });
+
+    return res.data;
   },
 };
 

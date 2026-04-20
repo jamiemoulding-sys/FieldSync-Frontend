@@ -1,6 +1,6 @@
 // src/pages/Tasks.jsx
-// TASKS V3 PREMIUM VERSION
-// Multi Staff + Multi Route Stops + Claim + Complete + Better Dropdowns
+// TASKS V4 FINAL PRODUCTION VERSION
+// Uses your current api.js exactly as-is
 
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -13,13 +13,13 @@ import { useAuth } from "../hooks/useAuth";
 
 import {
   Plus,
-  Search,
   Loader2,
+  Search,
   X,
-  CheckCircle2,
   Trash2,
-  MapPin,
-  User,
+  CheckCircle2,
+  Route,
+  Users,
 } from "lucide-react";
 
 export default function Tasks() {
@@ -33,10 +33,10 @@ export default function Tasks() {
   const [loading, setLoading] =
     useState(true);
 
-  const [showModal, setShowModal] =
+  const [saving, setSaving] =
     useState(false);
 
-  const [saving, setSaving] =
+  const [showModal, setShowModal] =
     useState(false);
 
   const [search, setSearch] =
@@ -84,8 +84,6 @@ export default function Tasks() {
   async function createTask(e) {
     e.preventDefault();
 
-    if (!form.title.trim()) return;
-
     try {
       setSaving(true);
 
@@ -119,27 +117,17 @@ export default function Tasks() {
     }
   }
 
-  async function claimTask(task) {
-    await taskAPI.update(task.id, {
-      claimed_by: user.id,
-      status: "progress",
-    });
-
-    loadData();
-  }
-
   async function completeTask(task) {
     await taskAPI.update(task.id, {
       completed: true,
       status: "done",
-      completed_by: user.id,
     });
 
     loadData();
   }
 
   async function deleteTask(id) {
-    if (!window.confirm("Delete?"))
+    if (!window.confirm("Delete task?"))
       return;
 
     await taskAPI.delete(id);
@@ -175,12 +163,12 @@ export default function Tasks() {
     });
   }
 
-  function removeStop(id) {
+  function removeStop(index) {
     setForm({
       ...form,
       route_locations:
         form.route_locations.filter(
-          (x, i) => i !== id
+          (_, i) => i !== index
         ),
     });
   }
@@ -198,7 +186,7 @@ export default function Tasks() {
 
   if (loading) {
     return (
-      <div className="flex gap-2 text-gray-400">
+      <div className="flex gap-2 text-gray-300">
         <Loader2
           size={16}
           className="animate-spin"
@@ -212,15 +200,16 @@ export default function Tasks() {
     <div className="space-y-6">
 
       {/* HEADER */}
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center flex-wrap gap-4">
 
         <div>
-          <h1 className="text-2xl font-semibold">
-            Tasks
+          <h1 className="text-2xl font-semibold text-white">
+            Tasks & Route Planner
           </h1>
 
-          <p className="text-sm text-gray-400">
-            Route Jobs / Work Orders
+          <p className="text-gray-400 text-sm">
+            Jobs, staff assignment &
+            multi-stop routes
           </p>
         </div>
 
@@ -229,41 +218,49 @@ export default function Tasks() {
             onClick={() =>
               setShowModal(true)
             }
-            className="px-4 py-2 rounded-xl bg-indigo-600 flex gap-2 items-center"
+            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 flex gap-2 items-center"
           >
             <Plus size={16} />
             New Task
           </button>
         )}
+
       </div>
 
       {/* SEARCH */}
-      <input
-        value={search}
-        onChange={(e) =>
-          setSearch(e.target.value)
-        }
-        placeholder="Search..."
-        className="w-full px-4 py-3 rounded-xl bg-[#020617] border border-white/10"
-      />
+      <div className="relative">
+        <Search
+          size={16}
+          className="absolute left-4 top-4 text-gray-500"
+        />
 
-      {/* TASK LIST */}
+        <input
+          value={search}
+          onChange={(e) =>
+            setSearch(e.target.value)
+          }
+          placeholder="Search tasks..."
+          className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#020617] border border-white/10 text-white"
+        />
+      </div>
+
+      {/* TASKS */}
       <div className="grid gap-4">
 
         {filtered.map((task) => (
           <div
             key={task.id}
-            className="rounded-2xl border border-white/10 bg-[#020617] p-5 space-y-3"
+            className="rounded-2xl bg-[#020617] border border-white/10 p-5 space-y-4"
           >
 
             <div className="flex justify-between">
 
               <div>
-                <h2 className="font-semibold">
+                <h2 className="text-white font-semibold text-lg">
                   {task.title}
                 </h2>
 
-                <p className="text-sm text-gray-400">
+                <p className="text-gray-300 text-sm mt-1">
                   {task.description}
                 </p>
               </div>
@@ -275,19 +272,24 @@ export default function Tasks() {
             </div>
 
             {/* STAFF */}
-            <div className="text-xs text-gray-400">
+            <div className="text-sm text-indigo-300 flex gap-2 items-center">
+              <Users size={14} />
               {task.assigned_users
-                ?.length
-                ? `Assigned Staff: ${task.assigned_users.length}`
-                : "Open Task"}
+                ?.length || 0} Staff Assigned
             </div>
 
             {/* ROUTE */}
             {task.route_locations
               ?.length > 0 && (
-              <div className="space-y-1">
+              <div className="space-y-2">
+
+                <div className="text-sm text-orange-300 flex gap-2 items-center">
+                  <Route size={14} />
+                  Planned Route
+                </div>
+
                 {task.route_locations.map(
-                  (stop, i) => {
+                  (id, i) => {
                     const loc =
                       locations.find(
                         (x) =>
@@ -295,14 +297,14 @@ export default function Tasks() {
                             x.id
                           ) ===
                           String(
-                            stop
+                            id
                           )
                       );
 
                     return (
                       <div
                         key={i}
-                        className="text-xs text-indigo-300"
+                        className="text-sm text-gray-200 bg-white/5 rounded-lg px-3 py-2"
                       >
                         {i + 1}.{" "}
                         {loc?.name ||
@@ -317,33 +319,18 @@ export default function Tasks() {
             {/* ACTIONS */}
             <div className="flex gap-2 flex-wrap">
 
-              {!task.claimed_by &&
-                !task.completed && (
-                  <button
-                    onClick={() =>
-                      claimTask(task)
-                    }
-                    className="px-3 py-2 rounded-lg bg-white/10 text-sm"
-                  >
-                    Claim
-                  </button>
-                )}
-
-              {!task.completed &&
-                (task.claimed_by ===
-                  user.id ||
-                  canManage) && (
-                  <button
-                    onClick={() =>
-                      completeTask(
-                        task
-                      )
-                    }
-                    className="px-3 py-2 rounded-lg bg-green-600 text-sm"
-                  >
-                    Complete
-                  </button>
-                )}
+              {!task.completed && (
+                <button
+                  onClick={() =>
+                    completeTask(
+                      task
+                    )
+                  }
+                  className="px-4 py-2 rounded-lg bg-green-600"
+                >
+                  Complete
+                </button>
+              )}
 
               {canManage && (
                 <button
@@ -352,9 +339,9 @@ export default function Tasks() {
                       task.id
                     )
                   }
-                  className="px-3 py-2 rounded-lg bg-red-600 text-sm flex gap-1 items-center"
+                  className="px-4 py-2 rounded-lg bg-red-600 flex gap-2 items-center"
                 >
-                  <Trash2 size={12} />
+                  <Trash2 size={14} />
                   Delete
                 </button>
               )}
@@ -370,11 +357,11 @@ export default function Tasks() {
       {showModal && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
 
-          <div className="w-full max-w-xl rounded-2xl bg-[#020617] border border-white/10 p-6 space-y-4">
+          <div className="w-full max-w-xl rounded-2xl bg-[#020617] border border-white/10 p-6 space-y-5">
 
-            <div className="flex justify-between">
-              <h2 className="text-lg font-semibold">
-                Create Task
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold text-white">
+                New Task & Route Planner
               </h2>
 
               <button
@@ -382,7 +369,7 @@ export default function Tasks() {
                   setShowModal(false)
                 }
               >
-                <X size={18} />
+                <X />
               </button>
             </div>
 
@@ -393,7 +380,7 @@ export default function Tasks() {
 
               <input
                 required
-                placeholder="Title"
+                placeholder="Task title"
                 value={form.title}
                 onChange={(e) =>
                   setForm({
@@ -402,7 +389,7 @@ export default function Tasks() {
                       e.target.value,
                   })
                 }
-                className="w-full px-4 py-3 rounded-xl bg-white/5"
+                className="w-full px-4 py-3 rounded-xl bg-white/5 text-white"
               />
 
               <textarea
@@ -417,46 +404,46 @@ export default function Tasks() {
                       e.target.value,
                   })
                 }
-                className="w-full px-4 py-3 rounded-xl bg-white/5"
+                className="w-full px-4 py-3 rounded-xl bg-white/5 text-white"
               />
 
               {/* STAFF */}
               <div>
-                <p className="text-sm mb-2">
-                  Assign Staff
+                <p className="text-white mb-2">
+                  Assign Employees
                 </p>
 
-                <div className="grid gap-2 max-h-40 overflow-y-auto">
+                <div className="grid gap-2 max-h-44 overflow-y-auto">
 
                   {users.map((u) => (
-                    <button
-                      type="button"
+                    <label
                       key={u.id}
-                      onClick={() =>
-                        toggleUser(
-                          u.id
-                        )
-                      }
-                      className={`px-3 py-2 rounded-lg text-left ${
-                        form.assigned_users.includes(
-                          u.id
-                        )
-                          ? "bg-indigo-600"
-                          : "bg-white/5"
-                      }`}
+                      className="flex gap-3 items-center px-3 py-2 rounded-lg bg-white/5 text-white"
                     >
+                      <input
+                        type="checkbox"
+                        checked={form.assigned_users.includes(
+                          u.id
+                        )}
+                        onChange={() =>
+                          toggleUser(
+                            u.id
+                          )
+                        }
+                      />
+
                       {u.name ||
                         u.email}
-                    </button>
+                    </label>
                   ))}
 
                 </div>
               </div>
 
-              {/* ROUTES */}
+              {/* ROUTE */}
               <div>
-                <p className="text-sm mb-2">
-                  Add Route Stops
+                <p className="text-white mb-2">
+                  Route Planner
                 </p>
 
                 <select
@@ -465,10 +452,10 @@ export default function Tasks() {
                       e.target.value
                     )
                   }
-                  className="w-full px-4 py-3 rounded-xl bg-white/5"
+                  className="w-full px-4 py-3 rounded-xl bg-white/5 text-white"
                 >
                   <option value="">
-                    Select location
+                    Add location stop
                   </option>
 
                   {locations.map((l) => (
@@ -476,8 +463,7 @@ export default function Tasks() {
                       key={l.id}
                       value={l.id}
                     >
-                      {l.name ||
-                        `Location ${l.id}`}
+                      {l.name}
                     </option>
                   ))}
                 </select>
@@ -503,12 +489,11 @@ export default function Tasks() {
                       return (
                         <div
                           key={i}
-                          className="flex justify-between px-3 py-2 rounded-lg bg-white/5"
+                          className="flex justify-between bg-white/5 px-3 py-2 rounded-lg text-white"
                         >
                           <span>
                             {i + 1}.{" "}
-                            {loc?.name ||
-                              "Location"}
+                            {loc?.name}
                           </span>
 
                           <button
@@ -539,7 +524,9 @@ export default function Tasks() {
               </button>
 
             </form>
+
           </div>
+
         </div>
       )}
 
