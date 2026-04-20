@@ -1,11 +1,13 @@
 /* src/pages/Employees.js */
 /* FULL FIX FILE ONLY
-✅ Save numeric fields fixed
-✅ Empty numeric values become null
-✅ Delete employee restored
-✅ 2 step delete confirm
-✅ Better save handling
-✅ Modal scroll kept
+✅ Cleaned broken pasted code
+✅ Labels added to all fields
+✅ Save works
+✅ Numeric fields safe
+✅ Delete restored (2 step confirm)
+✅ Invite modal works
+✅ Modal scroll works
+✅ Table + Grid view
 */
 
 import { useState, useEffect, useMemo } from "react";
@@ -70,7 +72,8 @@ export default function Employees() {
       data = data.filter(
         (x) =>
           x.name?.toLowerCase().includes(q) ||
-          x.email?.toLowerCase().includes(q)
+          x.email?.toLowerCase().includes(q) ||
+          x.department?.toLowerCase().includes(q)
       );
     }
 
@@ -84,6 +87,11 @@ export default function Employees() {
 
     return data;
   }, [rows, search, sort]);
+
+  function num(v) {
+    if (v === "" || v === null || v === undefined) return null;
+    return Number(v);
+  }
 
   function openEditor(emp) {
     setEditor(emp);
@@ -104,11 +112,6 @@ export default function Employees() {
       role: emp.role || "employee",
       status: emp.status || "active",
     });
-  }
-
-  function num(v) {
-    if (v === "" || v === null || v === undefined) return null;
-    return Number(v);
   }
 
   async function saveEditor() {
@@ -132,14 +135,11 @@ export default function Employees() {
   }
 
   async function removeUser(id, name) {
-    const first = window.confirm(
-      `Delete ${name}?`
-    );
-
+    const first = window.confirm(`Delete ${name}?`);
     if (!first) return;
 
     const second = window.confirm(
-      "FINAL WARNING:\n\nAll employee data will be permanently deleted.\nThis cannot be undone."
+      "FINAL WARNING:\nAll employee data will be permanently deleted."
     );
 
     if (!second) return;
@@ -157,8 +157,8 @@ export default function Employees() {
         role: inviteRole,
       });
 
-      setInviteOpen(false);
       setInviteEmail("");
+      setInviteOpen(false);
     } finally {
       setSaving(false);
     }
@@ -202,7 +202,6 @@ export default function Employees() {
           </button>
 
         </div>
-
       </div>
 
       {/* KPI */}
@@ -282,7 +281,6 @@ export default function Employees() {
                   key={emp.id}
                   className="border-t border-white/5"
                 >
-
                   <td className="p-4">
                     <UserRow emp={emp} />
                   </td>
@@ -315,7 +313,6 @@ export default function Employees() {
                     </button>
 
                   </td>
-
                 </tr>
               ))}
             </tbody>
@@ -335,7 +332,6 @@ export default function Employees() {
               animate={{ opacity: 1, y: 0 }}
               className="rounded-2xl border border-white/10 bg-[#020617] p-5"
             >
-
               <UserRow emp={emp} />
 
               <p className="mt-3 text-sm text-gray-400">
@@ -343,7 +339,7 @@ export default function Employees() {
               </p>
 
               <p className="text-sm text-gray-400">
-                Rate: {emp.hourly_rate ? `£${emp.hourly_rate}` : "-"}
+                Department: {emp.department || "-"}
               </p>
 
               <div className="grid grid-cols-2 gap-2 mt-4">
@@ -379,27 +375,26 @@ export default function Employees() {
           close={() => setEditor(null)}
         >
 
-          <div className="grid md:grid-cols-2 gap-3">
+          <div className="grid md:grid-cols-2 gap-4">
 
-            {Object.keys(form).map((key) => (
-              <input
-                key={key}
-                value={form[key]}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    [key]: e.target.value,
-                  })
-                }
-                placeholder={key.replaceAll("_", " ")}
-                className="px-4 py-3 rounded-xl bg-slate-900 border border-white/10"
-              />
-            ))}
+            <Field label="Full Name" value={form.name} onChange={(v)=>setForm({...form,name:v})} />
+            <Field label="Phone Number" value={form.phone} onChange={(v)=>setForm({...form,phone:v})} />
+            <Field label="Department" value={form.department} onChange={(v)=>setForm({...form,department:v})} />
+            <Field label="Job Title" value={form.job_title} onChange={(v)=>setForm({...form,job_title:v})} />
+            <Field label="Payroll ID" value={form.payroll_id} onChange={(v)=>setForm({...form,payroll_id:v})} />
+            <Field label="Emergency Contact" value={form.emergency_contact} onChange={(v)=>setForm({...form,emergency_contact:v})} />
+            <Field label="Start Date" type="date" value={form.start_date} onChange={(v)=>setForm({...form,start_date:v})} />
+            <Field label="Hourly Rate (£)" value={form.hourly_rate} onChange={(v)=>setForm({...form,hourly_rate:v})} />
+            <Field label="Overtime Rate (£)" value={form.overtime_rate} onChange={(v)=>setForm({...form,overtime_rate:v})} />
+            <Field label="Night Rate (£)" value={form.night_rate} onChange={(v)=>setForm({...form,night_rate:v})} />
+            <Field label="Contracted Hours" value={form.contracted_hours} onChange={(v)=>setForm({...form,contracted_hours:v})} />
+            <Field label="Holiday Allowance" value={form.holiday_allowance} onChange={(v)=>setForm({...form,holiday_allowance:v})} />
+            <Field label="Role" value={form.role} onChange={(v)=>setForm({...form,role:v})} />
+            <Field label="Status" value={form.status} onChange={(v)=>setForm({...form,status:v})} />
 
           </div>
 
-          <div className="sticky bottom-0 pt-4 mt-4 bg-[#020617]">
-
+          <div className="sticky bottom-0 mt-6 pt-4 bg-[#020617]">
             <button
               onClick={saveEditor}
               disabled={saving}
@@ -408,7 +403,6 @@ export default function Employees() {
               <Save size={16} />
               {saving ? "Saving..." : "Save Changes"}
             </button>
-
           </div>
 
         </Modal>
@@ -423,18 +417,14 @@ export default function Employees() {
 
           <input
             value={inviteEmail}
-            onChange={(e) =>
-              setInviteEmail(e.target.value)
-            }
+            onChange={(e)=>setInviteEmail(e.target.value)}
             placeholder="Email"
             className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-white/10"
           />
 
           <select
             value={inviteRole}
-            onChange={(e) =>
-              setInviteRole(e.target.value)
-            }
+            onChange={(e)=>setInviteRole(e.target.value)}
             className="w-full mt-3 px-4 py-3 rounded-xl bg-slate-900 border border-white/10"
           >
             <option value="employee">Employee</option>
@@ -462,20 +452,14 @@ export default function Employees() {
 function UserRow({ emp }) {
   return (
     <div className="flex gap-3 items-center">
-
       <div className="w-11 h-11 rounded-full bg-indigo-600 flex items-center justify-center">
-        {(emp.name || emp.email || "?")
-          .charAt(0)
-          .toUpperCase()}
+        {(emp.name || emp.email || "?").charAt(0).toUpperCase()}
       </div>
 
       <div>
         <p>{emp.name || "Unnamed"}</p>
-        <p className="text-xs text-gray-400">
-          {emp.email}
-        </p>
+        <p className="text-xs text-gray-400">{emp.email}</p>
       </div>
-
     </div>
   );
 }
@@ -483,21 +467,36 @@ function UserRow({ emp }) {
 function Card({ title, value, icon }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-[#020617] p-5">
-
       <div className="flex justify-between">
-        <p className="text-xs text-gray-400">
-          {title}
-        </p>
-
-        <div className="text-indigo-400">
-          {icon}
-        </div>
+        <p className="text-xs text-gray-400">{title}</p>
+        <div className="text-indigo-400">{icon}</div>
       </div>
 
       <h2 className="text-2xl font-semibold mt-2">
         {value}
       </h2>
+    </div>
+  );
+}
 
+function Field({
+  label,
+  value,
+  onChange,
+  type = "text",
+}) {
+  return (
+    <div>
+      <p className="text-xs text-gray-400 mb-2">
+        {label}
+      </p>
+
+      <input
+        type={type}
+        value={value || ""}
+        onChange={(e)=>onChange(e.target.value)}
+        className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-white/10"
+      />
     </div>
   );
 }
@@ -509,15 +508,11 @@ function Modal({ title, close, children }) {
       <div className="w-full max-w-4xl max-h-[92vh] overflow-y-auto rounded-2xl bg-[#020617] border border-white/10 p-6">
 
         <div className="flex justify-between mb-4">
-
-          <h2 className="font-semibold">
-            {title}
-          </h2>
+          <h2 className="font-semibold">{title}</h2>
 
           <button onClick={close}>
             <X size={18} />
           </button>
-
         </div>
 
         {children}
