@@ -1,48 +1,62 @@
 // src/pages/Billing.js
-// BILLING V3
-// ✅ Clearer trial wording
-// ✅ Better conversions
-// ✅ Shows what happens after trial
-// ✅ Savings examples
-// ✅ Extra staff pricing explained
-// ✅ Premium modern UI
-// ✅ Keeps checkout / portal logic
+// BILLING V4
+// ✅ Cancel Anytime explained
+// ✅ Current month access explained
+// ✅ Delete company account section
+// ✅ Better trust / conversions
+// ✅ Stripe portal kept
+// ✅ Logout added
+// ✅ Premium UI
 // ✅ Copy / paste ready
 
 import {
   useEffect,
-  useMemo,
   useState,
 } from "react";
 
-import { billingAPI } from "../services/api";
-import { useAuth } from "../hooks/useAuth";
+import {
+  useNavigate,
+} from "react-router-dom";
+
+import {
+  billingAPI,
+} from "../services/api";
+
+import {
+  useAuth,
+} from "../hooks/useAuth";
+
 import { motion } from "framer-motion";
 
 import {
   Crown,
-  Sparkles,
   Users,
   Building2,
-  BarChart3,
+  Sparkles,
   Check,
   Loader2,
   RefreshCw,
   ArrowUpRight,
   Clock3,
+  Shield,
+  AlertTriangle,
+  Trash2,
+  LogOut,
   PoundSterling,
-  AlertCircle,
-  Zap,
 } from "lucide-react";
 
 export default function Billing() {
-  const { logout } = useAuth();
+  const navigate =
+    useNavigate();
 
-  const [subscription, setSubscription] =
-    useState(null);
+  const { logout } =
+    useAuth();
 
   const [loading, setLoading] =
     useState(true);
+
+  const [data, setData] =
+    useState(null);
 
   const [loadingPlan, setLoadingPlan] =
     useState("");
@@ -60,11 +74,12 @@ export default function Billing() {
   async function loadBilling() {
     try {
       setLoading(true);
+      setError("");
 
-      const data =
+      const res =
         await billingAPI.getStatus();
 
-      setSubscription(data);
+      setData(res || {});
     } catch (err) {
       setError(
         err?.message ||
@@ -110,23 +125,37 @@ export default function Billing() {
       }
     } catch {
       setError(
-        "Billing portal unavailable"
+        "Portal unavailable"
       );
     } finally {
       setPortalLoading(false);
     }
   }
 
+  function deleteCompany() {
+    const ok =
+      window.confirm(
+        "Delete company account permanently?\n\nThis should remove all users, schedules and data."
+      );
+
+    if (!ok) return;
+
+    alert(
+      "Connect this button to your backend delete endpoint."
+    );
+  }
+
   const currentPlan =
-    subscription?.plan ||
+    data?.plan ||
     "starter";
 
   const status =
-    subscription?.status ||
+    data?.status ||
     "inactive";
 
   const trialEnd =
-    subscription?.trial_end ||
+    data?.trial_end ||
+    data?.trial_ends_at ||
     null;
 
   const trialActive =
@@ -150,14 +179,13 @@ export default function Billing() {
       key: "starter",
       title: "Starter",
       price: "£49",
-      icon: <Users size={18} />,
-      badge: "Best for small teams",
       staff: "Up to 5 staff",
       extra:
         "+£7 per extra staff",
+      icon: <Users size={18} />,
       features: [
         "Scheduling",
-        "Clock in / out",
+        "Clock in/out",
         "Holiday requests",
         "Timesheets",
         "Basic reports",
@@ -167,15 +195,14 @@ export default function Billing() {
       key: "pro",
       title: "Pro",
       price: "£89",
-      icon: <Crown size={18} />,
-      badge: "Most Popular",
       staff: "Up to 15 staff",
       extra:
         "+£6 per extra staff",
+      icon: <Crown size={18} />,
       featured: true,
       features: [
         "Everything in Starter",
-        "Performance tracking",
+        "Performance tools",
         "Advanced reports",
         "No-show visibility",
         "Priority support",
@@ -185,30 +212,21 @@ export default function Billing() {
       key: "business",
       title: "Business",
       price: "£149",
-      icon: (
-        <Building2 size={18} />
-      ),
-      badge: "Scale teams fast",
       staff: "Up to 30 staff",
       extra:
         "+£5 per extra staff",
+      icon: (
+        <Building2 size={18} />
+      ),
       features: [
         "Everything in Pro",
-        "Multi-site support",
+        "Multi-location",
+        "Best value scale",
+        "Premium support",
         "Deep analytics",
-        "Priority onboarding",
-        "Best value at scale",
       ],
     },
   ];
-
-  const trialText =
-    useMemo(() => {
-      if (!trialActive)
-        return null;
-
-      return `${daysLeft} days of FULL premium access remaining`;
-    }, [trialActive, daysLeft]);
 
   if (loading) {
     return (
@@ -231,22 +249,21 @@ export default function Billing() {
           <div className="flex justify-between gap-4 flex-wrap">
 
             <div>
-              <div className="inline-flex px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-sm gap-2 items-center">
+              <div className="inline-flex gap-2 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-sm items-center">
                 <Sparkles size={14} />
-                Billing & Plans
+                Billing V4
               </div>
 
               <h1 className="text-4xl font-semibold mt-4">
-                Grow faster.
-                Save hours.
+                Plans built to
+                save time & money
               </h1>
 
               <p className="text-gray-400 mt-4 max-w-2xl">
-                Automate staff
-                scheduling, reduce
-                no-shows, track live
-                attendance and cut
-                admin time every week.
+                Reduce admin time,
+                stop missed shifts,
+                track attendance and
+                automate schedules.
               </p>
             </div>
 
@@ -254,7 +271,7 @@ export default function Billing() {
 
               <button
                 onClick={loadBilling}
-                className="px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/15 flex items-center gap-2"
+                className="px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/15 flex gap-2 items-center"
               >
                 <RefreshCw
                   size={16}
@@ -266,7 +283,7 @@ export default function Billing() {
                 onClick={
                   openPortal
                 }
-                className="px-4 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 flex items-center gap-2"
+                className="px-4 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 flex gap-2 items-center"
               >
                 {portalLoading ? (
                   <Loader2
@@ -278,14 +295,16 @@ export default function Billing() {
                     size={16}
                   />
                 )}
-
-                Manage
+                Manage Billing
               </button>
 
               <button
                 onClick={logout}
-                className="px-4 py-3 rounded-2xl bg-red-500/20 text-red-300 hover:bg-red-500/30"
+                className="px-4 py-3 rounded-2xl bg-red-500/20 text-red-300 hover:bg-red-500/30 flex gap-2 items-center"
               >
+                <LogOut
+                  size={16}
+                />
                 Logout
               </button>
 
@@ -293,25 +312,23 @@ export default function Billing() {
 
           </div>
 
-          <div className="mt-6 grid md:grid-cols-3 gap-4">
+          <div className="grid md:grid-cols-3 gap-4 mt-6">
 
-            <MiniBox
-              title="Selected Plan"
-              value={
-                currentPlan.toUpperCase()
-              }
+            <InfoCard
+              title="Current Plan"
+              value={currentPlan.toUpperCase()}
             />
 
-            <MiniBox
+            <InfoCard
               title="Status"
               value={status}
             />
 
-            <MiniBox
+            <InfoCard
               title="Trial"
               value={
                 trialActive
-                  ? trialText
+                  ? `${daysLeft} days left`
                   : "Inactive"
               }
             />
@@ -321,14 +338,12 @@ export default function Billing() {
           {trialActive && (
             <div className="mt-5 rounded-2xl bg-green-500/10 border border-green-500/30 p-4 text-green-300 text-sm flex gap-2">
               <Clock3 size={16} />
-              You selected{" "}
+              Your selected plan is{" "}
               <b>
                 {currentPlan}
-              </b>{" "}
-              plan, but trial gives
-              full access to all
-              premium features until
-              it ends.
+              </b>
+              . Trial currently gives
+              full premium access.
             </div>
           )}
 
@@ -336,35 +351,37 @@ export default function Billing() {
       </div>
 
       {error && (
-        <Alert text={error} />
+        <ErrorBox
+          text={error}
+        />
       )}
 
       {/* SAVINGS */}
 
       <div className="grid md:grid-cols-3 gap-4">
 
-        <Saving
+        <SaveCard
           icon={
             <Clock3 size={18} />
           }
-          title="Save Admin Time"
-          text="Typical business saves 8–20 admin hours monthly with rota changes, leave requests and timesheets."
+          title="Admin Time"
+          text="Save 8–20 hours monthly handling rota changes, holidays and payroll prep."
         />
 
-        <Saving
+        <SaveCard
           icon={
             <PoundSterling size={18} />
           }
-          title="Reduce Lost Wages"
-          text="Prevent paying missed shifts, late starts or buddy clock-ins with tracked clocking."
+          title="Reduce Wage Loss"
+          text="Avoid paying missed shifts, no-shows and untracked late starts."
         />
 
-        <Saving
+        <SaveCard
           icon={
-            <Zap size={18} />
+            <Shield size={18} />
           }
-          title="Increase Efficiency"
-          text="Auto-updated schedules reduce confusion, texting staff and last-minute changes."
+          title="Better Control"
+          text="Live attendance and location clock-ins improve accountability."
         />
 
       </div>
@@ -392,19 +409,15 @@ export default function Billing() {
             >
               <div className="rounded-3xl border border-white/10 bg-[#020617] p-6">
 
-                <div className="flex items-center gap-2 text-indigo-400 text-sm">
+                <div className="flex gap-2 text-indigo-400 text-sm items-center">
                   {plan.icon}
-                  {plan.badge}
-                </div>
-
-                <h2 className="text-2xl font-semibold mt-3">
                   {plan.title}
-                </h2>
+                </div>
 
                 <p className="text-4xl font-bold mt-4">
                   {plan.price}
                   <span className="text-base text-gray-400 font-normal">
-                    /mo
+                    /month
                   </span>
                 </p>
 
@@ -439,21 +452,19 @@ export default function Billing() {
                 </div>
 
                 <button
+                  disabled={
+                    current ||
+                    loadingPlan
+                  }
                   onClick={() =>
                     upgrade(
                       plan.key
                     )
                   }
-                  disabled={
-                    loadingPlan ||
-                    current
-                  }
                   className={`w-full mt-6 py-3 rounded-2xl font-medium ${
                     current
                       ? "bg-green-600"
-                      : plan.featured
-                      ? "bg-indigo-600 hover:bg-indigo-500"
-                      : "bg-white/10 hover:bg-white/20"
+                      : "bg-indigo-600 hover:bg-indigo-500"
                   }`}
                 >
                   {loadingPlan ===
@@ -471,20 +482,73 @@ export default function Billing() {
 
       </div>
 
-      {/* AFTER TRIAL */}
+      {/* CANCEL ANYTIME */}
 
-      {trialActive && (
-        <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-5 text-sm text-yellow-200">
-          When your trial ends,
-          access will switch to your
-          selected{" "}
-          <b>
-            {currentPlan}
-          </b>{" "}
-          plan automatically unless
-          upgraded.
+      <div className="rounded-3xl border border-white/10 bg-[#020617] p-6">
+
+        <h2 className="text-xl font-semibold">
+          Cancel Anytime
+        </h2>
+
+        <p className="text-gray-400 mt-3 text-sm">
+          If you cancel during an
+          active month, you keep
+          access until the end of
+          the billing period.
+        </p>
+
+        <p className="text-gray-400 mt-2 text-sm">
+          Example: Pay on the 1st,
+          cancel on the 10th, still
+          use the app until next
+          renewal date.
+        </p>
+
+        <button
+          onClick={openPortal}
+          className="mt-5 px-5 py-3 rounded-2xl bg-white/10 hover:bg-white/15"
+        >
+          Manage / Cancel Subscription
+        </button>
+
+      </div>
+
+      {/* DANGER ZONE */}
+
+      <div className="rounded-3xl border border-red-500/20 bg-red-500/5 p-6">
+
+        <div className="flex gap-3 items-center">
+
+          <AlertTriangle
+            size={20}
+            className="text-red-400"
+          />
+
+          <h2 className="text-xl font-semibold text-red-300">
+            Danger Zone
+          </h2>
+
         </div>
-      )}
+
+        <p className="text-sm text-gray-400 mt-3">
+          Permanently delete your
+          company account and all
+          related data.
+        </p>
+
+        <button
+          onClick={
+            deleteCompany
+          }
+          className="mt-5 px-5 py-3 rounded-2xl bg-red-600 hover:bg-red-500 flex gap-2 items-center"
+        >
+          <Trash2
+            size={16}
+          />
+          Delete Account
+        </button>
+
+      </div>
 
     </div>
   );
@@ -492,16 +556,15 @@ export default function Billing() {
 
 /* COMPONENTS */
 
-function MiniBox({
+function InfoCard({
   title,
   value,
 }) {
   return (
-    <div className="rounded-2xl bg-white/5 p-4 border border-white/10">
+    <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
       <p className="text-xs text-gray-400">
         {title}
       </p>
-
       <p className="font-semibold mt-2">
         {value}
       </p>
@@ -509,7 +572,7 @@ function MiniBox({
   );
 }
 
-function Saving({
+function SaveCard({
   icon,
   title,
   text,
@@ -519,11 +582,9 @@ function Saving({
       <div className="text-indigo-400">
         {icon}
       </div>
-
       <h3 className="font-medium mt-3">
         {title}
       </h3>
-
       <p className="text-sm text-gray-400 mt-2">
         {text}
       </p>
@@ -531,12 +592,11 @@ function Saving({
   );
 }
 
-function Alert({
+function ErrorBox({
   text,
 }) {
   return (
-    <div className="rounded-2xl bg-red-500/10 border border-red-500/30 p-4 text-red-300 text-sm flex gap-2">
-      <AlertCircle size={16} />
+    <div className="rounded-2xl bg-red-500/10 border border-red-500/30 p-4 text-red-300 text-sm">
       {text}
     </div>
   );
@@ -547,14 +607,13 @@ function Center({
   loading,
 }) {
   return (
-    <div className="h-[60vh] flex items-center justify-center text-gray-400 gap-2">
+    <div className="h-[60vh] flex items-center justify-center gap-2 text-gray-400">
       {loading && (
         <Loader2
           size={16}
           className="animate-spin"
         />
       )}
-
       {text}
     </div>
   );
