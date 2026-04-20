@@ -1,17 +1,17 @@
 /* =========================================================
 src/pages/Employees.js
-EMPLOYEES V4 REAL DATA ONLY
+EMPLOYEES V5 FULL FILE
 COPY / PASTE READY
 
-✅ No fake demo data
-✅ Real users from Supabase
-✅ Real invites only
-✅ Pending invites panel
+✅ Real data only
+✅ Role changing fixed
+✅ Delete employee (2 step confirm)
+✅ Admin summary cards
 ✅ Action needed alerts
-✅ Admin profile top
-✅ Multi invites
-✅ Edit employee
-✅ Search staff
+✅ Multi invite staff
+✅ Full employee profile modal
+✅ Start date / phone / payroll / rates
+✅ Overtime + night fallback to hourly
 ========================================================= */
 
 import { useState, useEffect, useMemo } from "react";
@@ -31,6 +31,7 @@ import {
   Mail,
   X,
   Save,
+  Trash2,
 } from "lucide-react";
 
 export default function Employees() {
@@ -89,7 +90,7 @@ export default function Employees() {
       );
     } catch {
       setError(
-        "Failed loading staff"
+        "Failed loading employees"
       );
     } finally {
       setLoading(false);
@@ -98,14 +99,18 @@ export default function Employees() {
 
   async function loadInvites() {
     try {
-      const data =
-        await inviteAPI.getAll();
+      if (
+        inviteAPI.getAll
+      ) {
+        const data =
+          await inviteAPI.getAll();
 
-      setPendingInvites(
-        Array.isArray(data)
-          ? data
-          : []
-      );
+        setPendingInvites(
+          Array.isArray(data)
+            ? data
+            : []
+        );
+      }
     } catch {
       setPendingInvites([]);
     }
@@ -177,16 +182,69 @@ export default function Employees() {
     }
   );
 
-  async function sendInvites() {
-    if (saving) return;
+  async function updateRole(
+    id,
+    role
+  ) {
+    try {
+      await userAPI.update(
+        id,
+        { role }
+      );
 
+      await load();
+
+      setSuccess(
+        "Role updated"
+      );
+    } catch {
+      setError(
+        "Failed to update role"
+      );
+    }
+  }
+
+  async function removeUser(
+    id,
+    name
+  ) {
+    const first =
+      window.confirm(
+        `Delete ${name}?`
+      );
+
+    if (!first) return;
+
+    const second =
+      window.confirm(
+        `FINAL WARNING:\nThis permanently deletes ${name}`
+      );
+
+    if (!second) return;
+
+    try {
+      await userAPI.delete(
+        id
+      );
+
+      await load();
+
+      setSuccess(
+        "Employee deleted"
+      );
+    } catch {
+      setError(
+        "Delete failed"
+      );
+    }
+  }
+
+  async function sendInvites() {
     const emails =
       inviteEmails
         .split("\n")
         .map((x) =>
-          x
-            .trim()
-            .toLowerCase()
+          x.trim()
         )
         .filter(Boolean);
 
@@ -195,8 +253,6 @@ export default function Employees() {
 
     try {
       setSaving(true);
-      setError("");
-      setSuccess("");
 
       for (const email of emails) {
         await inviteAPI.send({
@@ -234,15 +290,50 @@ export default function Employees() {
     setForm({
       name:
         emp.name || "",
+      phone:
+        emp.phone || "",
       department:
         emp.department ||
         "",
+      job_title:
+        emp.job_title ||
+        "",
+      payroll_id:
+        emp.payroll_id ||
+        "",
+      emergency_contact:
+        emp.emergency_contact ||
+        "",
+
+      start_date:
+        emp.start_date ||
+        "",
+
       hourly_rate:
         emp.hourly_rate ||
         "",
+
+      overtime_rate:
+        emp.overtime_rate ||
+        emp.hourly_rate ||
+        "",
+
+      night_rate:
+        emp.night_rate ||
+        emp.hourly_rate ||
+        "",
+
       contracted_hours:
         emp.contracted_hours ||
         "",
+
+      holiday_allowance:
+        emp.holiday_allowance ||
+        "",
+
+      status:
+        emp.status ||
+        "active",
     });
   }
 
@@ -252,7 +343,15 @@ export default function Employees() {
 
       await userAPI.update(
         editor.id,
-        form
+        {
+          ...form,
+          overtime_rate:
+            form.overtime_rate ||
+            form.hourly_rate,
+          night_rate:
+            form.night_rate ||
+            form.hourly_rate,
+        }
       );
 
       setEditor(null);
@@ -260,7 +359,7 @@ export default function Employees() {
       await load();
 
       setSuccess(
-        "Saved"
+        "Employee updated"
       );
     } catch {
       setError(
@@ -275,7 +374,7 @@ export default function Employees() {
     <div className="space-y-6">
 
       {/* HEADER */}
-      <div className="flex justify-between flex-wrap gap-4">
+      <div className="flex justify-between gap-4 flex-wrap">
 
         <div>
           <h1 className="text-3xl font-bold">
@@ -301,14 +400,13 @@ export default function Employees() {
 
       </div>
 
-      {/* SUCCESS */}
+      {/* MESSAGES */}
       {success && (
         <div className="rounded-xl bg-green-500/10 text-green-300 px-4 py-3">
           {success}
         </div>
       )}
 
-      {/* ERROR */}
       {error && (
         <div className="rounded-xl bg-red-500/10 text-red-300 px-4 py-3">
           {error}
@@ -328,7 +426,7 @@ export default function Employees() {
               user?.email}
           </h2>
 
-          <p className="text-indigo-300 text-sm">
+          <p className="text-sm text-indigo-300">
             Admin
           </p>
         </div>
@@ -356,11 +454,7 @@ export default function Employees() {
         <Card
           title="Pending Invites"
           value={
-            pendingInvites.filter(
-              (x) =>
-                x.accepted !==
-                true
-            ).length
+            pendingInvites.length
           }
           icon={
             <Mail size={16} />
@@ -400,16 +494,15 @@ export default function Employees() {
           Action Needed
         </h3>
 
-        <div className="space-y-2 text-sm">
-
-          {!alerts.length ? (
-            <p className="text-green-400">
-              Everything complete
-            </p>
-          ) : (
-            alerts.map(
+        {!alerts.length ? (
+          <p className="text-green-400 text-sm">
+            Everything complete
+          </p>
+        ) : (
+          <div className="space-y-2 text-sm">
+            {alerts.map(
               (
-                item,
+                x,
                 i
               ) => (
                 <div
@@ -418,19 +511,17 @@ export default function Employees() {
                   }
                   className="text-amber-300"
                 >
-                  • {item}
+                  • {x}
                 </div>
               )
-            )
-          )}
-
-        </div>
+            )}
+          </div>
+        )}
 
       </div>
 
       {/* SEARCH */}
       <div className="relative">
-
         <Search
           size={16}
           className="absolute left-4 top-4 text-gray-500"
@@ -443,14 +534,13 @@ export default function Employees() {
               e.target.value
             )
           }
-          placeholder="Search staff..."
+          placeholder="Search employees..."
           className="w-full pl-11 pr-4 py-3 rounded-xl bg-[#020617] border border-white/10"
         />
-
       </div>
 
       {/* TABLE */}
-      <div className="rounded-2xl overflow-hidden bg-[#020617] border border-white/10">
+      <div className="rounded-2xl overflow-hidden border border-white/10 bg-[#020617]">
 
         <table className="w-full text-sm">
 
@@ -499,7 +589,32 @@ export default function Employees() {
                     </td>
 
                     <td className="p-4">
-                      {emp.role}
+                      <select
+                        value={
+                          emp.role ||
+                          "employee"
+                        }
+                        onChange={(
+                          e
+                        ) =>
+                          updateRole(
+                            emp.id,
+                            e.target
+                              .value
+                          )
+                        }
+                        className="px-3 py-2 rounded-xl bg-slate-900 border border-white/10"
+                      >
+                        <option value="employee">
+                          Employee
+                        </option>
+                        <option value="manager">
+                          Manager
+                        </option>
+                        <option value="admin">
+                          Admin
+                        </option>
+                      </select>
                     </td>
 
                     <td className="p-4">
@@ -509,16 +624,33 @@ export default function Employees() {
                     </td>
 
                     <td className="p-4">
-                      <button
-                        onClick={() =>
-                          openEditor(
-                            emp
-                          )
-                        }
-                        className="text-indigo-400"
-                      >
-                        Edit
-                      </button>
+                      <div className="flex gap-3">
+
+                        <button
+                          onClick={() =>
+                            openEditor(
+                              emp
+                            )
+                          }
+                          className="text-indigo-400"
+                        >
+                          Edit
+                        </button>
+
+                        <button
+                          onClick={() =>
+                            removeUser(
+                              emp.id,
+                              emp.name ||
+                                emp.email
+                            )
+                          }
+                          className="text-red-400"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+
+                      </div>
                     </td>
 
                   </tr>
@@ -602,13 +734,34 @@ two@email.com`}
       {/* EDIT MODAL */}
       {editor && (
         <Modal
-          title={`Edit ${editor.name}`}
+          title={`Employee Profile - ${editor.name}`}
           close={() =>
             setEditor(
               null
             )
           }
         >
+
+          <div className="rounded-xl bg-white/5 p-4 mb-4 text-sm space-y-1">
+            <p>
+              Email:{" "}
+              {editor.email}
+            </p>
+
+            <p>
+              Role:{" "}
+              {editor.role}
+            </p>
+
+            <p>
+              Joined:{" "}
+              {editor.created_at
+                ? new Date(
+                    editor.created_at
+                  ).toLocaleDateString()
+                : "-"}
+            </p>
+          </div>
 
           {Object.keys(
             form
@@ -638,9 +791,10 @@ two@email.com`}
                     }
                   )
                 }
-                placeholder={
-                  key
-                }
+                placeholder={key.replaceAll(
+                  "_",
+                  " "
+                )}
                 className="w-full mt-3 px-4 py-3 rounded-xl bg-slate-900 border border-white/10"
               />
             )
@@ -674,6 +828,7 @@ function Card({
         <p className="text-xs text-gray-400">
           {title}
         </p>
+
         <div className="text-indigo-400">
           {icon}
         </div>
@@ -693,6 +848,7 @@ function Modal({
 }) {
   return (
     <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center px-4">
+
       <div className="w-full max-w-xl rounded-2xl bg-[#020617] border border-white/10 p-6">
 
         <div className="flex justify-between mb-4">
@@ -708,6 +864,7 @@ function Modal({
         {children}
 
       </div>
+
     </div>
   );
 }
