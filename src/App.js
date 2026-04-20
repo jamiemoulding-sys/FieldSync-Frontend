@@ -1,7 +1,8 @@
 // src/App.js
 // FINAL FIXED PLATFORM VERSION
 // ✅ Nothing removed
-// ✅ Billing lock issue fixed
+// ✅ Billing moved into sidebar layout
+// ✅ No more trapped billing page
 // ✅ Trial works
 // ✅ Starter / Pro / Business unlock properly
 // ✅ Stripe success refresh safe
@@ -69,7 +70,6 @@ function ExpiredPage() {
   return (
     <div className="min-h-screen bg-[#020617] text-white flex items-center justify-center px-6">
       <div className="max-w-md w-full rounded-3xl border border-white/10 bg-[#020617] p-8 text-center">
-
         <h1 className="text-2xl font-semibold mb-4">
           Subscription Expired
         </h1>
@@ -78,7 +78,6 @@ function ExpiredPage() {
           Your company trial has ended.
           Please contact your admin.
         </p>
-
       </div>
     </div>
   );
@@ -364,7 +363,6 @@ export default function App() {
 
   return (
     <Router>
-
       <VisibilityRefresh />
 
       <Routes>
@@ -400,38 +398,27 @@ export default function App() {
 
         <Route
           path="/set-password"
-          element={
-            <SetPassword />
-          }
+          element={<SetPassword />}
         />
 
         <Route
           path="/accept-invite"
-          element={
-            <SetPassword />
-          }
+          element={<SetPassword />}
         />
 
         <Route
           path="/reset-password"
-          element={
-            <ResetPassword />
-          }
+          element={<ResetPassword />}
         />
 
-        {/* BILLING */}
-
-        <Route
-          path="/billing"
-          element={<Billing />}
-        />
+        {/* SUCCESS PAGE ONLY */}
 
         <Route
           path="/billing-success"
           element={<Success />}
         />
 
-        {/* PRIVATE APP */}
+        {/* PRIVATE APP WITH SIDEBAR */}
 
         <Route
           element={
@@ -443,51 +430,42 @@ export default function App() {
 
           <Route
             path="/dashboard"
-            element={
-              <Dashboard />
-            }
+            element={<Dashboard />}
+          />
+
+          <Route
+            path="/billing"
+            element={<Billing />}
           />
 
           <Route
             path="/tasks"
-            element={
-              <Tasks />
-            }
+            element={<Tasks />}
           />
 
           <Route
             path="/work-session"
-            element={
-              <WorkSession />
-            }
+            element={<WorkSession />}
           />
 
           <Route
             path="/notifications"
-            element={
-              <Notifications />
-            }
+            element={<Notifications />}
           />
 
           <Route
             path="/my-schedule"
-            element={
-              <MySchedule />
-            }
+            element={<MySchedule />}
           />
 
           <Route
             path="/my-holidays"
-            element={
-              <MyHolidays />
-            }
+            element={<MyHolidays />}
           />
 
           <Route
             path="/my-locations"
-            element={
-              <MyLocations />
-            }
+            element={<MyLocations />}
           />
 
           {/* STARTER+ */}
@@ -638,9 +616,7 @@ export default function App() {
 
           <Route
             path="/profile"
-            element={
-              <Profile />
-            }
+            element={<Profile />}
           />
 
         </Route>
@@ -658,7 +634,6 @@ export default function App() {
         />
 
       </Routes>
-
     </Router>
   );
 }

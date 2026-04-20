@@ -1,14 +1,12 @@
 // src/pages/Billing.js
-// BILLING V2 FINAL
-// ✅ All original logic preserved
-// ✅ Stripe checkout works
-// ✅ Portal works
-// ✅ Trial countdown works
-// ✅ Logout button added
-// ✅ ROI savings added
-// ✅ Better pricing conversion copy
-// ✅ Founder pricing banner
-// ✅ Premium polished UI
+// BILLING V3
+// ✅ Clearer trial wording
+// ✅ Better conversions
+// ✅ Shows what happens after trial
+// ✅ Savings examples
+// ✅ Extra staff pricing explained
+// ✅ Premium modern UI
+// ✅ Keeps checkout / portal logic
 // ✅ Copy / paste ready
 
 import {
@@ -17,37 +15,29 @@ import {
   useState,
 } from "react";
 
-import {
-  billingAPI,
-  authAPI,
-} from "../services/api";
-
+import { billingAPI } from "../services/api";
+import { useAuth } from "../hooks/useAuth";
 import { motion } from "framer-motion";
 
 import {
   Crown,
-  Shield,
-  Zap,
-  BarChart3,
-  Building2,
-  Users,
-  RefreshCw,
-  CreditCard,
   Sparkles,
+  Users,
+  Building2,
+  BarChart3,
   Check,
   Loader2,
-  AlertCircle,
-  Clock3,
+  RefreshCw,
   ArrowUpRight,
-  TrendingUp,
+  Clock3,
   PoundSterling,
-  Timer,
-  MapPin,
-  Briefcase,
-  LogOut,
+  AlertCircle,
+  Zap,
 } from "lucide-react";
 
 export default function Billing() {
+  const { logout } = useAuth();
+
   const [subscription, setSubscription] =
     useState(null);
 
@@ -60,9 +50,6 @@ export default function Billing() {
   const [portalLoading, setPortalLoading] =
     useState(false);
 
-  const [logoutLoading, setLogoutLoading] =
-    useState(false);
-
   const [error, setError] =
     useState("");
 
@@ -73,20 +60,15 @@ export default function Billing() {
   async function loadBilling() {
     try {
       setLoading(true);
-      setError("");
 
       const data =
         await billingAPI.getStatus();
 
-      setSubscription(
-        data || null
-      );
+      setSubscription(data);
     } catch (err) {
-      console.error(err);
-
       setError(
         err?.message ||
-          "Unable to load billing"
+          "Failed to load billing"
       );
     } finally {
       setLoading(false);
@@ -96,7 +78,6 @@ export default function Billing() {
   async function upgrade(plan) {
     try {
       setLoadingPlan(plan);
-      setError("");
 
       const res =
         await billingAPI.checkout({
@@ -107,9 +88,7 @@ export default function Billing() {
         window.location.href =
           res.url;
       }
-    } catch (err) {
-      console.error(err);
-
+    } catch {
       setError(
         "Checkout unavailable"
       );
@@ -121,7 +100,6 @@ export default function Billing() {
   async function openPortal() {
     try {
       setPortalLoading(true);
-      setError("");
 
       const res =
         await billingAPI.portal();
@@ -130,9 +108,7 @@ export default function Billing() {
         window.location.href =
           res.url;
       }
-    } catch (err) {
-      console.error(err);
-
+    } catch {
       setError(
         "Billing portal unavailable"
       );
@@ -141,94 +117,16 @@ export default function Billing() {
     }
   }
 
-  async function logout() {
-    try {
-      setLogoutLoading(true);
-      await authAPI.logout();
-      window.location.href =
-        "/login";
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLogoutLoading(false);
-    }
-  }
-
-  const plans = [
-    {
-      key: "starter",
-      title: "Starter",
-      price: "£49",
-      badge: "Small Teams",
-      icon: <Users size={18} />,
-      featured: false,
-      staff: "5 staff included",
-      extra: "+ £7 per extra staff",
-      save: "Potential saving £165+ / month",
-      features: [
-        "Scheduling",
-        "Clock in / out",
-        "Holiday requests",
-        "Reports",
-        "Timesheets",
-        "Notifications",
-      ],
-    },
-    {
-      key: "pro",
-      title: "Pro",
-      price: "£89",
-      badge: "Most Popular",
-      icon: <Crown size={18} />,
-      featured: true,
-      staff: "15 staff included",
-      extra: "+ £8 per extra staff",
-      save: "Potential saving £380+ / month",
-      features: [
-        "Everything in Starter",
-        "Advanced reports",
-        "Priority support",
-        "Premium scheduling",
-        "Team analytics",
-        "Auto reminders",
-      ],
-    },
-    {
-      key: "business",
-      title: "Business",
-      price: "£149",
-      badge: "Scale Fast",
-      icon: (
-        <Building2 size={18} />
-      ),
-      featured: false,
-      staff: "30 staff included",
-      extra: "+ £10 per extra staff",
-      save: "Potential saving £950+ / month",
-      features: [
-        "Everything in Pro",
-        "Multi-site tools",
-        "Dedicated support",
-        "Enterprise tools",
-        "Custom workflows",
-        "Priority onboarding",
-      ],
-    },
-  ];
-
   const currentPlan =
     subscription?.plan ||
-    subscription?.current_plan ||
-    "";
+    "starter";
 
-  const currentStatus =
+  const status =
     subscription?.status ||
-    subscription?.subscription_status ||
     "inactive";
 
   const trialEnd =
     subscription?.trial_end ||
-    subscription?.trial_ends_at ||
     null;
 
   const trialActive =
@@ -236,7 +134,7 @@ export default function Billing() {
     new Date(trialEnd) >
       new Date();
 
-  const trialDaysLeft =
+  const daysLeft =
     trialActive
       ? Math.ceil(
           (new Date(
@@ -247,33 +145,70 @@ export default function Billing() {
         )
       : 0;
 
-  const headerText = useMemo(() => {
-    if (trialActive) {
-      return `14 DAY TRIAL ACTIVE • ${trialDaysLeft} DAYS LEFT`;
-    }
+  const plans = [
+    {
+      key: "starter",
+      title: "Starter",
+      price: "£49",
+      icon: <Users size={18} />,
+      badge: "Best for small teams",
+      staff: "Up to 5 staff",
+      extra:
+        "+£7 per extra staff",
+      features: [
+        "Scheduling",
+        "Clock in / out",
+        "Holiday requests",
+        "Timesheets",
+        "Basic reports",
+      ],
+    },
+    {
+      key: "pro",
+      title: "Pro",
+      price: "£89",
+      icon: <Crown size={18} />,
+      badge: "Most Popular",
+      staff: "Up to 15 staff",
+      extra:
+        "+£6 per extra staff",
+      featured: true,
+      features: [
+        "Everything in Starter",
+        "Performance tracking",
+        "Advanced reports",
+        "No-show visibility",
+        "Priority support",
+      ],
+    },
+    {
+      key: "business",
+      title: "Business",
+      price: "£149",
+      icon: (
+        <Building2 size={18} />
+      ),
+      badge: "Scale teams fast",
+      staff: "Up to 30 staff",
+      extra:
+        "+£5 per extra staff",
+      features: [
+        "Everything in Pro",
+        "Multi-site support",
+        "Deep analytics",
+        "Priority onboarding",
+        "Best value at scale",
+      ],
+    },
+  ];
 
-    if (
-      currentStatus ===
-        "active" &&
-      currentPlan
-    ) {
-      return `${currentPlan.toUpperCase()} ACTIVE`;
-    }
+  const trialText =
+    useMemo(() => {
+      if (!trialActive)
+        return null;
 
-    if (
-      currentStatus ===
-      "canceled"
-    ) {
-      return "Subscription Cancelled";
-    }
-
-    return "No Active Plan";
-  }, [
-    trialActive,
-    trialDaysLeft,
-    currentPlan,
-    currentStatus,
-  ]);
+      return `${daysLeft} days of FULL premium access remaining`;
+    }, [trialActive, daysLeft]);
 
   if (loading) {
     return (
@@ -288,97 +223,114 @@ export default function Billing() {
     <div className="max-w-7xl mx-auto space-y-8">
 
       {/* HERO */}
+
       <div className="rounded-3xl p-[1px] bg-gradient-to-r from-indigo-500/30 via-purple-500/20 to-transparent">
 
-        <div className="rounded-3xl border border-white/10 bg-[#020617] p-8 text-center">
+        <div className="rounded-3xl border border-white/10 bg-[#020617] p-8">
 
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-sm mb-4">
-            <Sparkles size={15} />
-            Subscription
+          <div className="flex justify-between gap-4 flex-wrap">
+
+            <div>
+              <div className="inline-flex px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-sm gap-2 items-center">
+                <Sparkles size={14} />
+                Billing & Plans
+              </div>
+
+              <h1 className="text-4xl font-semibold mt-4">
+                Grow faster.
+                Save hours.
+              </h1>
+
+              <p className="text-gray-400 mt-4 max-w-2xl">
+                Automate staff
+                scheduling, reduce
+                no-shows, track live
+                attendance and cut
+                admin time every week.
+              </p>
+            </div>
+
+            <div className="flex gap-2 flex-wrap">
+
+              <button
+                onClick={loadBilling}
+                className="px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/15 flex items-center gap-2"
+              >
+                <RefreshCw
+                  size={16}
+                />
+                Refresh
+              </button>
+
+              <button
+                onClick={
+                  openPortal
+                }
+                className="px-4 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 flex items-center gap-2"
+              >
+                {portalLoading ? (
+                  <Loader2
+                    size={16}
+                    className="animate-spin"
+                  />
+                ) : (
+                  <ArrowUpRight
+                    size={16}
+                  />
+                )}
+
+                Manage
+              </button>
+
+              <button
+                onClick={logout}
+                className="px-4 py-3 rounded-2xl bg-red-500/20 text-red-300 hover:bg-red-500/30"
+              >
+                Logout
+              </button>
+
+            </div>
+
           </div>
 
-          <h1 className="text-4xl font-semibold">
-            Billing &
-            Subscription
-          </h1>
+          <div className="mt-6 grid md:grid-cols-3 gap-4">
 
-          <p className="text-gray-400 mt-4 max-w-2xl mx-auto">
-            Save time, reduce wage loss,
-            stop missed shifts and grow
-            your business faster.
-          </p>
+            <MiniBox
+              title="Selected Plan"
+              value={
+                currentPlan.toUpperCase()
+              }
+            />
 
-          <div className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-green-500/10 text-green-400 font-medium flex-wrap justify-center">
-            <CreditCard size={16} />
-            {headerText}
+            <MiniBox
+              title="Status"
+              value={status}
+            />
+
+            <MiniBox
+              title="Trial"
+              value={
+                trialActive
+                  ? trialText
+                  : "Inactive"
+              }
+            />
+
           </div>
 
           {trialActive && (
-            <div className="mt-4 text-sm text-indigo-300">
-              Full premium access during
-              trial.
+            <div className="mt-5 rounded-2xl bg-green-500/10 border border-green-500/30 p-4 text-green-300 text-sm flex gap-2">
+              <Clock3 size={16} />
+              You selected{" "}
+              <b>
+                {currentPlan}
+              </b>{" "}
+              plan, but trial gives
+              full access to all
+              premium features until
+              it ends.
             </div>
           )}
-
-          <div className="mt-5 rounded-2xl bg-yellow-500/10 border border-yellow-500/20 px-4 py-3 text-yellow-300 text-sm">
-            Join in first 6 months and
-            keep these lower prices for
-            life while subscription stays
-            active.
-          </div>
-
-          <div className="mt-6 flex justify-center gap-3 flex-wrap">
-
-            <button
-              onClick={loadBilling}
-              className="px-5 py-3 rounded-2xl bg-white/10 hover:bg-white/15 inline-flex items-center gap-2"
-            >
-              <RefreshCw size={16} />
-              Refresh
-            </button>
-
-            <button
-              onClick={openPortal}
-              disabled={
-                portalLoading
-              }
-              className="px-5 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 inline-flex items-center gap-2"
-            >
-              {portalLoading ? (
-                <Loader2
-                  size={16}
-                  className="animate-spin"
-                />
-              ) : (
-                <ArrowUpRight
-                  size={16}
-                />
-              )}
-
-              Manage Billing
-            </button>
-
-            <button
-              onClick={logout}
-              disabled={
-                logoutLoading
-              }
-              className="px-5 py-3 rounded-2xl bg-red-500/10 hover:bg-red-500/20 text-red-300 inline-flex items-center gap-2"
-            >
-              {logoutLoading ? (
-                <Loader2
-                  size={16}
-                  className="animate-spin"
-                />
-              ) : (
-                <LogOut
-                  size={16}
-                />
-              )}
-              Logout
-            </button>
-
-          </div>
 
         </div>
       </div>
@@ -387,58 +339,50 @@ export default function Billing() {
         <Alert text={error} />
       )}
 
-      {/* ROI TOP */}
-      <div className="grid md:grid-cols-4 gap-4">
+      {/* SAVINGS */}
 
-        <Feature
-          icon={<Timer size={18} />}
+      <div className="grid md:grid-cols-3 gap-4">
+
+        <Saving
+          icon={
+            <Clock3 size={18} />
+          }
           title="Save Admin Time"
-          text="3-10+ hours monthly saved managing staff."
+          text="Typical business saves 8–20 admin hours monthly with rota changes, leave requests and timesheets."
         />
 
-        <Feature
+        <Saving
           icon={
-            <PoundSterling
-              size={18}
-            />
+            <PoundSterling size={18} />
           }
-          title="Reduce Wage Loss"
-          text="Track late starts, no-shows and missing clock-ins."
+          title="Reduce Lost Wages"
+          text="Prevent paying missed shifts, late starts or buddy clock-ins with tracked clocking."
         />
 
-        <Feature
-          icon={<MapPin size={18} />}
-          title="Live Locations"
-          text="Staff get map links and instant schedule updates."
-        />
-
-        <Feature
+        <Saving
           icon={
-            <TrendingUp
-              size={18}
-            />
+            <Zap size={18} />
           }
-          title="Grow Faster"
-          text="Systems built to scale your company."
+          title="Increase Efficiency"
+          text="Auto-updated schedules reduce confusion, texting staff and last-minute changes."
         />
 
       </div>
 
-      {/* PRICING */}
+      {/* PLANS */}
+
       <div className="grid lg:grid-cols-3 gap-6">
 
         {plans.map((plan) => {
-          const isCurrent =
+          const current =
             currentPlan ===
-              plan.key &&
-            currentStatus ===
-              "active";
+            plan.key;
 
           return (
             <motion.div
               key={plan.key}
               whileHover={{
-                y: -5,
+                y: -4,
               }}
               className={`rounded-3xl p-[1px] ${
                 plan.featured
@@ -446,7 +390,7 @@ export default function Billing() {
                   : "bg-white/10"
               }`}
             >
-              <div className="rounded-3xl border border-white/10 bg-[#020617] p-6 h-full">
+              <div className="rounded-3xl border border-white/10 bg-[#020617] p-6">
 
                 <div className="flex items-center gap-2 text-indigo-400 text-sm">
                   {plan.icon}
@@ -460,7 +404,7 @@ export default function Billing() {
                 <p className="text-4xl font-bold mt-4">
                   {plan.price}
                   <span className="text-base text-gray-400 font-normal">
-                    /month
+                    /mo
                   </span>
                 </p>
 
@@ -472,11 +416,7 @@ export default function Billing() {
                   {plan.extra}
                 </p>
 
-                <p className="text-xs text-yellow-300 mt-2">
-                  {plan.save}
-                </p>
-
-                <div className="mt-5 space-y-2">
+                <div className="space-y-2 mt-5">
 
                   {plan.features.map(
                     (
@@ -485,13 +425,11 @@ export default function Billing() {
                     ) => (
                       <div
                         key={i}
-                        className="flex items-center gap-2 text-sm text-gray-300"
+                        className="flex gap-2 text-sm text-gray-300"
                       >
                         <Check
-                          size={
-                            14
-                          }
-                          className="text-green-400"
+                          size={14}
+                          className="text-green-400 mt-0.5"
                         />
                         {item}
                       </div>
@@ -501,43 +439,29 @@ export default function Billing() {
                 </div>
 
                 <button
-                  disabled={
-                    isCurrent ||
-                    !!loadingPlan
-                  }
                   onClick={() =>
-                    !isCurrent &&
                     upgrade(
                       plan.key
                     )
                   }
-                  className={`w-full mt-6 py-3 rounded-2xl font-medium flex items-center justify-center gap-2 ${
-                    isCurrent
+                  disabled={
+                    loadingPlan ||
+                    current
+                  }
+                  className={`w-full mt-6 py-3 rounded-2xl font-medium ${
+                    current
                       ? "bg-green-600"
                       : plan.featured
                       ? "bg-indigo-600 hover:bg-indigo-500"
                       : "bg-white/10 hover:bg-white/20"
                   }`}
                 >
-                  {isCurrent ? (
-                    <>
-                      <Check
-                        size={
-                          16
-                        }
-                      />
-                      Current Plan
-                    </>
-                  ) : (
-                    <>
-                      <Crown
-                        size={
-                          16
-                        }
-                      />
-                      Choose Plan
-                    </>
-                  )}
+                  {loadingPlan ===
+                  plan.key
+                    ? "Loading..."
+                    : current
+                    ? "Current Plan"
+                    : "Choose Plan"}
                 </button>
 
               </div>
@@ -547,25 +471,20 @@ export default function Billing() {
 
       </div>
 
-      {/* SAVINGS EXAMPLES */}
-      <div className="grid md:grid-cols-3 gap-4">
+      {/* AFTER TRIAL */}
 
-        <ROI
-          title="Starter Example"
-          text="1 missed shift + 2 late starts + admin time saved = £165+"
-        />
-
-        <ROI
-          title="Pro Example"
-          text="Payroll fixes + rota time + missed shifts = £380+"
-        />
-
-        <ROI
-          title="Business Example"
-          text="Large teams often save £950+ monthly."
-        />
-
-      </div>
+      {trialActive && (
+        <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-5 text-sm text-yellow-200">
+          When your trial ends,
+          access will switch to your
+          selected{" "}
+          <b>
+            {currentPlan}
+          </b>{" "}
+          plan automatically unless
+          upgraded.
+        </div>
+      )}
 
     </div>
   );
@@ -573,7 +492,24 @@ export default function Billing() {
 
 /* COMPONENTS */
 
-function Feature({
+function MiniBox({
+  title,
+  value,
+}) {
+  return (
+    <div className="rounded-2xl bg-white/5 p-4 border border-white/10">
+      <p className="text-xs text-gray-400">
+        {title}
+      </p>
+
+      <p className="font-semibold mt-2">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function Saving({
   icon,
   title,
   text,
@@ -595,28 +531,11 @@ function Feature({
   );
 }
 
-function ROI({
-  title,
-  text,
-}) {
-  return (
-    <div className="rounded-2xl border border-green-500/20 bg-green-500/5 p-5">
-      <h3 className="font-medium text-green-300">
-        {title}
-      </h3>
-
-      <p className="text-sm text-gray-400 mt-2">
-        {text}
-      </p>
-    </div>
-  );
-}
-
 function Alert({
   text,
 }) {
   return (
-    <div className="rounded-xl bg-red-500/10 border border-red-500/30 p-4 text-red-300 text-sm flex gap-2">
+    <div className="rounded-2xl bg-red-500/10 border border-red-500/30 p-4 text-red-300 text-sm flex gap-2">
       <AlertCircle size={16} />
       {text}
     </div>
@@ -635,6 +554,7 @@ function Center({
           className="animate-spin"
         />
       )}
+
       {text}
     </div>
   );
