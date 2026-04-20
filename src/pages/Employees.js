@@ -1,23 +1,25 @@
 /* =========================================================
 src/pages/Employees.js
-EMPLOYEES V4 CONTROL CENTRE
+EMPLOYEES V4 REAL DATA ONLY
 COPY / PASTE READY
 
-✅ Your admin profile at top
-✅ Company stats cards
-✅ Missing setup alerts
-✅ Pending invites tracker
-✅ Invite expiry countdown
-✅ Accepted invites auto disappear
-✅ Search staff
-✅ Edit employee
+✅ No fake demo data
+✅ Real users from Supabase
+✅ Real invites only
+✅ Pending invites panel
+✅ Action needed alerts
+✅ Admin profile top
 ✅ Multi invites
-✅ Modern SaaS UI
+✅ Edit employee
+✅ Search staff
 ========================================================= */
 
 import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "../hooks/useAuth";
-import { userAPI, inviteAPI } from "../services/api";
+import {
+  userAPI,
+  inviteAPI,
+} from "../services/api";
 
 import {
   Users,
@@ -26,9 +28,6 @@ import {
   AlertTriangle,
   Crown,
   Shield,
-  User,
-  PoundSterling,
-  Clock,
   Mail,
   X,
   Save,
@@ -38,59 +37,94 @@ export default function Employees() {
   const { user } = useAuth();
 
   const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-
-  const [search, setSearch] = useState("");
-
-  const [inviteOpen, setInviteOpen] = useState(false);
-  const [inviteEmails, setInviteEmails] = useState("");
-  const [inviteRole, setInviteRole] = useState("employee");
-
-  const [editor, setEditor] = useState(null);
-  const [form, setForm] = useState({});
-
-  const [success, setSuccess] = useState("");
-  const [error, setError] = useState("");
-
-  /* demo pending invites
-     replace with real DB later */
   const [pendingInvites, setPendingInvites] =
-    useState([
-      {
-        email: "frank@frank.com",
-        sent_at: Date.now(),
-        expires_days: 7,
-      },
-    ]);
+    useState([]);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [saving, setSaving] =
+    useState(false);
+
+  const [search, setSearch] =
+    useState("");
+
+  const [inviteOpen, setInviteOpen] =
+    useState(false);
+
+  const [inviteEmails, setInviteEmails] =
+    useState("");
+
+  const [inviteRole, setInviteRole] =
+    useState("employee");
+
+  const [editor, setEditor] =
+    useState(null);
+
+  const [form, setForm] =
+    useState({});
+
+  const [success, setSuccess] =
+    useState("");
+
+  const [error, setError] =
+    useState("");
 
   useEffect(() => {
     load();
+    loadInvites();
   }, []);
 
   async function load() {
     try {
       setLoading(true);
-      const data = await userAPI.getAll();
-      setRows(Array.isArray(data) ? data : []);
+
+      const data =
+        await userAPI.getAll();
+
+      setRows(
+        Array.isArray(data)
+          ? data
+          : []
+      );
     } catch {
-      setError("Failed loading employees");
+      setError(
+        "Failed loading staff"
+      );
     } finally {
       setLoading(false);
     }
   }
 
+  async function loadInvites() {
+    try {
+      const data =
+        await inviteAPI.getAll();
+
+      setPendingInvites(
+        Array.isArray(data)
+          ? data
+          : []
+      );
+    } catch {
+      setPendingInvites([]);
+    }
+  }
+
   const filtered = useMemo(() => {
-    const q = search.toLowerCase();
+    const q =
+      search.toLowerCase();
 
     return rows.filter(
       (x) =>
-        x.name?.toLowerCase().includes(q) ||
-        x.email?.toLowerCase().includes(q)
+        x.name
+          ?.toLowerCase()
+          .includes(q) ||
+        x.email
+          ?.toLowerCase()
+          .includes(q)
     );
   }, [rows, search]);
-
-  const me = rows.find((x) => x.id === user?.id);
 
   const alerts = [];
 
@@ -106,60 +140,89 @@ export default function Employees() {
         `${x.name || x.email} needs department`
       );
     }
-  });
 
-  pendingInvites.forEach((x) => {
-    const daysLeft =
-      x.expires_days -
-      Math.floor(
-        (Date.now() - x.sent_at) /
-          86400000
-      );
-
-    if (daysLeft > 0) {
+    if (
+      !x.contracted_hours
+    ) {
       alerts.push(
-        `Invite sent to ${x.email} (${daysLeft} day left)`
+        `${x.name || x.email} needs contracted hours`
       );
     }
   });
 
+  pendingInvites.forEach(
+    (x) => {
+      const sent =
+        new Date(
+          x.created_at
+        ).getTime();
+
+      const daysLeft =
+        7 -
+        Math.floor(
+          (Date.now() -
+            sent) /
+            86400000
+        );
+
+      if (
+        x.accepted !==
+          true &&
+        daysLeft > 0
+      ) {
+        alerts.push(
+          `Invite sent to ${x.email} (${daysLeft} day left)`
+        );
+      }
+    }
+  );
+
   async function sendInvites() {
     if (saving) return;
 
-    const emails = inviteEmails
-      .split("\n")
-      .map((x) => x.trim())
-      .filter(Boolean);
+    const emails =
+      inviteEmails
+        .split("\n")
+        .map((x) =>
+          x
+            .trim()
+            .toLowerCase()
+        )
+        .filter(Boolean);
 
-    if (!emails.length) return;
+    if (!emails.length)
+      return;
 
     try {
       setSaving(true);
+      setError("");
+      setSuccess("");
 
       for (const email of emails) {
         await inviteAPI.send({
           email,
-          role: inviteRole,
+          role:
+            inviteRole,
         });
       }
 
-      setPendingInvites([
-        ...pendingInvites,
-        ...emails.map((email) => ({
-          email,
-          sent_at: Date.now(),
-          expires_days: 7,
-        })),
-      ]);
+      await loadInvites();
 
-      setInviteEmails("");
-      setInviteOpen(false);
+      setInviteEmails(
+        ""
+      );
+
+      setInviteOpen(
+        false
+      );
 
       setSuccess(
         `${emails.length} invite(s) sent`
       );
     } catch {
-      setError("Invite failed");
+      setError(
+        "Invite failed"
+      );
     } finally {
       setSaving(false);
     }
@@ -169,13 +232,17 @@ export default function Employees() {
     setEditor(emp);
 
     setForm({
-      name: emp.name || "",
+      name:
+        emp.name || "",
       department:
-        emp.department || "",
+        emp.department ||
+        "",
       hourly_rate:
-        emp.hourly_rate || "",
+        emp.hourly_rate ||
+        "",
       contracted_hours:
-        emp.contracted_hours || "",
+        emp.contracted_hours ||
+        "",
     });
   }
 
@@ -189,11 +256,16 @@ export default function Employees() {
       );
 
       setEditor(null);
-      load();
 
-      setSuccess("Saved");
+      await load();
+
+      setSuccess(
+        "Saved"
+      );
     } catch {
-      setError("Save failed");
+      setError(
+        "Save failed"
+      );
     } finally {
       setSaving(false);
     }
@@ -203,7 +275,7 @@ export default function Employees() {
     <div className="space-y-6">
 
       {/* HEADER */}
-      <div className="flex justify-between gap-3 flex-wrap">
+      <div className="flex justify-between flex-wrap gap-4">
 
         <div>
           <h1 className="text-3xl font-bold">
@@ -217,7 +289,9 @@ export default function Employees() {
 
         <button
           onClick={() =>
-            setInviteOpen(true)
+            setInviteOpen(
+              true
+            )
           }
           className="px-4 py-2 rounded-xl bg-indigo-600 flex gap-2 items-center"
         >
@@ -227,32 +301,42 @@ export default function Employees() {
 
       </div>
 
-      {/* MY PROFILE */}
-      <div className="rounded-2xl bg-[#020617] border border-white/10 p-5">
-
-        <div className="flex justify-between">
-
-          <div>
-            <p className="text-sm text-gray-400">
-              Logged in as
-            </p>
-
-            <h2 className="text-xl font-semibold">
-              {user?.name ||
-                user?.email}
-            </h2>
-
-            <p className="text-sm text-indigo-300">
-              Admin Account
-            </p>
-          </div>
-
-          <Crown
-            className="text-amber-400"
-            size={26}
-          />
-
+      {/* SUCCESS */}
+      {success && (
+        <div className="rounded-xl bg-green-500/10 text-green-300 px-4 py-3">
+          {success}
         </div>
+      )}
+
+      {/* ERROR */}
+      {error && (
+        <div className="rounded-xl bg-red-500/10 text-red-300 px-4 py-3">
+          {error}
+        </div>
+      )}
+
+      {/* PROFILE */}
+      <div className="rounded-2xl bg-[#020617] border border-white/10 p-5 flex justify-between">
+
+        <div>
+          <p className="text-sm text-gray-400">
+            Logged in as
+          </p>
+
+          <h2 className="text-xl font-semibold">
+            {user?.name ||
+              user?.email}
+          </h2>
+
+          <p className="text-indigo-300 text-sm">
+            Admin
+          </p>
+        </div>
+
+        <Crown
+          className="text-amber-400"
+          size={26}
+        />
 
       </div>
 
@@ -261,25 +345,35 @@ export default function Employees() {
 
         <Card
           title="Total Staff"
-          value={rows.length}
-          icon={<Users size={16} />}
+          value={
+            rows.length
+          }
+          icon={
+            <Users size={16} />
+          }
         />
 
         <Card
           title="Pending Invites"
           value={
-            pendingInvites.length
+            pendingInvites.filter(
+              (x) =>
+                x.accepted !==
+                true
+            ).length
           }
-          icon={<Mail size={16} />}
+          icon={
+            <Mail size={16} />
+          }
         />
 
         <Card
-          title="Missing Setup"
-          value={alerts.length}
+          title="Needs Action"
+          value={
+            alerts.length
+          }
           icon={
-            <AlertTriangle
-              size={16}
-            />
+            <AlertTriangle size={16} />
           }
         />
 
@@ -308,19 +402,26 @@ export default function Employees() {
 
         <div className="space-y-2 text-sm">
 
-          {alerts.length === 0 ? (
+          {!alerts.length ? (
             <p className="text-green-400">
               Everything complete
             </p>
           ) : (
-            alerts.map((x, i) => (
-              <div
-                key={i}
-                className="text-amber-300"
-              >
-                • {x}
-              </div>
-            ))
+            alerts.map(
+              (
+                item,
+                i
+              ) => (
+                <div
+                  key={
+                    i
+                  }
+                  className="text-amber-300"
+                >
+                  • {item}
+                </div>
+              )
+            )
           )}
 
         </div>
@@ -328,16 +429,27 @@ export default function Employees() {
       </div>
 
       {/* SEARCH */}
-      <input
-        value={search}
-        onChange={(e) =>
-          setSearch(e.target.value)
-        }
-        placeholder="Search staff..."
-        className="w-full px-4 py-3 rounded-xl bg-[#020617] border border-white/10"
-      />
+      <div className="relative">
 
-      {/* STAFF TABLE */}
+        <Search
+          size={16}
+          className="absolute left-4 top-4 text-gray-500"
+        />
+
+        <input
+          value={search}
+          onChange={(e) =>
+            setSearch(
+              e.target.value
+            )
+          }
+          placeholder="Search staff..."
+          className="w-full pl-11 pr-4 py-3 rounded-xl bg-[#020617] border border-white/10"
+        />
+
+      </div>
+
+      {/* TABLE */}
       <div className="rounded-2xl overflow-hidden bg-[#020617] border border-white/10">
 
         <table className="w-full text-sm">
@@ -360,40 +472,60 @@ export default function Employees() {
           </thead>
 
           <tbody>
-            {filtered.map((emp) => (
-              <tr
-                key={emp.id}
-                className="border-t border-white/5"
-              >
-                <td className="p-4">
-                  {emp.name ||
-                    emp.email}
-                </td>
 
-                <td className="p-4">
-                  {emp.role}
-                </td>
-
-                <td className="p-4">
-                  {emp.hourly_rate
-                    ? `£${emp.hourly_rate}`
-                    : "-"}
-                </td>
-
-                <td className="p-4">
-                  <button
-                    onClick={() =>
-                      openEditor(
-                        emp
-                      )
-                    }
-                    className="text-indigo-400"
-                  >
-                    Edit
-                  </button>
+            {loading ? (
+              <tr>
+                <td
+                  colSpan="4"
+                  className="p-6 text-center text-gray-400"
+                >
+                  Loading...
                 </td>
               </tr>
-            ))}
+            ) : (
+              filtered.map(
+                (
+                  emp
+                ) => (
+                  <tr
+                    key={
+                      emp.id
+                    }
+                    className="border-t border-white/5"
+                  >
+                    <td className="p-4">
+                      {emp.name ||
+                        emp.email}
+                    </td>
+
+                    <td className="p-4">
+                      {emp.role}
+                    </td>
+
+                    <td className="p-4">
+                      {emp.hourly_rate
+                        ? `£${emp.hourly_rate}`
+                        : "-"}
+                    </td>
+
+                    <td className="p-4">
+                      <button
+                        onClick={() =>
+                          openEditor(
+                            emp
+                          )
+                        }
+                        className="text-indigo-400"
+                      >
+                        Edit
+                      </button>
+                    </td>
+
+                  </tr>
+                )
+              )
+            )}
+
           </tbody>
 
         </table>
@@ -405,16 +537,21 @@ export default function Employees() {
         <Modal
           title="Invite Staff"
           close={() =>
-            setInviteOpen(false)
+            setInviteOpen(
+              false
+            )
           }
         >
 
           <textarea
             rows="7"
-            value={inviteEmails}
+            value={
+              inviteEmails
+            }
             onChange={(e) =>
               setInviteEmails(
-                e.target.value
+                e.target
+                  .value
               )
             }
             placeholder={`one@email.com
@@ -423,10 +560,13 @@ two@email.com`}
           />
 
           <select
-            value={inviteRole}
+            value={
+              inviteRole
+            }
             onChange={(e) =>
               setInviteRole(
-                e.target.value
+                e.target
+                  .value
               )
             }
             className="w-full mt-3 px-4 py-3 rounded-xl bg-slate-900 border border-white/10"
@@ -443,8 +583,12 @@ two@email.com`}
           </select>
 
           <button
-            onClick={sendInvites}
-            disabled={saving}
+            onClick={
+              sendInvites
+            }
+            disabled={
+              saving
+            }
             className="w-full mt-4 py-3 rounded-xl bg-indigo-600"
           >
             {saving
@@ -460,30 +604,52 @@ two@email.com`}
         <Modal
           title={`Edit ${editor.name}`}
           close={() =>
-            setEditor(null)
+            setEditor(
+              null
+            )
           }
         >
 
-          {Object.keys(form).map(
-            (key) => (
+          {Object.keys(
+            form
+          ).map(
+            (
+              key
+            ) => (
               <input
-                key={key}
-                value={form[key]}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    [key]:
-                      e.target.value,
-                  })
+                key={
+                  key
                 }
-                placeholder={key}
+                value={
+                  form[
+                    key
+                  ]
+                }
+                onChange={(
+                  e
+                ) =>
+                  setForm(
+                    {
+                      ...form,
+                      [key]:
+                        e
+                          .target
+                          .value,
+                    }
+                  )
+                }
+                placeholder={
+                  key
+                }
                 className="w-full mt-3 px-4 py-3 rounded-xl bg-slate-900 border border-white/10"
               />
             )
           )}
 
           <button
-            onClick={saveEditor}
+            onClick={
+              saveEditor
+            }
             className="w-full mt-4 py-3 rounded-xl bg-indigo-600 flex justify-center gap-2"
           >
             <Save size={16} />
@@ -496,8 +662,6 @@ two@email.com`}
     </div>
   );
 }
-
-/* COMPONENTS */
 
 function Card({
   title,
