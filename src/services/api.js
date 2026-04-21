@@ -463,21 +463,33 @@ export const shiftAPI = {
     return data || [];
   },
 
-  clockIn: async (payload = {}) => {
-    const user = await getCurrentUser();
+clockIn: async (payload = {}) => {
+  const user = await getCurrentUser();
 
-    const { error } = await supabase
-      .from("shifts")
-      .insert({
-        ...payload,
-        user_id: user.id,
-        company_id: user.company_id,
-        clock_in_time: new Date().toISOString(),
-      });
+  const { data: locations } = await supabase
+    .from("locations")
+    .select("id")
+    .eq("company_id", user.company_id)
+    .limit(1);
 
-    if (error) throw error;
-    return true;
-  },
+  const defaultLocationId =
+    payload.location_id ||
+    locations?.[0]?.id;
+
+  const { error } = await supabase
+    .from("shifts")
+    .insert({
+      ...payload,
+      user_id: user.id,
+      company_id: user.company_id,
+      location_id: defaultLocationId,
+      clock_in_time: new Date().toISOString(),
+    });
+
+  if (error) throw error;
+
+  return true;
+},
 
   clockOut: async () => {
     const user = await getCurrentUser();
