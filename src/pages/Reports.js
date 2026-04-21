@@ -243,11 +243,17 @@ const totalWages = filtered
       r.total_break_seconds
     );
 
-    /* pull wage rate from every possible place */
     const rate = Number(
       r.users?.hourly_rate ??
+      r.users?.hourly_wage ??
+      r.users?.wage ??
+      r.users?.pay_rate ??
+      r.users?.salary_hourly ??
       r.user?.hourly_rate ??
       r.hourly_rate ??
+      r.hourly_wage ??
+      r.wage ??
+      r.pay_rate ??
       r.rate ??
       0
     );
