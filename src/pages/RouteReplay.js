@@ -1,14 +1,10 @@
 // src/pages/RouteReplay.js
-// FULL COPY / PASTE READY
-// FIELD SYNC ENTERPRISE VERSION
-// ✅ Route playback
-// ✅ Employee selector
-// ✅ Date selector
-// ✅ Mileage total
-// ✅ Shift summary
-// ✅ Leaflet map (FREE)
-// ✅ Timeline points
-// ✅ Premium UI
+// FULL FIXED FILE
+// ✅ Mileage now in MILES
+// ✅ UK friendly
+// ✅ Full existing logic kept
+// ✅ Premium UI kept
+// ✅ Copy / Paste Ready
 
 import { useEffect, useMemo, useState } from "react";
 import { reportAPI, userAPI } from "../services/api";
@@ -25,7 +21,6 @@ import "leaflet/dist/leaflet.css";
 
 import {
   Map,
-  Search,
   Navigation,
   CalendarDays,
   Truck,
@@ -163,6 +158,7 @@ export default function RouteReplay() {
     return R * c;
   }
 
+  /* FIXED TO MILES */
   const mileage = useMemo(() => {
     let km = 0;
 
@@ -191,7 +187,10 @@ export default function RouteReplay() {
       );
     }
 
-    return km.toFixed(2);
+    const miles =
+      km * 0.621371;
+
+    return miles.toFixed(2);
   }, [filtered]);
 
   const start =
@@ -290,7 +289,7 @@ export default function RouteReplay() {
 
         <Card
           title="Mileage"
-          value={`${mileage} km`}
+          value={`${mileage} mi`}
           icon={
             <Truck
               size={16}

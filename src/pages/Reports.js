@@ -232,29 +232,29 @@ export default function Reports() {
       )
       .toFixed(2);
 
-  const totalWages =
-    filtered
-      .reduce((sum, r) => {
-        const hrs =
-          calcHours(
-            r.clock_in_time,
-            r.clock_out_time,
-            r.total_break_seconds
-          );
+  /* FIX ONLY */
+/* Replace totalWages in Reports.js */
 
-        const rate =
-          Number(
-            r.users
-              ?.hourly_rate ||
-              r.hourly_rate ||
-              0
-          );
+const totalWages = filtered
+  .reduce((sum, r) => {
+    const hrs = calcHours(
+      r.clock_in_time,
+      r.clock_out_time,
+      r.total_break_seconds
+    );
 
-        return (
-          sum + hrs * rate
-        );
-      }, 0)
-      .toFixed(2);
+    /* pull wage rate from every possible place */
+    const rate = Number(
+      r.users?.hourly_rate ??
+      r.user?.hourly_rate ??
+      r.hourly_rate ??
+      r.rate ??
+      0
+    );
+
+    return sum + hrs * rate;
+  }, 0)
+  .toFixed(2);
 
   const completionRate =
     summary?.tasks > 0
