@@ -391,7 +391,17 @@ export const shiftAPI = {
 
     const { data, error } = await supabase
       .from("shifts")
-      .select("*, users(name,email)")
+      .select(`
+  *,
+  users(
+    name,
+    email,
+    hourly_rate,
+    hourly_wage,
+    wage,
+    pay_rate
+  )
+`)
       .eq("company_id", companyId)
       .order("clock_in_time", {
         ascending: false,
@@ -437,7 +447,17 @@ export const shiftAPI = {
 
     const { data, error } = await supabase
       .from("shifts")
-      .select("*, users(name,email)")
+      .select(`
+  *,
+  users(
+    name,
+    email,
+    hourly_rate,
+    hourly_wage,
+    wage,
+    pay_rate
+  )
+`)
       .eq("company_id", companyId)
       .is("clock_out_time", null);
 
