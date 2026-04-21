@@ -12,7 +12,6 @@ import {
   useState,
   useEffect,
   useCallback,
-  useRef,
 } from "react";
 
 import {
@@ -29,7 +28,9 @@ let listeners = [];
 let started = false;
 
 
-const loadingRef = useRef(false);
+let loadingRef = {
+  current: false,
+};
 
 /* ===================================================== */
 
