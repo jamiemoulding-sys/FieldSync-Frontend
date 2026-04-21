@@ -356,12 +356,9 @@ export const holidayAPI = {
       .from("holidays")
       .select("*")
       .eq("company_id", companyId)
-      .order("created_at", {
-        ascending: false,
-      });
+      .order("created_at", { ascending: false });
 
     if (error) throw error;
-
     return data || [];
   },
 
@@ -372,10 +369,10 @@ export const holidayAPI = {
       .from("holidays")
       .select("*")
       .eq("user_id", user.id)
-      .eq("company_id", user.company_id);
+      .eq("company_id", user.company_id)
+      .order("created_at", { ascending: false });
 
     if (error) throw error;
-
     return data || [];
   },
 
@@ -386,13 +383,41 @@ export const holidayAPI = {
       .from("holidays")
       .insert({
         ...payload,
-        user_id: user.id,
         company_id: user.company_id,
-        status: "pending",
+        status: payload.status || "pending",
       });
 
     if (error) throw error;
+    return true;
+  },
 
+  approve: async (id) => {
+    const { error } = await supabase
+      .from("holidays")
+      .update({ status: "approved" })
+      .eq("id", id);
+
+    if (error) throw error;
+    return true;
+  },
+
+  reject: async (id) => {
+    const { error } = await supabase
+      .from("holidays")
+      .update({ status: "rejected" })
+      .eq("id", id);
+
+    if (error) throw error;
+    return true;
+  },
+
+  delete: async (id) => {
+    const { error } = await supabase
+      .from("holidays")
+      .delete()
+      .eq("id", id);
+
+    if (error) throw error;
     return true;
   },
 };
@@ -781,17 +806,34 @@ export const notificationAPI = {
   },
 
   clearAll: async () => {
-    const user = await getCurrentUser();
+  const user = await getCurrentUser();
 
-    const { error } = await supabase
-      .from("notifications")
-      .delete()
-      .eq("user_id", user.id);
+  const { error } = await supabase
+    .from("notifications")
+    .delete()
+    .eq("user_id", user.id)
+    .eq("company_id", user.company_id);
 
-    if (error) throw error;
+  if (error) throw error;
 
-    return true;
-  },
+  return true;
+},
+
+delete: async (id) => {
+  const user = await getCurrentUser();
+
+  const { error } = await supabase
+    .from("notifications")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .eq("company_id", user.company_id);
+
+  if (error) throw error;
+
+  return true;
+},
+
 };
 
 /* =====================================================
@@ -1026,19 +1068,22 @@ export const locationAPI = {
   },
 
   create: async (payload) => {
-    const companyId = await getCompanyId();
+  const companyId = await getCompanyId();
 
-    const { error } = await supabase
-      .from("locations")
-      .insert({
+  const { error } = await supabase
+    .from("locations")
+    .insert([
+      {
         ...payload,
         company_id: companyId,
-      });
+        created_at: new Date().toISOString(),
+      },
+    ]);
 
-    if (error) throw error;
+  if (error) throw error;
 
-    return true;
-  },
+  return true;
+},
 
   update: async (id, payload) => {
     const companyId = await getCompanyId();
