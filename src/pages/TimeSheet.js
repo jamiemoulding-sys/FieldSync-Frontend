@@ -65,9 +65,13 @@ export default function TimeSheet() {
           return false;
 
         const day =
-          row.clock_in_time.split(
-            "T"
-          )[0];
+          new Date(row.clock_in_time).toLocaleTimeString(
+          "en-GB",
+          {
+           hour: "2-digit",
+           minute: "2-digit",
+          }
+           )
 
         const dateMatch =
           day >= fromDate &&

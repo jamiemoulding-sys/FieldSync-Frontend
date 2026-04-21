@@ -366,10 +366,22 @@ export function useAuth() {
     );
 
 const logout = useCallback(async () => {
-  await supabase.auth.signOut();
+  try {
+    await supabase.auth.signOut({
+      scope: "global",
+    });
+  } catch (err) {
+    console.error(err);
+  }
+
+  globalUser = null;
+  globalLoading = false;
+  emit();
+
   localStorage.clear();
   sessionStorage.clear();
-  window.location.href = "/login";
+
+  window.location.replace("/login");
 }, []);
 
   /* ===================================================== */
