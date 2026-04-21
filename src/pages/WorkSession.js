@@ -203,9 +203,9 @@ export default function WorkSession() {
           await shiftAPI.clockIn({
             location_id:
               selectedLocation,
-            live_latitude:
+            latitude:
               pos.coords.latitude,
-            live_longitude:
+            longitude:
               pos.coords.longitude,
             latitude:
               pos.coords.latitude,
@@ -246,14 +246,11 @@ export default function WorkSession() {
       async (pos) => {
         try {
           await shiftAPI.clockIn({
-            live_latitude:
-              pos.coords.latitude,
-            live_longitude:
-              pos.coords.longitude,
             latitude:
               pos.coords.latitude,
             longitude:
               pos.coords.longitude,
+           
             shift_type: "open",
           });
 
