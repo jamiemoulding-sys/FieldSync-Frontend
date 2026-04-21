@@ -84,6 +84,22 @@ async function getCompanyId() {
   return user.company_id;
 }
 
+function nowISO() {
+  return new Date().toISOString();
+}
+
+function calcSafeHours(start, end, breakSecs = 0) {
+  if (!start || !end) return 0;
+
+  const diff =
+    (new Date(end).getTime() -
+      new Date(start).getTime()) /
+      3600000 -
+    Number(breakSecs || 0) / 3600;
+
+  return Math.max(diff, 0);
+}
+
 /* =====================================================
 AUTH
 ===================================================== */
@@ -463,6 +479,12 @@ export const shiftAPI = {
     return data || [];
   },
 
+/* ONLY CHANGE THESE 3 FUNCTIONS INSIDE shiftAPI */
+/* Paste over your existing clockIn / clockOut / managerClockOut */
+
+/* =========================================
+CLOCK IN (timezone fixed)
+========================================= */
 clockIn: async (payload = {}) => {
   const user = await getCurrentUser();
 
@@ -503,10 +525,7 @@ clockIn: async (payload = {}) => {
       user_id: user.id,
       company_id: user.company_id,
       location_id: defaultLocationId,
-      clock_in_time: new Date(
-      Date.now() -
-      new Date().getTimezoneOffset() * 60000
-      ).toISOString(),
+      clock_in_time: nowISO(),
       latitude: position.lat,
       longitude: position.lng,
     });
@@ -516,35 +535,79 @@ clockIn: async (payload = {}) => {
   return true;
 },
 
-  clockOut: async () => {
-    const user = await getCurrentUser();
+/* =========================================
+CLOCK OUT (negative hours fixed)
+========================================= */
+clockOut: async () => {
+  const user = await getCurrentUser();
 
-    const { error } = await supabase
-      .from("shifts")
-      .update({
-        clock_out_time: new Date().toISOString(),
-      })
-      .eq("user_id", user.id)
-      .is("clock_out_time", null);
+  const active =
+    await shiftAPI.getActive();
 
-    if (error) throw error;
-    return true;
-  },
+  if (!active) return true;
 
-  managerClockOut: async (shiftId, time = null) => {
-    const { error } = await supabase
-      .from("shifts")
-      .update({
-        clock_out_time: new Date(
-        Date.now() -
-        new Date().getTimezoneOffset() * 60000
-        ).toISOString(),
-      })
-      .eq("id", shiftId);
+  const endTime = nowISO();
 
-    if (error) throw error;
-    return true;
-  },
+  const totalHours =
+    calcSafeHours(
+      active.clock_in_time,
+      endTime,
+      active.total_break_seconds
+    );
+
+  const { error } = await supabase
+    .from("shifts")
+    .update({
+      clock_out_time: endTime,
+      total_hours: totalHours,
+    })
+    .eq("id", active.id);
+
+  if (error) throw error;
+
+  return true;
+},
+
+/* =========================================
+MANAGER CLOCK OUT (custom time fixed)
+========================================= */
+managerClockOut: async (
+  shiftId,
+  customTime = null
+) => {
+  const endTime =
+    customTime || nowISO();
+
+  const {
+    data: row,
+    error: loadError,
+  } = await supabase
+    .from("shifts")
+    .select("*")
+    .eq("id", shiftId)
+    .single();
+
+  if (loadError) throw loadError;
+
+  const totalHours =
+    calcSafeHours(
+      row.clock_in_time,
+      endTime,
+      row.total_break_seconds
+    );
+
+  const { error } = await supabase
+    .from("shifts")
+    .update({
+      clock_out_time: endTime,
+      total_hours: totalHours,
+    })
+    .eq("id", shiftId);
+
+  if (error) throw error;
+
+  return true;
+},
 
   startBreak: async () => {
     const user = await getCurrentUser();

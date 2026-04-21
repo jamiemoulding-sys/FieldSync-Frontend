@@ -185,11 +185,6 @@ export default function AppLayout() {
       path: "/my-locations",
     },
     {
-      label: "Route Replay",
-      icon: RouteIcon,
-      path: "/route-replay",
-    },
-    {
       label: "Notifications",
       icon: BellRing,
       path: "/notifications",

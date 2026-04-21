@@ -53,14 +53,16 @@ export default function Dashboard() {
 
 /* ================================================= */
 /* EMPLOYEE DASHBOARD */
-/* FULL PROFESSIONAL FIXED VERSION */
-/* ✅ Route Replay removed
-/* ✅ Leave Remaining added
-/* ✅ Tax Year / Calendar ready
-/* ✅ Timesheet stats added
-/* ✅ Wage estimate added
-/* ✅ This week shifts list
-/* ✅ Existing clock in kept
+/* FULL FIXED VERSION */
+/* ✅ Negative hours fixed
+/* ✅ Negative pay fixed
+/* ✅ Route Replay removed (employee)
+/* ✅ Leave remaining added
+/* ✅ Weekly hours
+/* ✅ Overtime
+/* ✅ Estimated pay
+/* ✅ This week's shifts
+/* ✅ Clean professional layout
 /* ================================================= */
 
 function EmployeeDashboard({ user }) {
@@ -102,25 +104,25 @@ function EmployeeDashboard({ user }) {
       ]);
 
       const mine =
-        allShifts.filter(
+        (allShifts || []).filter(
           (x) =>
             String(x.user_id) ===
             String(user.id)
-        ) || [];
+        );
 
       const myHolidays =
-        allHolidays.filter(
+        (allHolidays || []).filter(
           (x) =>
             String(x.user_id) ===
             String(user.id)
-        ) || [];
+        );
 
       const myTasks =
-        allTasks.filter((x) =>
+        (allTasks || []).filter((x) =>
           x.assigned_users?.includes(
             user.id
           )
-        ) || [];
+        );
 
       const live = mine.find(
         (x) =>
@@ -140,16 +142,25 @@ function EmployeeDashboard({ user }) {
   if (loading) return <Loading />;
 
   /* ====================================== */
-  /* THIS WEEK FILTER */
+  /* WEEK START */
   /* ====================================== */
 
   const now = new Date();
 
-  const startWeek = new Date();
+  const startWeek = new Date(now);
+
+  const day =
+    startWeek.getDay() || 7;
+
   startWeek.setDate(
-    now.getDate() - now.getDay()
+    startWeek.getDate() - day + 1
   );
+
   startWeek.setHours(0, 0, 0, 0);
+
+  /* ====================================== */
+  /* THIS WEEK SHIFTS */
+  /* ====================================== */
 
   const weekShifts = shifts.filter(
     (row) =>
@@ -160,11 +171,14 @@ function EmployeeDashboard({ user }) {
   );
 
   /* ====================================== */
-  /* HOURS */
+  /* HOURS FIX */
   /* ====================================== */
 
-  const weekHours = weekShifts
-    .reduce((sum, row) => {
+  const totalHours = weekShifts.reduce(
+    (sum, row) => {
+      if (!row.clock_in_time)
+        return sum;
+
       const start = new Date(
         row.clock_in_time
       );
@@ -175,32 +189,42 @@ function EmployeeDashboard({ user }) {
           )
         : new Date();
 
-      return (
-        sum +
-        (end - start) / 3600000
-      );
-    }, 0)
-    .toFixed(1);
+      const diff =
+        (end - start) / 3600000;
+
+      if (
+        isNaN(diff) ||
+        diff < 0
+      )
+        return sum;
+
+      return sum + diff;
+    },
+    0
+  );
+
+  const weekHours =
+    totalHours.toFixed(1);
 
   const overtime = Math.max(
-    Number(weekHours) - 40,
+    totalHours - 40,
     0
   ).toFixed(1);
 
   /* ====================================== */
-  /* WAGES */
+  /* PAY */
   /* ====================================== */
 
-  const hourly =
-    Number(
-      user?.profile?.hourly_rate ||
-        user?.profile?.hourly_wage ||
-        user?.profile?.wage ||
-        0
-    ) || 0;
+  const hourlyRate = Number(
+    user?.profile?.hourly_rate ||
+      user?.profile?.hourly_wage ||
+      user?.profile?.wage ||
+      user?.profile?.pay_rate ||
+      0
+  );
 
   const estimatedPay = (
-    Number(weekHours) * hourly
+    totalHours * hourlyRate
   ).toFixed(2);
 
   /* ====================================== */
@@ -208,12 +232,15 @@ function EmployeeDashboard({ user }) {
   /* ====================================== */
 
   const allowance =
-    user?.company?.holiday_allowance ||
-    20;
+    Number(
+      user?.company
+        ?.holiday_allowance
+    ) || 20;
 
   const used = holidays
     .filter(
-      (x) => x.status === "approved"
+      (x) =>
+        x.status === "approved"
     )
     .reduce(
       (sum, row) =>
@@ -225,12 +252,12 @@ function EmployeeDashboard({ user }) {
   const remaining =
     allowance - used;
 
+  /* ====================================== */
+
   const pending =
     tasks.filter(
       (x) => !x.completed
     ).length;
-
-  /* ====================================== */
 
   return (
     <div className="space-y-6">
@@ -247,7 +274,7 @@ function EmployeeDashboard({ user }) {
         </h1>
       </div>
 
-      {/* CLOCK */}
+      {/* CLOCK BUTTON */}
 
       <button
         onClick={() =>
@@ -260,7 +287,7 @@ function EmployeeDashboard({ user }) {
           : "Clock In"}
       </button>
 
-      {/* TOP STATS */}
+      {/* TOP CARDS */}
 
       <div className="grid md:grid-cols-4 gap-4">
 
@@ -292,7 +319,7 @@ function EmployeeDashboard({ user }) {
 
       </div>
 
-      {/* LEAVE */}
+      {/* LEAVE CARD */}
 
       <div className="rounded-3xl bg-white/5 p-6 border border-white/10">
 
@@ -332,11 +359,12 @@ function EmployeeDashboard({ user }) {
           <div
             className="h-full bg-green-500"
             style={{
-              width: `${
+              width: `${Math.max(
                 (remaining /
                   allowance) *
-                100
-              }%`,
+                  100,
+                0
+              )}%`,
             }}
           />
         </div>
@@ -367,14 +395,19 @@ function EmployeeDashboard({ user }) {
                     )
                   : null;
 
-              const hrs =
-                end
-                  ? (
-                      (end -
-                        start) /
-                      3600000
-                    ).toFixed(1)
-                  : "--";
+              let hrs = "--";
+
+              if (end) {
+                const diff =
+                  (end -
+                    start) /
+                  3600000;
+
+                hrs =
+                  diff > 0
+                    ? diff.toFixed(1)
+                    : "0.0";
+              }
 
               return (
                 <div
@@ -382,12 +415,14 @@ function EmployeeDashboard({ user }) {
                   className="grid grid-cols-3 gap-3 text-sm bg-white/5 rounded-2xl p-4"
                 >
                   <span>
-                    {start.toLocaleDateString()}
+                    {start.toLocaleDateString(
+                      "en-GB"
+                    )}
                   </span>
 
                   <span>
                     {start.toLocaleTimeString(
-                      [],
+                      "en-GB",
                       {
                         hour:
                           "2-digit",
@@ -397,15 +432,15 @@ function EmployeeDashboard({ user }) {
                     )}
                   </span>
 
-                  <span className="text-indigo-300">
+                  <span className="text-indigo-300 text-right">
                     {hrs} hrs
                   </span>
                 </div>
               );
             })
           ) : (
-            <p className="text-gray-400 text-sm">
-              No completed shifts this week.
+            <p className="text-sm text-gray-400">
+              No shifts completed this week.
             </p>
           )}
 
@@ -416,7 +451,6 @@ function EmployeeDashboard({ user }) {
     </div>
   );
 }
-
 /* ================================================= */
 /* ADMIN DASHBOARD */
 /* ================================================= */
