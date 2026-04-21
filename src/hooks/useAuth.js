@@ -12,6 +12,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useRef,
 } from "react";
 
 import {
@@ -26,6 +27,9 @@ let globalUser = null;
 let globalLoading = true;
 let listeners = [];
 let started = false;
+
+
+const loadingRef = useRef(false);
 
 /* ===================================================== */
 
@@ -51,159 +55,107 @@ function setLoading(v) {
 /* ===================================================== */
 
 async function loadProfile() {
-  const {
-    data: { session },
-  } =
-    await supabase.auth.getSession();
+  if (loadingRef.current) return;
 
-  if (!session?.user) {
-    setUser(null);
-    return;
-  }
+  try {
+    loadingRef.current = true;
 
-  const authUser =
-    session.user;
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-  /* USER PROFILE */
+    if (!session?.user) {
+      setUser(null);
+      return;
+    }
 
-  const {
-    data: row,
-    error: rowError,
-  } =
-    await supabase
+    const authUser = session.user;
+
+    const {
+      data: row,
+      error: rowError,
+    } = await supabase
       .from("users")
       .select("*")
-      .eq(
-        "id",
-        authUser.id
-      )
+      .eq("id", authUser.id)
       .single();
 
-  if (rowError || !row) {
-    setUser(null);
-    return;
+    if (rowError || !row) {
+      setUser(null);
+      return;
+    }
+
+    let company = null;
+
+    if (row.company_id) {
+      const { data } =
+        await supabase
+          .from("companies")
+          .select("*")
+          .eq("id", row.company_id)
+          .single();
+
+      company = data;
+    }
+
+    const trialEnd =
+      company?.trial_ends_at ||
+      company?.trial_end ||
+      row?.trial_ends_at ||
+      row?.trial_end ||
+      null;
+
+    const trialActive =
+      !!trialEnd &&
+      new Date(trialEnd) >
+        new Date();
+
+    const paid =
+      company?.subscription_status ===
+        "active" ||
+      row?.subscription_status ===
+        "active" ||
+      company?.is_pro === true ||
+      row?.is_pro === true;
+
+    const hasPremiumAccess =
+      paid || trialActive;
+
+    const currentPlan =
+      company?.current_plan ||
+      row?.current_plan ||
+      company?.plan ||
+      row?.plan ||
+      "starter";
+
+    setUser({
+      id: authUser.id,
+      email: authUser.email,
+      name: row?.name || "",
+      role: row?.role || "employee",
+      companyId: row?.company_id,
+      companyName:
+        company?.name || "",
+      isPro: paid,
+      subscription_status:
+        company?.subscription_status ||
+        row?.subscription_status ||
+        (trialActive
+          ? "trial"
+          : "inactive"),
+      currentPlan,
+      trial_end: trialEnd,
+      trialActive,
+      hasPremiumAccess,
+      company,
+      profile: row,
+    });
+  } finally {
+    loadingRef.current = false;
   }
-
-  /* COMPANY */
-
-  let company = null;
-
-  if (row.company_id) {
-    const {
-      data,
-    } =
-      await supabase
-        .from("companies")
-        .select("*")
-        .eq(
-          "id",
-          row.company_id
-        )
-        .single();
-
-    company = data;
-  }
-
-  /* =====================================================
-     TRIAL LOGIC
-  ===================================================== */
-
-  const trialEnd =
-    company?.trial_ends_at ||
-    company?.trial_end ||
-    row?.trial_ends_at ||
-    row?.trial_end ||
-    null;
-
-  const trialActive =
-    !!trialEnd &&
-    new Date(trialEnd) >
-      new Date();
-
-  /* =====================================================
-     PAID STATUS
-  ===================================================== */
-
-  const paid =
-    company?.subscription_status ===
-      "active" ||
-    row?.subscription_status ===
-      "active" ||
-    company?.is_pro === true ||
-    row?.is_pro === true;
-
-  const hasPremiumAccess =
-    paid || trialActive;
-
-  /* =====================================================
-     PLAN FIX
-  ===================================================== */
-
-  const currentPlan =
-    company?.current_plan ||
-    row?.current_plan ||
-    company?.plan ||
-    row?.plan ||
-    (paid
-      ? "starter"
-      : "starter");
-
-  /* =====================================================
-     FINAL USER
-  ===================================================== */
-
-  setUser({
-    id: authUser.id,
-
-    email:
-      authUser.email,
-
-    name:
-      row?.name || "",
-
-    role:
-      row?.role ||
-      "employee",
-
-    companyId:
-      row?.company_id,
-
-    companyName:
-      company?.name ||
-      "",
-
-    /* billing */
-
-    isPro: paid,
-
-    subscription_status:
-      company?.subscription_status ||
-      row?.subscription_status ||
-      (trialActive
-        ? "trial"
-        : "inactive"),
-
-    /* plan */
-
-    currentPlan,
-
-    /* trial */
-
-    trial_end:
-      trialEnd,
-
-    trialActive,
-
-    /* access */
-
-    hasPremiumAccess,
-
-    /* extras */
-
-    company,
-    profile: row,
-  });
 }
+
+ 
 
 /* ===================================================== */
 
@@ -270,27 +222,15 @@ async function init() {
   );
 
   /* TAB FOCUS REFRESH */
-
-  window.addEventListener(
-    "focus",
-    async () => {
-      await loadProfile();
+window.addEventListener(
+  "focus",
+  () => {
+    if (!loadingRef.current) {
+      loadProfile();
     }
-  );
-
-  /* PAGE VISIBILITY REFRESH */
-
-  document.addEventListener(
-    "visibilitychange",
-    async () => {
-      if (
-        document.visibilityState ===
-        "visible"
-      ) {
-        await loadProfile();
-      }
-    }
-  );
+  }
+);
+  
 }
 
 /* ===================================================== */
