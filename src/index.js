@@ -31,7 +31,9 @@ if (
           await navigator.serviceWorker.register(
             "/service-worker.js"
           );
-
+        navigator.serviceWorker.ready.then(() => {
+  console.log("SW ready");
+});
         console.log(
           "SW registered",
           reg
