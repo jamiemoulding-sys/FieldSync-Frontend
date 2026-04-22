@@ -1,12 +1,10 @@
 // src/App.js
-// FULL FIX EMPLOYEE VERSION
-// ✅ Full copy / paste ready
-// ✅ Admin + Manager desktop unchanged
-// ✅ Employee side cleaned up
-// ✅ Employee sees only own pages
-// ✅ Mobile friendly structure
-// ✅ Billing + auth kept
+// FULL FILE REPLACEMENT
+// ✅ Offline airplane mode open fixed
+// ✅ Cached user support
+// ✅ Existing routes untouched
 // ✅ Route protection kept
+// ✅ Admin / Manager / Employee logic kept
 
 import {
   BrowserRouter as Router,
@@ -54,7 +52,6 @@ import Billing from "./pages/Billing";
 import Profile from "./pages/Profile";
 import Success from "./pages/Success";
 import AppLayout from "./layout/AppLayout";
-
 import RouteReplay from "./pages/RouteReplay";
 import PayrollExport from "./pages/PayrollExport";
 import Alerts from "./pages/Alerts";
@@ -93,8 +90,9 @@ function VisibilityRefresh() {
   useEffect(() => {
     const refresh = () => {
       if (
+        navigator.onLine &&
         document.visibilityState ===
-        "visible"
+          "visible"
       ) {
         reloadUser?.();
       }
@@ -154,6 +152,32 @@ function ProtectedRoute({
     loading,
   } = useAuth();
 
+  /* ===================================== */
+  /* OFFLINE MODE FIX */
+  /* ===================================== */
+
+  if (!navigator.onLine) {
+    const cachedUser =
+      localStorage.getItem(
+        "cachedUser"
+      );
+
+    if (cachedUser) {
+      return children;
+    }
+
+    return (
+      <Navigate
+        to="/login"
+        replace
+      />
+    );
+  }
+
+  /* ===================================== */
+  /* ONLINE MODE */
+  /* ===================================== */
+
   if (loading)
     return <ScreenLoader />;
 
@@ -196,6 +220,10 @@ function RoleRoute({
     loading,
   } = useAuth();
 
+  if (!navigator.onLine) {
+    return children;
+  }
+
   if (loading)
     return <ScreenLoader />;
 
@@ -231,6 +259,10 @@ function PublicOnly({
     user,
     loading,
   } = useAuth();
+
+  if (!navigator.onLine) {
+    return children;
+  }
 
   if (loading)
     return <ScreenLoader />;
@@ -332,8 +364,6 @@ export default function App() {
           }
         >
 
-          {/* ALL USERS */}
-
           <Route
             path="/dashboard"
             element={<Dashboard />}
@@ -346,15 +376,17 @@ export default function App() {
 
           <Route
             path="/notifications"
-            element={<Notifications />}
+            element={
+              <Notifications />
+            }
           />
 
           <Route
             path="/work-session"
-            element={<WorkSession />}
+            element={
+              <WorkSession />
+            }
           />
-
-          {/* EMPLOYEE SAFE PAGES */}
 
           <Route
             path="/tasks"
@@ -368,20 +400,24 @@ export default function App() {
 
           <Route
             path="/my-schedule"
-            element={<MySchedule />}
+            element={
+              <MySchedule />
+            }
           />
 
           <Route
             path="/my-holidays"
-            element={<MyHolidays />}
+            element={
+              <MyHolidays />
+            }
           />
 
           <Route
             path="/my-locations"
-            element={<MyLocations />}
+            element={
+              <MyLocations />
+            }
           />
-
-          {/* MANAGER + ADMIN */}
 
           <Route
             path="/employees"
@@ -508,8 +544,6 @@ export default function App() {
               </RoleRoute>
             }
           />
-
-          {/* ADMIN ONLY */}
 
           <Route
             path="/reports"
