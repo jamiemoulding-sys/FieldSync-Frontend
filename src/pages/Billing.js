@@ -141,28 +141,27 @@ export default function Billing() {
   }
 
   async function confirmDeleteCompany() {
-    try {
-      setDeleteLoading(true);
+  try {
+    setDeleteLoading(true);
+    setError("");
 
-      // CONNECT BACKEND DELETE ENDPOINT HERE
-      // await accountAPI.deleteCompany();
+    await billingAPI.deleteAccount();
 
-      await new Promise((r) =>
-        setTimeout(r, 1500)
-      );
+    await logout();
 
-      alert(
-        "Connect backend delete endpoint."
-      );
+    window.location.href = "/login";
 
-    } catch {
-      setError(
-        "Delete failed"
-      );
-    } finally {
-      setDeleteLoading(false);
-    }
+  } catch (err) {
+    setError(
+      err?.response?.data?.error ||
+      err?.message ||
+      "Delete failed"
+    );
+  } finally {
+    setDeleteLoading(false);
   }
+}
+    
 
   const currentPlan =
     data?.plan ||

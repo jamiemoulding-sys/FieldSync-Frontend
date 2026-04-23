@@ -1696,6 +1696,14 @@ export const billingAPI = {
     return res.data;
   },
 
+  deleteAccount: async () => {
+  const res = await api.post(
+    "/auth/delete-account"
+  );
+
+  return res.data;
+},
+
   setPlan: async (plan) => {
   const companyId = await getCompanyId();
 
