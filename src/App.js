@@ -340,7 +340,7 @@ export default function App() {
         />
 
         <Route
-          path="/accept-invite"
+          path="/accept-invite/*"
           element={<SetPassword />}
         />
 

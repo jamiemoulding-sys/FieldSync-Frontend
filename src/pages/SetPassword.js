@@ -60,8 +60,10 @@ export default function SetPassword() {
       } = await supabase.auth.getSession();
 
       if (!session?.user) {
-        navigate("/login");
-        return;
+         setTimeout(() => {
+         navigate("/login");
+        }, 1500);
+         return;
       }
 
       setEmail(session.user.email || "");
