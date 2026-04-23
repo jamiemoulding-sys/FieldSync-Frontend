@@ -1,12 +1,11 @@
 // src/pages/Performance.js
-// FULL PREMIUM PERFORMANCE REPLACEMENT
-// ✅ Real live data only
-// ✅ No demo metrics
-// ✅ Uses existing performanceAPI.getAll()
-// ✅ Lateness / hours / consistency / rankings
-// ✅ Useful management insights
-// ✅ Premium UI
-// ✅ Full copy / paste ready
+// FULL PREMIUM PERFORMANCE REPLACEMENT V2
+// ✅ Real company-useful metrics
+// ✅ Lateness / attendance / utilisation
+// ✅ Top performers
+// ✅ Needs attention list
+// ✅ Clean premium UI
+// ✅ Full copy + paste ready
 
 import {
   useEffect,
@@ -19,17 +18,17 @@ import { motion } from "framer-motion";
 
 import {
   Trophy,
-  Clock3,
-  Search,
   RefreshCw,
   Loader2,
+  Search,
+  Users,
+  Clock3,
   AlertTriangle,
+  TrendingUp,
   Star,
   Medal,
   TimerReset,
-  Users,
-  TrendingUp,
-  Briefcase,
+  ShieldAlert,
 } from "lucide-react";
 
 export default function Performance() {
@@ -69,13 +68,13 @@ export default function Performance() {
   }
 
   const rows = useMemo(() => {
-    let list = [...data];
+    let arr = [...data];
 
     if (search.trim()) {
       const q =
         search.toLowerCase();
 
-      list = list.filter(
+      arr = arr.filter(
         (x) =>
           x.name
             ?.toLowerCase()
@@ -86,27 +85,24 @@ export default function Performance() {
       );
     }
 
-    list.sort((a, b) => {
-      if (sortBy === "hours") {
+    arr.sort((a, b) => {
+      if (sortBy === "hours")
         return (
           getHours(b) -
           getHours(a)
         );
-      }
 
-      if (sortBy === "lateness") {
+      if (sortBy === "late")
         return (
-          getLateCount(b) -
-          getLateCount(a)
+          getLate(b) -
+          getLate(a)
         );
-      }
 
-      if (sortBy === "shifts") {
+      if (sortBy === "attendance")
         return (
-          getShifts(b) -
-          getShifts(a)
+          getAttendance(b) -
+          getAttendance(a)
         );
-      }
 
       return (
         getScore(b) -
@@ -114,7 +110,7 @@ export default function Performance() {
       );
     });
 
-    return list;
+    return arr;
   }, [data, search, sortBy]);
 
   const top =
@@ -140,7 +136,7 @@ export default function Performance() {
     rows.reduce(
       (sum, x) =>
         sum +
-        getLateCount(x),
+        getLate(x),
       0
     );
 
@@ -156,18 +152,26 @@ export default function Performance() {
         )
       : 0;
 
-  const lowPerformers =
+  const lowStaff =
     rows.filter(
       (x) =>
         getScore(x) < 55
     ).length;
 
+  const bestAttendance =
+    rows.length
+      ? Math.max(
+          ...rows.map((x) =>
+            getAttendance(x)
+          )
+        )
+      : 0;
+
   const insights = [];
 
   if (top) {
     insights.push(
-      `${top.name ||
-        "Top Employee"} leads performance this period`
+      `${top.name} currently highest performer`
     );
   }
 
@@ -177,25 +181,21 @@ export default function Performance() {
     );
   }
 
-  if (
-    Number(avgHours) > 42
-  ) {
+  if (lowStaff > 0) {
     insights.push(
-      "Average hours are high — check burnout risk"
+      `${lowStaff} staff need review`
     );
   }
 
-  if (
-    lowPerformers > 0
-  ) {
+  if (Number(avgHours) > 42) {
     insights.push(
-      `${lowPerformers} team members need review`
+      "Average weekly hours are high"
     );
   }
 
   if (!insights.length) {
     insights.push(
-      "Team performance looks strong"
+      "Team performance healthy"
     );
   }
 
@@ -221,7 +221,7 @@ export default function Performance() {
           </h1>
 
           <p className="text-sm text-gray-400">
-            Staff output, reliability & workforce rankings
+            Real workforce productivity intelligence
           </p>
         </div>
 
@@ -239,13 +239,14 @@ export default function Performance() {
 
       {top && (
         <div className="rounded-3xl p-[1px] bg-gradient-to-r from-yellow-500/30 via-indigo-500/20 to-transparent">
+
           <div className="rounded-3xl bg-[#020617] border border-white/10 p-6">
 
-            <div className="flex justify-between gap-4 flex-wrap items-center">
+            <div className="flex justify-between flex-wrap gap-4 items-center">
 
-              <div className="flex items-center gap-4">
+              <div className="flex gap-4 items-center">
 
-                <div className="w-14 h-14 rounded-full bg-yellow-500/20 flex items-center justify-center text-yellow-400">
+                <div className="w-14 h-14 rounded-full bg-yellow-500/20 text-yellow-400 flex items-center justify-center">
                   <Trophy size={24} />
                 </div>
 
@@ -254,16 +255,17 @@ export default function Performance() {
                     Top Performer
                   </p>
 
-                  <h2 className="text-xl font-semibold">
-                    {top.name ||
-                      top.email}
+                  <h2 className="text-2xl font-semibold">
+                    {top.name}
                   </h2>
 
                   <p className="text-sm text-gray-400 mt-1">
-                    {getShifts(top)} shifts •{" "}
                     {getHours(top).toFixed(
                       1
-                    )} hrs
+                    )} hrs •{" "}
+                    {getAttendance(
+                      top
+                    )}% attendance
                   </p>
                 </div>
 
@@ -271,7 +273,7 @@ export default function Performance() {
 
               <div className="text-right">
                 <p className="text-xs text-gray-400">
-                  Performance Score
+                  Score
                 </p>
 
                 <p className="text-4xl font-semibold text-yellow-400">
@@ -282,43 +284,42 @@ export default function Performance() {
             </div>
 
           </div>
+
         </div>
       )}
 
       {/* KPI */}
 
-      <div className="grid md:grid-cols-4 gap-4">
+      <div className="grid md:grid-cols-5 gap-4">
 
         <KPI
           title="Employees"
           value={rows.length}
-          icon={
-            <Users size={16} />
-          }
+          icon={<Users size={16} />}
         />
 
         <KPI
-          title="Average Score"
+          title="Avg Score"
           value={`${avgScore}%`}
-          icon={
-            <Star size={16} />
-          }
+          icon={<Star size={16} />}
         />
 
         <KPI
           title="Avg Hours"
           value={avgHours}
-          icon={
-            <Clock3 size={16} />
-          }
+          icon={<Clock3 size={16} />}
         />
 
         <KPI
           title="Late Arrivals"
           value={totalLate}
-          icon={
-            <TimerReset size={16} />
-          }
+          icon={<TimerReset size={16} />}
+        />
+
+        <KPI
+          title="Best Attendance"
+          value={`${bestAttendance}%`}
+          icon={<TrendingUp size={16} />}
         />
 
       </div>
@@ -340,7 +341,7 @@ export default function Performance() {
 
       </div>
 
-      {/* SEARCH */}
+      {/* FILTERS */}
 
       <div className="grid md:grid-cols-2 gap-3">
 
@@ -374,23 +375,20 @@ export default function Performance() {
           <option value="score">
             Sort by Score
           </option>
-
           <option value="hours">
             Sort by Hours
           </option>
-
-          <option value="shifts">
-            Sort by Shifts
-          </option>
-
-          <option value="lateness">
+          <option value="late">
             Sort by Lateness
+          </option>
+          <option value="attendance">
+            Sort by Attendance
           </option>
         </select>
 
       </div>
 
-      {/* STAFF GRID */}
+      {/* STAFF CARDS */}
 
       <div className="grid md:grid-cols-3 gap-4">
 
@@ -425,8 +423,7 @@ export default function Performance() {
 
                     <div>
                       <p className="font-medium">
-                        {item.name ||
-                          item.email}
+                        {item.name}
                       </p>
 
                       <p className="text-xs text-gray-400">
@@ -434,12 +431,17 @@ export default function Performance() {
                       </p>
                     </div>
 
-                    {i === 0 && (
+                    {i === 0 ? (
                       <Medal
                         size={18}
                         className="text-yellow-400"
                       />
-                    )}
+                    ) : risk ? (
+                      <ShieldAlert
+                        size={18}
+                        className="text-red-400"
+                      />
+                    ) : null}
 
                   </div>
 
@@ -461,16 +463,16 @@ export default function Performance() {
 
                     <Stat
                       label="Late"
-                      value={getLateCount(
+                      value={getLate(
                         item
                       )}
                     />
 
                     <Stat
-                      label="Avg Shift"
-                      value={getAvgShift(
+                      label="Attendance"
+                      value={`${getAttendance(
                         item
-                      )}
+                      )}%`}
                     />
 
                   </div>
@@ -479,7 +481,7 @@ export default function Performance() {
 
                     <div className="flex justify-between text-xs mb-2">
                       <span className="text-gray-400">
-                        Score
+                        Performance Score
                       </span>
 
                       <span>
@@ -493,6 +495,9 @@ export default function Performance() {
                         className={`h-full ${
                           risk
                             ? "bg-red-500"
+                            : score >
+                              80
+                            ? "bg-green-500"
                             : "bg-indigo-500"
                         }`}
                         style={{
@@ -530,24 +535,34 @@ function getShifts(x) {
   );
 }
 
-function getLateCount(x) {
+function getLate(x) {
   return Number(
     x.late_count ||
-      x.lateness ||
       x.total_late ||
       0
   );
 }
 
-function getAvgShift(x) {
+function getAttendance(x) {
   const shifts =
     getShifts(x);
 
-  if (!shifts) return "0";
+  if (!shifts) return 0;
 
-  return (
-    getHours(x) / shifts
-  ).toFixed(1);
+  const late =
+    getLate(x);
+
+  return Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round(
+        ((shifts - late) /
+          shifts) *
+          100
+      )
+    )
+  );
 }
 
 function getScore(x) {
@@ -558,22 +573,24 @@ function getScore(x) {
     getShifts(x);
 
   const late =
-    getLateCount(x);
+    getLate(x);
+
+  const attendance =
+    getAttendance(x);
 
   let score =
-    shifts * 8 +
-    hours * 1.8 -
-    late * 6;
+    hours * 1.5 +
+    shifts * 6 +
+    attendance -
+    late * 8;
 
-  score = Math.max(
+  return Math.max(
     0,
     Math.min(
       100,
       Math.round(score)
     )
   );
-
-  return score;
 }
 
 /* UI */
@@ -631,7 +648,6 @@ function Center({
           className="animate-spin"
         />
       )}
-
       {text}
     </div>
   );
