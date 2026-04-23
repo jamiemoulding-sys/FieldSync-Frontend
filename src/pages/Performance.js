@@ -1,11 +1,12 @@
 // src/pages/Performance.js
-// FULL FIX FINAL UNLOCKED
-// ✅ ALL plans get ALL features
-// ✅ No subscription lock
-// ✅ Only employee limit differs by plan
-// ✅ Existing UI preserved
-// ✅ Full analytics kept
-// ✅ Production ready
+// FULL PREMIUM PERFORMANCE REPLACEMENT
+// ✅ Real live data only
+// ✅ No demo metrics
+// ✅ Uses existing performanceAPI.getAll()
+// ✅ Lateness / hours / consistency / rankings
+// ✅ Useful management insights
+// ✅ Premium UI
+// ✅ Full copy / paste ready
 
 import {
   useEffect,
@@ -19,17 +20,22 @@ import { motion } from "framer-motion";
 import {
   Trophy,
   Clock3,
-  Briefcase,
-  AlertTriangle,
-  Medal,
   Search,
   RefreshCw,
-  Star,
   Loader2,
+  AlertTriangle,
+  Star,
+  Medal,
+  TimerReset,
+  Users,
+  TrendingUp,
+  Briefcase,
 } from "lucide-react";
 
 export default function Performance() {
-  const [data, setData] = useState([]);
+  const [data, setData] =
+    useState([]);
+
   const [loading, setLoading] =
     useState(true);
 
@@ -37,7 +43,7 @@ export default function Performance() {
     useState("");
 
   const [sortBy, setSortBy] =
-    useState("shifts");
+    useState("score");
 
   useEffect(() => {
     load();
@@ -62,88 +68,143 @@ export default function Performance() {
     }
   }
 
-  const processed = useMemo(() => {
-    let rows = [...data];
+  const rows = useMemo(() => {
+    let list = [...data];
 
     if (search.trim()) {
       const q =
         search.toLowerCase();
 
-      rows = rows.filter(
-        (u) =>
-          u.name
+      list = list.filter(
+        (x) =>
+          x.name
             ?.toLowerCase()
             .includes(q) ||
-          u.email
+          x.email
             ?.toLowerCase()
             .includes(q)
       );
     }
 
-    rows.sort((a, b) => {
+    list.sort((a, b) => {
       if (sortBy === "hours") {
         return (
-          Number(
-            b.hours_worked || 0
-          ) -
-          Number(
-            a.hours_worked || 0
-          )
+          getHours(b) -
+          getHours(a)
         );
       }
 
-      if (sortBy === "score") {
+      if (sortBy === "lateness") {
         return (
-          calcScore(b) -
-          calcScore(a)
+          getLateCount(b) -
+          getLateCount(a)
+        );
+      }
+
+      if (sortBy === "shifts") {
+        return (
+          getShifts(b) -
+          getShifts(a)
         );
       }
 
       return (
-        Number(
-          b.total_shifts || 0
-        ) -
-        Number(
-          a.total_shifts || 0
-        )
+        getScore(b) -
+        getScore(a)
       );
     });
 
-    return rows;
+    return list;
   }, [data, search, sortBy]);
 
-  const topPerformer =
-    processed[0];
+  const top =
+    rows[0] || null;
 
-  const alerts =
-    data.filter(
-      (u) =>
-        Number(
-          u.total_shifts || 0
-        ) < 2
-    ).length;
+  const totalHours =
+    rows.reduce(
+      (sum, x) =>
+        sum +
+        getHours(x),
+      0
+    );
+
+  const avgHours =
+    rows.length
+      ? (
+          totalHours /
+          rows.length
+        ).toFixed(1)
+      : "0";
+
+  const totalLate =
+    rows.reduce(
+      (sum, x) =>
+        sum +
+        getLateCount(x),
+      0
+    );
 
   const avgScore =
-    data.length > 0
+    rows.length
       ? Math.round(
-          data.reduce(
-            (sum, item) =>
+          rows.reduce(
+            (sum, x) =>
               sum +
-              calcScore(item),
+              getScore(x),
             0
-          ) / data.length
+          ) / rows.length
         )
       : 0;
 
+  const lowPerformers =
+    rows.filter(
+      (x) =>
+        getScore(x) < 55
+    ).length;
+
+  const insights = [];
+
+  if (top) {
+    insights.push(
+      `${top.name ||
+        "Top Employee"} leads performance this period`
+    );
+  }
+
+  if (totalLate > 0) {
+    insights.push(
+      `${totalLate} late arrivals recorded`
+    );
+  }
+
+  if (
+    Number(avgHours) > 42
+  ) {
+    insights.push(
+      "Average hours are high — check burnout risk"
+    );
+  }
+
+  if (
+    lowPerformers > 0
+  ) {
+    insights.push(
+      `${lowPerformers} team members need review`
+    );
+  }
+
+  if (!insights.length) {
+    insights.push(
+      "Team performance looks strong"
+    );
+  }
+
   if (loading) {
     return (
-      <div className="h-[60vh] flex items-center justify-center gap-2 text-gray-400">
-        <Loader2
-          size={16}
-          className="animate-spin"
-        />
-        Loading performance...
-      </div>
+      <Center
+        text="Loading performance..."
+        loading
+      />
     );
   }
 
@@ -151,39 +212,40 @@ export default function Performance() {
     <div className="space-y-6">
 
       {/* HEADER */}
+
       <div className="flex justify-between items-center flex-wrap gap-4">
 
         <div>
-          <h1 className="text-2xl font-semibold">
+          <h1 className="text-3xl font-semibold">
             Performance
           </h1>
 
           <p className="text-sm text-gray-400">
-            Team productivity insights & rankings
+            Staff output, reliability & workforce rankings
           </p>
         </div>
 
         <button
           onClick={load}
-          className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm flex items-center gap-2"
+          className="px-4 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 flex items-center gap-2"
         >
-          <RefreshCw size={15} />
+          <RefreshCw size={16} />
           Refresh
         </button>
 
       </div>
 
       {/* HERO */}
-      {topPerformer && (
-        <div className="rounded-2xl p-[1px] bg-gradient-to-r from-yellow-500/30 via-indigo-500/20 to-transparent">
 
-          <div className="bg-[#020617] border border-white/10 rounded-2xl p-6">
+      {top && (
+        <div className="rounded-3xl p-[1px] bg-gradient-to-r from-yellow-500/30 via-indigo-500/20 to-transparent">
+          <div className="rounded-3xl bg-[#020617] border border-white/10 p-6">
 
-            <div className="flex justify-between items-center gap-4 flex-wrap">
+            <div className="flex justify-between gap-4 flex-wrap items-center">
 
               <div className="flex items-center gap-4">
 
-                <div className="w-14 h-14 rounded-full bg-yellow-500/20 text-yellow-400 flex items-center justify-center">
+                <div className="w-14 h-14 rounded-full bg-yellow-500/20 flex items-center justify-center text-yellow-400">
                   <Trophy size={24} />
                 </div>
 
@@ -193,18 +255,15 @@ export default function Performance() {
                   </p>
 
                   <h2 className="text-xl font-semibold">
-                    {topPerformer.name ||
-                      topPerformer.email}
+                    {top.name ||
+                      top.email}
                   </h2>
 
                   <p className="text-sm text-gray-400 mt-1">
-                    {
-                      topPerformer.total_shifts
-                    } shifts •{" "}
-                    {Number(
-                      topPerformer.hours_worked ||
-                        0
-                    ).toFixed(1)} hrs
+                    {getShifts(top)} shifts •{" "}
+                    {getHours(top).toFixed(
+                      1
+                    )} hrs
                   </p>
                 </div>
 
@@ -212,34 +271,29 @@ export default function Performance() {
 
               <div className="text-right">
                 <p className="text-xs text-gray-400">
-                  Productivity Score
+                  Performance Score
                 </p>
 
-                <p className="text-3xl font-semibold text-yellow-400">
-                  {calcScore(
-                    topPerformer
-                  )}
-                  %
+                <p className="text-4xl font-semibold text-yellow-400">
+                  {getScore(top)}%
                 </p>
               </div>
 
             </div>
 
           </div>
-
         </div>
       )}
 
       {/* KPI */}
+
       <div className="grid md:grid-cols-4 gap-4">
 
         <KPI
           title="Employees"
-          value={data.length}
+          value={rows.length}
           icon={
-            <Briefcase
-              size={16}
-            />
+            <Users size={16} />
           }
         />
 
@@ -252,48 +306,59 @@ export default function Performance() {
         />
 
         <KPI
-          title="Top Hours"
-          value={Number(
-            topPerformer?.hours_worked ||
-              0
-          ).toFixed(1)}
+          title="Avg Hours"
+          value={avgHours}
           icon={
-            <Clock3
-              size={16}
-            />
+            <Clock3 size={16} />
           }
         />
 
         <KPI
-          title="Alerts"
-          value={alerts}
+          title="Late Arrivals"
+          value={totalLate}
           icon={
-            <AlertTriangle
-              size={16}
-            />
+            <TimerReset size={16} />
           }
         />
 
       </div>
 
+      {/* INSIGHTS */}
+
+      <div className="grid md:grid-cols-4 gap-4">
+
+        {insights.map(
+          (item, i) => (
+            <div
+              key={i}
+              className="rounded-2xl bg-[#020617] border border-white/10 p-4 text-sm text-indigo-300"
+            >
+              {item}
+            </div>
+          )
+        )}
+
+      </div>
+
       {/* SEARCH */}
+
       <div className="grid md:grid-cols-2 gap-3">
 
         <div className="relative">
           <Search
             size={16}
-            className="absolute left-4 top-3.5 text-gray-500"
+            className="absolute left-4 top-4 text-gray-500"
           />
 
           <input
-            placeholder="Search employee..."
             value={search}
             onChange={(e) =>
               setSearch(
                 e.target.value
               )
             }
-            className="w-full bg-[#020617] border border-white/10 rounded-2xl pl-11 pr-4 py-3"
+            placeholder="Search employee..."
+            className="w-full pl-11 pr-4 py-3 rounded-2xl bg-[#020617] border border-white/10"
           />
         </div>
 
@@ -304,52 +369,45 @@ export default function Performance() {
               e.target.value
             )
           }
-          className="bg-[#020617] border border-white/10 rounded-2xl px-4 py-3"
+          className="px-4 py-3 rounded-2xl bg-[#020617] border border-white/10"
         >
-          <option value="shifts">
-            Sort by Shifts
+          <option value="score">
+            Sort by Score
           </option>
 
           <option value="hours">
             Sort by Hours
           </option>
 
-          <option value="score">
-            Sort by Score
+          <option value="shifts">
+            Sort by Shifts
+          </option>
+
+          <option value="lateness">
+            Sort by Lateness
           </option>
         </select>
 
       </div>
 
-      {/* GRID */}
+      {/* STAFF GRID */}
+
       <div className="grid md:grid-cols-3 gap-4">
 
-        {processed.map(
+        {rows.map(
           (item, i) => {
-            const shifts =
-              Number(
-                item.total_shifts ||
-                  0
-              );
-
-            const hours =
-              Number(
-                item.hours_worked ||
-                  0
-              );
-
             const score =
-              calcScore(item);
+              getScore(item);
 
-            const low =
-              shifts < 2;
+            const risk =
+              score < 55;
 
             return (
               <motion.div
                 key={item.id}
                 initial={{
                   opacity: 0,
-                  y: 12,
+                  y: 10,
                 }}
                 animate={{
                   opacity: 1,
@@ -357,11 +415,11 @@ export default function Performance() {
                 }}
                 transition={{
                   delay:
-                    i * 0.03,
+                    i * 0.02,
                 }}
-                className="rounded-2xl p-[1px] bg-gradient-to-b from-white/10 to-transparent"
+                className="rounded-3xl p-[1px] bg-gradient-to-b from-white/10 to-transparent"
               >
-                <div className="bg-[#020617] border border-white/10 rounded-2xl p-5">
+                <div className="rounded-3xl bg-[#020617] border border-white/10 p-5">
 
                   <div className="flex justify-between">
 
@@ -388,14 +446,30 @@ export default function Performance() {
                   <div className="grid grid-cols-2 gap-3 mt-4">
 
                     <Stat
-                      label="Shifts"
-                      value={shifts}
+                      label="Hours"
+                      value={getHours(
+                        item
+                      ).toFixed(1)}
                     />
 
                     <Stat
-                      label="Hours"
-                      value={hours.toFixed(
-                        1
+                      label="Shifts"
+                      value={getShifts(
+                        item
+                      )}
+                    />
+
+                    <Stat
+                      label="Late"
+                      value={getLateCount(
+                        item
+                      )}
+                    />
+
+                    <Stat
+                      label="Avg Shift"
+                      value={getAvgShift(
+                        item
                       )}
                     />
 
@@ -405,7 +479,7 @@ export default function Performance() {
 
                     <div className="flex justify-between text-xs mb-2">
                       <span className="text-gray-400">
-                        Productivity
+                        Score
                       </span>
 
                       <span>
@@ -417,7 +491,7 @@ export default function Performance() {
 
                       <div
                         className={`h-full ${
-                          low
+                          risk
                             ? "bg-red-500"
                             : "bg-indigo-500"
                         }`}
@@ -442,25 +516,67 @@ export default function Performance() {
   );
 }
 
-function calcScore(user) {
-  const shifts =
-    Number(
-      user.total_shifts || 0
-    );
+/* HELPERS */
 
-  const hours =
-    Number(
-      user.hours_worked || 0
-    );
-
-  return Math.min(
-    Math.round(
-      shifts * 12 +
-        hours * 2
-    ),
-    100
+function getHours(x) {
+  return Number(
+    x.hours_worked || 0
   );
 }
+
+function getShifts(x) {
+  return Number(
+    x.total_shifts || 0
+  );
+}
+
+function getLateCount(x) {
+  return Number(
+    x.late_count ||
+      x.lateness ||
+      x.total_late ||
+      0
+  );
+}
+
+function getAvgShift(x) {
+  const shifts =
+    getShifts(x);
+
+  if (!shifts) return "0";
+
+  return (
+    getHours(x) / shifts
+  ).toFixed(1);
+}
+
+function getScore(x) {
+  const hours =
+    getHours(x);
+
+  const shifts =
+    getShifts(x);
+
+  const late =
+    getLateCount(x);
+
+  let score =
+    shifts * 8 +
+    hours * 1.8 -
+    late * 6;
+
+  score = Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round(score)
+    )
+  );
+
+  return score;
+}
+
+/* UI */
 
 function KPI({
   title,
@@ -468,24 +584,20 @@ function KPI({
   icon,
 }) {
   return (
-    <div className="rounded-2xl p-[1px] bg-gradient-to-b from-indigo-500/20 to-transparent">
-      <div className="bg-[#020617] border border-white/10 rounded-2xl p-4">
+    <div className="rounded-2xl bg-[#020617] border border-white/10 p-5">
+      <div className="flex justify-between">
+        <p className="text-xs text-gray-400">
+          {title}
+        </p>
 
-        <div className="flex justify-between items-center">
-          <p className="text-xs text-gray-400">
-            {title}
-          </p>
-
-          <div className="text-indigo-400">
-            {icon}
-          </div>
+        <div className="text-indigo-400">
+          {icon}
         </div>
-
-        <h2 className="text-2xl font-semibold mt-2">
-          {value}
-        </h2>
-
       </div>
+
+      <h2 className="text-2xl font-semibold mt-3">
+        {value}
+      </h2>
     </div>
   );
 }
@@ -495,7 +607,7 @@ function Stat({
   value,
 }) {
   return (
-    <div className="bg-white/5 rounded-xl p-3 text-center">
+    <div className="rounded-xl bg-white/5 p-3 text-center">
       <p className="text-xs text-gray-400">
         {label}
       </p>
@@ -503,6 +615,24 @@ function Stat({
       <p className="text-sm font-semibold mt-1">
         {value}
       </p>
+    </div>
+  );
+}
+
+function Center({
+  text,
+  loading,
+}) {
+  return (
+    <div className="h-[60vh] flex items-center justify-center gap-2 text-gray-400">
+      {loading && (
+        <Loader2
+          size={16}
+          className="animate-spin"
+        />
+      )}
+
+      {text}
     </div>
   );
 }
