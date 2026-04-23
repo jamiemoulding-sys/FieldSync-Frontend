@@ -1,13 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import supabase from "../lib/supabase";
 import api from "../services/api";
 
 export default function SetPassword() {
   const navigate = useNavigate();
-
-  const mounted = useRef(true);
-  const timeoutRef = useRef(null);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -18,36 +15,16 @@ export default function SetPassword() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    mounted.current = true;
-
     loadInvite();
-
-    return () => {
-      mounted.current = false;
-
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
   }, []);
 
   async function loadInvite() {
-    let subscription;
-
     try {
-      setError("");
-
-      /* =====================================
-         URL
-      ===================================== */
       const url = new URL(window.location.href);
 
       const code =
         url.searchParams.get("code");
 
-      /* =====================================
-         NEW SUPABASE EMAIL LINK
-      ===================================== */
       if (code) {
         const { error } =
           await supabase.auth.exchangeCodeForSession(
@@ -57,9 +34,6 @@ export default function SetPassword() {
         if (error) throw error;
       }
 
-      /* =====================================
-         OLD HASH LINK
-      ===================================== */
       const hash =
         window.location.hash || "";
 
@@ -90,110 +64,56 @@ export default function SetPassword() {
           access_token &&
           refresh_token
         ) {
-          const { error } =
-            await supabase.auth.setSession(
-              {
-                access_token,
-                refresh_token,
-              }
-            );
-
-          if (error)
-            throw error;
+          await supabase.auth.setSession(
+            {
+              access_token,
+              refresh_token,
+            }
+          );
         }
       }
 
-      /* =====================================
-         CHECK NOW
-      ===================================== */
       const {
         data: { session },
       } =
         await supabase.auth.getSession();
 
-      if (
-        session?.user &&
-        mounted.current
-      ) {
-        setEmail(
-          session.user.email ||
-            ""
-        );
-
-        setReady(true);
-        return;
-      }
-
-      /* =====================================
-         WAIT FOR SESSION
-      ===================================== */
-      const {
-        data,
-      } =
-        supabase.auth.onAuthStateChange(
-          (
-            event,
-            newSession
-          ) => {
-            if (
-              newSession?.user &&
-              mounted.current
-            ) {
-              setEmail(
-                newSession
-                  .user.email ||
-                  ""
-              );
-
-              setReady(true);
-
-              subscription?.unsubscribe();
-            }
-          }
-        );
-
-      subscription =
-        data.subscription;
-
-      /* =====================================
-         TIMEOUT REDIRECT
-      ===================================== */
-      timeoutRef.current =
-        setTimeout(() => {
-          if (
-            mounted.current
-          ) {
-            subscription?.unsubscribe();
-
-            setError(
-              "Invite link expired. Please request a new invite."
-            );
-
-            setTimeout(() => {
-              navigate(
-                "/login"
-              );
-            }, 1800);
-          }
-        }, 6000);
-    } catch (err) {
-      console.error(err);
-
-      if (mounted.current) {
+      if (!session?.user) {
         setError(
-          err?.message ||
-            "Invite invalid"
+          "Invite expired"
         );
 
         setTimeout(() => {
           navigate("/login");
-        }, 1800);
+        }, 1500);
+
+        return;
       }
+
+      setEmail(
+        session.user.email ||
+          ""
+      );
+
+      setReady(true);
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        err?.message ||
+          "Invalid invite"
+      );
+
+      setTimeout(() => {
+        navigate("/login");
+      }, 1500);
     }
   }
 
   async function submit(e) {
     e.preventDefault();
+
+    if (loading) return;
 
     if (
       !password ||
@@ -223,15 +143,21 @@ export default function SetPassword() {
     try {
       setLoading(true);
 
-      const { error } =
+      /* STEP 1 */
+      const {
+        error:
+          passwordError,
+      } =
         await supabase.auth.updateUser(
           {
             password,
           }
         );
 
-      if (error) throw error;
+      if (passwordError)
+        throw passwordError;
 
+      /* STEP 2 */
       await api.post(
         "/auth/set-password",
         {
@@ -239,6 +165,9 @@ export default function SetPassword() {
           password,
         }
       );
+
+      /* STEP 3 FORCE REFRESH SESSION */
+      await supabase.auth.refreshSession();
 
       alert(
         "Account activated"
@@ -248,8 +177,12 @@ export default function SetPassword() {
         "/dashboard"
       );
     } catch (err) {
+      console.error(err);
+
       alert(
-        err?.message ||
+        err?.response?.data
+          ?.error ||
+          err?.message ||
           "Failed to activate account"
       );
     } finally {
@@ -259,18 +192,9 @@ export default function SetPassword() {
 
   if (!ready) {
     return (
-      <div className="min-h-screen bg-[#020617] text-white flex items-center justify-center px-6">
-        <div className="text-center">
-          <div className="text-lg">
-            Loading invite...
-          </div>
-
-          {error && (
-            <p className="text-red-400 text-sm mt-3">
-              {error}
-            </p>
-          )}
-        </div>
+      <div className="min-h-screen bg-[#020617] text-white flex items-center justify-center">
+        {error ||
+          "Loading invite..."}
       </div>
     );
   }
@@ -279,7 +203,7 @@ export default function SetPassword() {
     <div className="min-h-screen bg-[#020617] text-white flex items-center justify-center px-6">
       <form
         onSubmit={submit}
-        className="w-full max-w-md rounded-2xl bg-[#0f172a] p-8 space-y-4 border border-white/10"
+        className="w-full max-w-md rounded-2xl bg-[#0f172a] border border-white/10 p-8 space-y-4"
       >
         <h1 className="text-2xl font-semibold">
           Create Password
@@ -298,7 +222,7 @@ export default function SetPassword() {
               e.target.value
             )
           }
-          className="w-full px-4 py-3 rounded-xl bg-white/5 outline-none"
+          className="w-full px-4 py-3 rounded-xl bg-white/5"
         />
 
         <input
@@ -310,13 +234,13 @@ export default function SetPassword() {
               e.target.value
             )
           }
-          className="w-full px-4 py-3 rounded-xl bg-white/5 outline-none"
+          className="w-full px-4 py-3 rounded-xl bg-white/5"
         />
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 transition"
+          className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500"
         >
           {loading
             ? "Saving..."
