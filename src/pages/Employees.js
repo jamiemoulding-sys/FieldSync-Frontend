@@ -380,35 +380,79 @@ async function saveEditor() {
           close={() => setEditor(null)}
         >
 
-          <div className="grid md:grid-cols-2 gap-4">
+          <div className="space-y-6">
 
-            <Field label="Full Name" value={form.name} onChange={(v)=>setForm({...form,name:v})} />
-            <Field label="Phone Number" value={form.phone} onChange={(v)=>setForm({...form,phone:v})} />
-            <Field label="Department" value={form.department} onChange={(v)=>setForm({...form,department:v})} />
-            <Field label="Job Title" value={form.job_title} onChange={(v)=>setForm({...form,job_title:v})} />
-            <Field label="Payroll ID" value={form.payroll_id} onChange={(v)=>setForm({...form,payroll_id:v})} />
-            <Field label="Emergency Contact" value={form.emergency_contact} onChange={(v)=>setForm({...form,emergency_contact:v})} />
-            <Field label="Start Date" type="date" value={form.start_date} onChange={(v)=>setForm({...form,start_date:v})} />
-            <Field label="Hourly Rate (£)" value={form.hourly_rate} onChange={(v)=>setForm({...form,hourly_rate:v})} />
-            <Field label="Overtime Rate (£)" value={form.overtime_rate} onChange={(v)=>setForm({...form,overtime_rate:v})} />
-            <Field label="Night Rate (£)" value={form.night_rate} onChange={(v)=>setForm({...form,night_rate:v})} />
-            <Field label="Contracted Hours" value={form.contracted_hours} onChange={(v)=>setForm({...form,contracted_hours:v})} />
-            <Field label="Holiday Allowance" value={form.holiday_allowance} onChange={(v)=>setForm({...form,holiday_allowance:v})} />
-            <Field label="Role" value={form.role} onChange={(v)=>setForm({...form,role:v})} />
-            <Field label="Status" value={form.status} onChange={(v)=>setForm({...form,status:v})} />
+  {/* PERSONAL */}
+  <div>
+    <h3 className="text-sm font-semibold text-indigo-400 mb-3">
+      Personal
+    </h3>
 
-          </div>
+    <div className="grid md:grid-cols-2 gap-4">
+      <Field label="Full Name" value={form.name} onChange={(v)=>setForm({...form,name:v})} />
+      <Field label="Phone Number" value={form.phone} onChange={(v)=>setForm({...form,phone:v})} />
+      <Field label="Department" value={form.department} onChange={(v)=>setForm({...form,department:v})} />
+      <Field label="Job Title" value={form.job_title} onChange={(v)=>setForm({...form,job_title:v})} />
+      <Field label="Start Date" type="date" value={form.start_date} onChange={(v)=>setForm({...form,start_date:v})} />
+      <Field label="Status" value={form.status} onChange={(v)=>setForm({...form,status:v})} />
+    </div>
+  </div>
 
-          <div className="sticky bottom-0 mt-6 pt-4 bg-[#020617]">
-            <button
-              onClick={saveEditor}
-              disabled={saving}
-              className="w-full py-3 rounded-xl bg-indigo-600 flex justify-center gap-2"
-            >
-              <Save size={16} />
-              {saving ? "Saving..." : "Save Changes"}
-            </button>
-          </div>
+  {/* PAY */}
+  <div>
+    <h3 className="text-sm font-semibold text-emerald-400 mb-3">
+      Pay & Hours
+    </h3>
+
+    <div className="grid md:grid-cols-2 gap-4">
+      <Field label="Hourly Rate (£)" value={form.hourly_rate} onChange={(v)=>setForm({...form,hourly_rate:v})} />
+      <Field label="Overtime Rate (£)" value={form.overtime_rate} onChange={(v)=>setForm({...form,overtime_rate:v})} />
+      <Field label="Night Rate (£)" value={form.night_rate} onChange={(v)=>setForm({...form,night_rate:v})} />
+      <Field label="Contracted Hours" value={form.contracted_hours} onChange={(v)=>setForm({...form,contracted_hours:v})} />
+    </div>
+  </div>
+
+  {/* LEAVE */}
+  <div>
+    <h3 className="text-sm font-semibold text-yellow-400 mb-3">
+      Leave
+    </h3>
+
+    <div className="grid md:grid-cols-2 gap-4">
+      <Field label="Holiday Allowance" value={form.holiday_allowance} onChange={(v)=>setForm({...form,holiday_allowance:v})} />
+      <Field label="Role" value={form.role} onChange={(v)=>setForm({...form,role:v})} />
+    </div>
+  </div>
+
+  {/* ADVANCED */}
+  <div>
+    <h3 className="text-sm font-semibold text-gray-400 mb-3">
+      Advanced
+    </h3>
+
+    <div className="grid md:grid-cols-2 gap-4">
+      <Field label="Payroll ID" value={form.payroll_id} onChange={(v)=>setForm({...form,payroll_id:v})} />
+      <Field label="Emergency Contact" value={form.emergency_contact} onChange={(v)=>setForm({...form,emergency_contact:v})} />
+    </div>
+  </div>
+
+</div>
+
+    
+
+<div 
+
+className="sticky bottom-0 mt-6 pt-4 bg-[#020617]">
+
+  <button
+    onClick={saveEditor}
+    disabled={saving}
+    className="w-full py-3 rounded-xl bg-indigo-600 flex justify-center gap-2"
+  >
+    <Save size={16} />
+    {saving ? "Saving..." : "Save Changes"}
+  </button>
+</div>
 
         </Modal>
       )}
