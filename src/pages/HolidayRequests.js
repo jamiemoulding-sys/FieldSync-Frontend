@@ -142,28 +142,51 @@ export default function HolidayRequests() {
     ).toLocaleDateString("en-GB");
   }
 
-  function usedDays(id) {
-    return requests
-      .filter(
-        (x) =>
-          x.user_id === id &&
-          x.status === "approved" &&
-          x.type === "holiday"
-      )
-      .reduce((sum, h) => {
-        const start =
-          new Date(h.start_date);
-        const end =
-          new Date(h.end_date);
+function usedDays(id) {
+  const userSchedules = schedules.filter(
+    (x) => x.user_id === id
+  );
 
-        return (
-          sum +
-          (end - start) /
-            86400000 +
-          1
-        );
-      }, 0);
-  }
+  const approved = requests.filter(
+    (x) =>
+      x.user_id === id &&
+      x.status === "approved"
+  );
+
+  let total = 0;
+
+  approved.forEach((h) => {
+    let current = new Date(h.start_date);
+    const end = new Date(h.end_date);
+
+    while (current <= end) {
+      const ds = dateStr(current);
+
+      const hasShift = userSchedules.some(
+        (s) => s.date === ds
+      );
+
+      const weekday = current.getDay();
+
+      const fallbackMonFri =
+        weekday >= 1 && weekday <= 5;
+
+      if (
+        userSchedules.length
+          ? hasShift
+          : fallbackMonFri
+      ) {
+        total++;
+      }
+
+      current.setDate(
+        current.getDate() + 1
+      );
+    }
+  });
+
+  return total;
+}
 
   async function updateStatus(
     id,
@@ -474,20 +497,47 @@ export default function HolidayRequests() {
                     />
                   </td>
 
-                  <td className="p-4 flex gap-2">
-                    <button
-                      onClick={() =>
-                        removeLeave(
-                          r.id
-                        )
-                      }
-                      className="px-3 py-1 rounded bg-gray-700 text-xs"
-                    >
-                      <Trash2
-                        size={12}
-                      />
-                    </button>
-                  </td>
+                  <td className="p-4">
+  <div className="flex gap-2">
+
+    {r.status === "pending" && (
+      <>
+        <button
+          onClick={() =>
+            updateStatus(r.id, "approved")
+          }
+          className="px-3 py-1 rounded bg-green-600 text-xs"
+        >
+          Accept
+        </button>
+
+        <button
+          onClick={() => {
+            const reason = prompt("Reason for rejection?");
+            updateStatus(
+              r.id,
+              "rejected",
+              reason || ""
+            );
+          }}
+          className="px-3 py-1 rounded bg-red-600 text-xs"
+        >
+          Reject
+        </button>
+      </>
+    )}
+
+    <button
+      onClick={() =>
+        removeLeave(r.id)
+      }
+          className="px-3 py-1 rounded bg-gray-700 text-xs"
+       >
+             <Trash2 size={12} />
+           </button>
+
+          </div>
+         </td>
                 </motion.tr>
               )
             )}

@@ -356,25 +356,31 @@ export const holidayAPI = {
     return true;
   },
 
-  approve: async (id) => {
-    const { error } = await supabase
-      .from("holidays")
-      .update({ status: "approved" })
-      .eq("id", id);
+  approve: async (id, days) => {
+  const { error } = await supabase
+    .from("holidays")
+    .update({
+      status: "approved",
+      days_requested: days,
+    })
+    .eq("id", id);
 
-    if (error) throw error;
-    return true;
-  },
+  if (error) throw error;
+  return true;
+},
 
-  reject: async (id) => {
-    const { error } = await supabase
-      .from("holidays")
-      .update({ status: "rejected" })
-      .eq("id", id);
+  reject: async (id, reason = "") => {
+  const { error } = await supabase
+    .from("holidays")
+    .update({
+      status: "rejected",
+      reason,
+    })
+    .eq("id", id);
 
-    if (error) throw error;
-    return true;
-  },
+  if (error) throw error;
+  return true;
+},
 
   delete: async (id) => {
     const { error } = await supabase
