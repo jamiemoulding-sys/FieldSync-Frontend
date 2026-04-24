@@ -342,18 +342,18 @@ export const holidayAPI = {
   },
 
   create: async (payload) => {
-    const user = await getCurrentUser();
+  const user = await getCurrentUser();
 
-    const { error } = await supabase
-      .from("holidays")
-      .insert({
-        ...payload,
-        company_id: user.company_id,
-        status: payload.status || "pending",
-      });
+  const { error } = await supabase
+    .from("holidays")
+    .insert({
+      ...payload,
+      user_id: payload.user_id || user.id,
+      company_id: user.company_id,
+      status: "pending",
+    });
 
     if (error) throw error;
-    return true;
   },
 
   approve: async (id, days) => {
