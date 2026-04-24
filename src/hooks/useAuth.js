@@ -136,25 +136,19 @@ async function loadProfile() {
       "starter";
 
     setUser({
-      id: authUser.id,
-      email: authUser.email,
-      name: row.name || "",
-      role:
-        row.role ||
-        "employee",
-      companyId:
-        row.company_id,
-      companyName:
-        company?.name || "",
-      isPro: paid,
-      currentPlan,
-      trial_end: trialEnd,
-      trialActive,
-      hasPremiumAccess:
-        paid || trialActive,
-      company,
-      profile: row,
-    });
+  ...row,                 // restores ALL columns directly
+  id: authUser.id,
+  email: authUser.email,
+  companyId: row.company_id,
+  companyName: company?.name || "",
+  isPro: paid,
+  currentPlan,
+  trial_end: trialEnd,
+  trialActive,
+  hasPremiumAccess: paid || trialActive,
+  company,
+  profile: row,
+});
   } catch (err) {
     console.error(err);
     setUser(null);
