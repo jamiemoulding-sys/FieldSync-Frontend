@@ -512,39 +512,59 @@ function AdminDashboard({ user }) {
   }, []);
 
   async function load() {
-    try {
-      const [
-        users,
-        active,
-        holidays,
-        billing,
-        allShifts,
-        roster,
-      ] = await Promise.all([
-        userAPI.getAll(),
-        shiftAPI.getActiveAll(),
-        holidayAPI.getAll(),
-        billingAPI.getStatus(),
-        shiftAPI.getAll(),
-        scheduleAPI.getAll(),
-      ]);
+  try {
+    const results = await Promise.allSettled([
+      userAPI.getAll(),
+      shiftAPI.getActiveAll(),
+      holidayAPI.getAll(),
+      billingAPI.getStatus(),
+      shiftAPI.getAll(),
+      scheduleAPI.getAll(),
+    ]);
 
-      setStaff(
-  Array.isArray(users)
-    ? users
-    : users?.users || []
-);
-      setLive(active || []);
-      setLeave(holidays || []);
-      setPlan(
-        billing?.plan || "starter"
-      );
-      setShifts(allShifts || []);
-      setSchedules(roster || []);
-    } finally {
-      setLoading(false);
-    }
+    const users =
+      results[0].status === "fulfilled"
+        ? results[0].value
+        : [];
+
+    const active =
+      results[1].status === "fulfilled"
+        ? results[1].value
+        : [];
+
+    const holidays =
+      results[2].status === "fulfilled"
+        ? results[2].value
+        : [];
+
+    const billing =
+      results[3].status === "fulfilled"
+        ? results[3].value
+        : {};
+
+    const allShifts =
+      results[4].status === "fulfilled"
+        ? results[4].value
+        : [];
+
+    const roster =
+      results[5].status === "fulfilled"
+        ? results[5].value
+        : [];
+
+    setStaff(Array.isArray(users) ? users : []);
+    setLive(active);
+    setLeave(holidays);
+    setPlan(billing?.plan || "starter");
+    setShifts(allShifts);
+    setSchedules(roster);
+
+  } catch (err) {
+    console.error(err);
+  } finally {
+    setLoading(false);
   }
+}
 
   if (loading) return <Loading />;
 
