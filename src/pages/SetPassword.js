@@ -158,13 +158,18 @@ export default function SetPassword() {
         throw passwordError;
 
       /* STEP 2 */
-      await api.post(
-        "/auth/set-password",
-        {
-          email,
-          password,
-        }
-      );
+      await Promise.race([
+  api.post("/auth/set-password", {
+    email,
+    password,
+  }),
+  new Promise((_, reject) =>
+    setTimeout(
+      () => reject(new Error("Server timeout")),
+      8000
+    )
+  ),
+]);
 
       /* STEP 3 FORCE REFRESH SESSION */
       await supabase.auth.refreshSession();
@@ -173,9 +178,7 @@ export default function SetPassword() {
         "Account activated"
       );
 
-      navigate(
-        "/dashboard"
-      );
+      window.location.href = "/dashboard";
     } catch (err) {
       console.error(err);
 
