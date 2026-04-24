@@ -180,15 +180,13 @@ async function init() {
      AUTH CHANGES
   ===================================== */
 
-  supabase.auth.onAuthStateChange(
-    async () => {
-      setLoading(true);
-
-      await loadProfile();
-
-      setLoading(false);
-    }
-  );
+  supabase.auth.onAuthStateChange((_event, session) => {
+  setTimeout(async () => {
+    setLoading(true);
+    await loadProfile();
+    setLoading(false);
+  }, 0);
+});
 }
 
 /* ===================================================== */
@@ -266,7 +264,7 @@ export function useAuth() {
   const logout =
     useCallback(
       async () => {
-        await supabase.auth.signOut();
+        await supabase.auth.signOut({ scope: "local" });
 
         setUser(null);
 

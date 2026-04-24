@@ -87,76 +87,62 @@ export default function SetPassword() {
     }
   }
 
-  async function submit(e) {
-    e.preventDefault();
+async function submit(e) {
+  e.preventDefault();
 
-    if (loading) return;
+  if (loading) return;
 
-    if (!password || !confirm) {
-      return alert("Fill all fields");
-    }
-
-    if (password.length < 6) {
-      return alert(
-        "Password must be at least 6 characters"
-      );
-    }
-
-    if (password !== confirm) {
-      return alert("Passwords do not match");
-    }
-
-    try {
-      setLoading(true);
-
-      /* STEP 1 - UPDATE SUPABASE PASSWORD */
-      const {
-        error: passwordError,
-      } = await supabase.auth.updateUser({
-        password,
-      });
-
-      if (passwordError) throw passwordError;
-
-      /* STEP 2 - UPDATE BACKEND PASSWORD */
-      await Promise.race([
-        api.post("/auth/set-password", {
-          email,
-          password,
-        }),
-
-        new Promise((_, reject) =>
-          setTimeout(
-            () =>
-              reject(
-                new Error(
-                  "Server timeout"
-                )
-              ),
-            8000
-          )
-        ),
-      ]);
-
-      /* STEP 3 - REFRESH SESSION */
-      await supabase.auth.refreshSession();
-
-      /* STEP 4 - HARD REDIRECT */
-      window.location.href =
-        "/dashboard";
-
-    } catch (err) {
-      console.error(err);
-
-      alert(
-        err?.response?.data?.error ||
-          err?.message ||
-          "Failed to activate account"
-      );
-    } finally {
-      setLoading(false);
-    }
+  if (!password || !confirm) {
+    return alert("Fill all fields");
   }
+
+  if (password.length < 6) {
+    return alert("Password too short");
+  }
+
+  if (password !== confirm) {
+    return alert("Passwords do not match");
+  }
+
+  try {
+    setLoading(true);
+
+    /* stop duplicate clicks */
+    const btn = document.activeElement;
+    if (btn) btn.blur();
+
+    /* wait for auth lock to clear */
+    await new Promise((r) => setTimeout(r, 500));
+
+    /* STEP 1 set password only */
+    const { error } = await supabase.auth.updateUser({
+      password,
+    });
+
+    if (error) throw error;
+
+    /* STEP 2 backend sync */
+    await api.post("/auth/set-password", {
+      email,
+      password,
+    });
+
+    alert("Account activated");
+
+    navigate("/dashboard");
+
+  } catch (err) {
+    console.error(err);
+
+    alert(
+      err?.response?.data?.error ||
+      err?.message ||
+      "Failed to activate account"
+    );
+  } finally {
+    setLoading(false);
+  }
+}
 
   if (!ready) {
     return (
