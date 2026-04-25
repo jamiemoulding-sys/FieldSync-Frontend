@@ -1,10 +1,10 @@
 // src/pages/HolidayRequests.jsx
-// FINAL FILE
-// ✅ List / Week / Month views
-// ✅ Shows holidays + scheduled shifts
-// ✅ Reject reason saves
-// ✅ Existing add leave modal kept
-// ✅ Production safe
+// FULL FILE REPLACEMENT
+// ✅ Holiday allowance added back to list view
+// ✅ List / Week / Month views kept
+// ✅ Shows shifts + holidays
+// ✅ Reject reason support
+// ✅ Ready to paste
 
 import { useEffect, useState } from "react";
 import {
@@ -82,6 +82,56 @@ export default function HolidayRequests() {
         (x) => x.id === id
       ) || {}
     );
+  }
+
+  function allowance(id) {
+    const u = getUser(id);
+
+    return Number(
+      u.holiday_allowance ??
+        u.holiday_days ??
+        u.annual_leave ??
+        20
+    );
+  }
+
+  function usedDays(id) {
+    const approved =
+      requests.filter(
+        (x) =>
+          x.user_id === id &&
+          x.status === "approved"
+      );
+
+    let total = 0;
+
+    approved.forEach((r) => {
+      let d = new Date(
+        r.start_date
+      );
+
+      const end = new Date(
+        r.end_date
+      );
+
+      while (d <= end) {
+        const day =
+          d.getDay();
+
+        if (
+          day >= 1 &&
+          day <= 5
+        ) {
+          total++;
+        }
+
+        d.setDate(
+          d.getDate() + 1
+        );
+      }
+    });
+
+    return total;
   }
 
   function format(ds) {
@@ -355,9 +405,7 @@ export default function HolidayRequests() {
                 : "bg-[#0f172a]"
             }`}
           >
-            <CalendarRange
-              size={16}
-            />
+            <CalendarRange size={16} />
           </button>
 
           <button
@@ -370,9 +418,7 @@ export default function HolidayRequests() {
                 : "bg-[#0f172a]"
             }`}
           >
-            <CalendarDays
-              size={16}
-            />
+            <CalendarDays size={16} />
           </button>
 
           <button
@@ -397,9 +443,7 @@ export default function HolidayRequests() {
             onClick={prev}
             className="px-4 py-2 rounded-xl bg-[#0f172a]"
           >
-            <ChevronLeft
-              size={16}
-            />
+            <ChevronLeft size={16} />
           </button>
 
           <div className="font-semibold">
@@ -416,9 +460,7 @@ export default function HolidayRequests() {
             onClick={next}
             className="px-4 py-2 rounded-xl bg-[#0f172a]"
           >
-            <ChevronRight
-              size={16}
-            />
+            <ChevronRight size={16} />
           </button>
         </div>
       )}
@@ -434,6 +476,9 @@ export default function HolidayRequests() {
                 </th>
                 <th className="p-4 text-left">
                   Dates
+                </th>
+                <th className="p-4 text-left">
+                  Allowance
                 </th>
                 <th className="p-4 text-left">
                   Status
@@ -465,6 +510,16 @@ export default function HolidayRequests() {
                       →{" "}
                       {format(
                         r.end_date
+                      )}
+                    </td>
+
+                    <td className="p-4">
+                      {usedDays(
+                        r.user_id
+                      )}{" "}
+                      /{" "}
+                      {allowance(
+                        r.user_id
                       )}
                     </td>
 
@@ -557,12 +612,8 @@ export default function HolidayRequests() {
               {users.map(
                 (u) => (
                   <option
-                    key={
-                      u.id
-                    }
-                    value={
-                      u.id
-                    }
+                    key={u.id}
+                    value={u.id}
                   >
                     {u.name}
                   </option>
