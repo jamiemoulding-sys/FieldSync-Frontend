@@ -1149,88 +1149,106 @@ function estimateWages(
 function buildAIAlerts(shifts, staff) {
   const alerts = [];
 
-  const today = new Date()
-    .toISOString()
-    .split("T")[0];
-
   const now = new Date();
+  const today = now.toISOString().split("T")[0];
+
+  /* ===============================
+     PER EMPLOYEE ANALYSIS
+  =============================== */
 
   staff.forEach((emp) => {
-    const empShifts = shifts.filter(
+    const rows = shifts.filter(
       (x) =>
         String(x.user_id) ===
         String(emp.id)
     );
 
-    const recent = empShifts.slice(-10);
+    const recent = rows.slice(-14);
 
-    let lateCount = 0;
-    let missedCount = 0;
+    let late = 0;
+    let missed = 0;
+    let overtime = 0;
 
     recent.forEach((row) => {
       if (!row.clock_in_time) {
-        missedCount++;
+        missed++;
         return;
       }
 
-      const start = new Date(
-        row.clock_in_time
-      );
+      if (row.start_time) {
+        const actual = new Date(
+          row.clock_in_time
+        );
 
-      const scheduled =
-        row.start_time
-          ? new Date(
-              row.start_time
-            )
-          : null;
+        const planned = new Date(
+          row.start_time
+        );
 
-      if (
-        scheduled &&
-        start > scheduled
-      ) {
         const mins =
-          (start - scheduled) /
+          (actual - planned) /
           60000;
 
-        if (mins > 5) lateCount++;
+        if (mins > 5) late++;
+      }
+
+      if (
+        row.clock_in_time &&
+        row.clock_out_time
+      ) {
+        const hrs =
+          (new Date(
+            row.clock_out_time
+          ) -
+            new Date(
+              row.clock_in_time
+            )) /
+          3600000;
+
+        if (hrs > 10) overtime++;
       }
     });
 
-    if (lateCount >= 3) {
+    /* repeat lateness */
+    if (late >= 3) {
       alerts.push(
-        `${emp.name} has been late ${lateCount} times recently.`
+        `${emp.name} attendance declining (${late} late arrivals).`
       );
     }
 
-    if (missedCount >= 2) {
+    /* missed shifts */
+    if (missed >= 2) {
       alerts.push(
-        `${emp.name} missed ${missedCount} recent shifts.`
+        `${emp.name} missed ${missed} scheduled shifts.`
       );
     }
 
-    const todayShift = empShifts.find(
-      (x) =>
-        x.date === today
+    /* burnout risk */
+    if (overtime >= 3) {
+      alerts.push(
+        `${emp.name} may be burnout risk (${overtime} long shifts).`
+      );
+    }
+
+    /* today no clock in */
+    const todayShift = rows.find(
+      (x) => x.date === today
     );
 
     if (
       todayShift &&
-      !todayShift.clock_in_time
+      !todayShift.clock_in_time &&
+      todayShift.start_time
     ) {
-      const sched =
+      const start = new Date(
         todayShift.start_time
-          ? new Date(
-              todayShift.start_time
-            )
-          : null;
+      );
 
       if (
-        sched &&
         now >
-          new Date(
-            sched.getTime() +
-              30 * 60000
-          )
+        new Date(
+          start.getTime() +
+            30 * 60000
+        )
       ) {
         alerts.push(
           `${emp.name} has not clocked in for today's shift.`
@@ -1239,19 +1257,61 @@ function buildAIAlerts(shifts, staff) {
     }
   });
 
-  if (
-    shifts.filter(
-      (x) =>
-        x.clock_in_time &&
-        !x.clock_out_time
-    ).length > 5
-  ) {
+  /* ===============================
+     COMPANY ANALYSIS
+  =============================== */
+
+  const open = shifts.filter(
+    (x) =>
+      x.clock_in_time &&
+      !x.clock_out_time
+  ).length;
+
+  if (open > 5) {
     alerts.push(
-      "Multiple open shifts detected."
+      "Multiple open shifts still active."
     );
   }
 
-  return alerts;
+  const totalLate = alerts.filter((x) =>
+    x.includes("late")
+  ).length;
+
+  if (totalLate >= 3) {
+    alerts.push(
+      "Company lateness trend rising this week."
+    );
+  }
+
+  const totalHours = shifts.reduce(
+    (sum, row) => {
+      if (
+        !row.clock_in_time ||
+        !row.clock_out_time
+      )
+        return sum;
+
+      return (
+        sum +
+        (new Date(
+          row.clock_out_time
+        ) -
+          new Date(
+            row.clock_in_time
+          )) /
+          3600000
+      );
+    },
+    0
+  );
+
+  if (totalHours > 250) {
+    alerts.push(
+      "Weekly labour hours unusually high."
+    );
+  }
+
+  return alerts.slice(0, 8);
 }
 
 function LiveMap({ live }) {
