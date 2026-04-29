@@ -63,9 +63,15 @@ export default function Locations() {
       setLoading(true);
       setError("");
 
-      const data = await locationAPI.getLocations();
+     const data = await locationAPI.getLocations();
 
-      setLocations(Array.isArray(data) ? data : []);
+setLocations(
+  Array.isArray(data)
+    ? data.filter(
+        (x) => !x.archived
+      )
+    : []
+);
     } catch {
       setError("Failed to load locations");
     } finally {
@@ -142,17 +148,34 @@ export default function Locations() {
     }
   }
 
-  async function deleteLocation(id) {
-    if (!window.confirm("Delete this location?")) return;
+async function deleteLocation(id) {
+  if (
+    !window.confirm(
+      "This site may be linked to shifts or schedules.\n\nArchive instead?"
+    )
+  )
+    return;
 
-    try {
-      await locationAPI.delete(id);
-      setSuccess("Location deleted");
-      await loadLocations();
-    } catch {
-      setError("Delete failed");
-    }
+  try {
+    setError("");
+    setSuccess("");
+
+    /* OPTION 1 = soft delete */
+    await locationAPI.update(id, {
+      archived: true,
+    });
+
+    setSuccess("Location archived");
+    await loadLocations();
+
+  } catch (err) {
+    console.error(err);
+
+    setError(
+      "Cannot delete site because staff history or schedules are linked."
+    );
   }
+}
 
   const filtered = useMemo(() => {
     return locations.filter((loc) =>
@@ -322,7 +345,7 @@ export default function Locations() {
                   className="py-2 rounded-xl bg-red-500/20 text-red-300 hover:bg-red-500/30 flex items-center justify-center gap-2"
                 >
                   <Trash2 size={15} />
-                  Delete
+                  Archive
                 </button>
               </div>
             </motion.div>
