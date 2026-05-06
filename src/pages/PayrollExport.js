@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { reportAPI, userAPI, companyAPI } from "../services/api";
+import { reportAPI, userAPI } from "../services/api";
 import jsPDF from "jspdf";
 
 /* ================= HELPERS ================= */
@@ -134,7 +134,6 @@ export default function PayrollExport() {
     const [timesheets, staff, comps] = await Promise.all([
       reportAPI.getTimesheets(),
       userAPI.getAll(),
-      companyAPI.getAll(), // 🔥 NEW
     ]);
 
     setRows(timesheets || []);
