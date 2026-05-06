@@ -12,7 +12,6 @@ const ROW_HEIGHT = 90;
 /* ================= HELPERS ================= */
 
 const snap = (h) => Math.round(h * 4) / 4;
-
 const toDecimal = (m) => m.hours() + m.minutes() / 60;
 
 function getPosition(start, end) {
@@ -78,23 +77,21 @@ export default function Schedule() {
   /* ================= NAV ================= */
 
   function prev() {
-  setDate(moment(date).subtract(1, view === "month" ? "month" : "week").toDate());
-}
+    setDate(moment(date).subtract(1, view === "month" ? "month" : "week").toDate());
+  }
 
-function next() {
-  setDate(moment(date).add(1, view === "month" ? "month" : "week").toDate());
-}
+  function next() {
+    setDate(moment(date).add(1, view === "month" ? "month" : "week").toDate());
+  }
 
   /* ================= DAYS ================= */
 
-    const days = useMemo(() => {
-    const start = moment(date).startOf("isoWeek"); // ✅ FIXED
-      return Array.from({ length: 7 }).map((_, i) =>
+  const days = useMemo(() => {
+    const start = moment(date).startOf("isoWeek");
+    return Array.from({ length: 7 }).map((_, i) =>
       start.clone().add(i, "days")
-   );
-   }, [date]);
-
- 
+    );
+  }, [date]);
 
   /* ================= CREATE ================= */
 
@@ -201,220 +198,204 @@ function next() {
 
   /* ================= UI ================= */
 
-  return (
-  <div className="h-screen flex bg-[#0B1220] text-white">
+ return (
+  <>
+    <div className="h-screen flex bg-[#0B1220] text-white">
 
-    {/* SIDEBAR */}
-    <div className="w-[220px] bg-[#020617] border-r border-white/10 p-4 space-y-4">
-      <div className="text-lg font-bold">YourApp</div>
+      {/* SIDEBAR */}
+      <div className="w-[220px] bg-[#020617] border-r border-white/10 p-4 space-y-4">
+        <div className="text-lg font-bold">YourApp</div>
 
-      <div className="space-y-2 text-sm">
-        <div className="nav-item active">Scheduler</div>
-        <div className="nav-item">Payroll</div>
-        <div className="nav-item">Employees</div>
-      </div>
-    </div>
-
-    {/* MAIN */}
-    <div className="flex-1 flex flex-col">
-
-      {/* TOP BAR */}
-      <div className="flex justify-between items-center px-6 py-4 bg-[#111827] border-b border-white/10">
-
-        <div className="text-lg font-semibold">
-  {view === "week" && (
-    <span>
-      {moment(date).startOf("isoWeek").format("DD MMM")}
-      {" - "}
-      {moment(date).endOf("isoWeek").format("DD MMM YYYY")}
-    </span>
-  )}
-
-  {view === "month" && (
-    <span>{moment(date).format("MMMM YYYY")}</span>
-  )}
-
-  {view === "list" && (
-    <span>All Shifts</span>
-  )}
-</div>
-
-        <div className="flex gap-2">
-
-          <button onClick={() => setView("week")} className="btn-secondary">
-            Week
-          </button>
-
-          <button onClick={() => setView("month")} className="btn-secondary">
-            Month
-          </button>
-
-          <button onClick={() => setView("list")} className="btn-secondary">
-            List
-          </button>
-
-          <button onClick={prev} className="btn-secondary">←</button>
-          <button onClick={() => setDate(new Date())} className="btn-secondary">Today</button>
-          <button onClick={next} className="btn-secondary">→</button>
-
-          <button onClick={runAutoFill} className="btn-ai">🤖 AI</button>
-
-          <button onClick={() => setShowAdd(true)} className="btn-primary">
-            + Shift
-          </button>
-
+        <div className="space-y-2 text-sm">
+          <div className="nav-item active">Scheduler</div>
+          <div className="nav-item">Payroll</div>
+          <div className="nav-item">Employees</div>
         </div>
       </div>
 
-      {/* CONTENT */}
-      <div className="flex-1 overflow-auto p-6">
+      {/* MAIN */}
+      <div className="flex-1 flex flex-col">
 
-        {/* WEEK VIEW */}
-        {view === "week" && (
-          <div className="overflow-x-auto border border-white/10">
+        {/* TOP BAR */}
+        <div className="flex justify-between items-center px-6 py-4 bg-[#111827] border-b border-white/10">
 
-            {/* TIME HEADER */}
-            <div className="flex border-b border-white/10 bg-[#020617]">
-              <div className="w-[160px]" />
-              {Array.from({ length: END_HOUR - START_HOUR }).map((_, i) => (
-                <div
-                  key={i}
-                  style={{ width: HOUR_WIDTH }}
-                  className="text-xs text-gray-400 text-center py-1 border-l border-white/5"
-                >
-                  {START_HOUR + i}:00
+          <div className="text-lg font-semibold">
+            {view === "week" && (
+              <span>
+                {moment(date).startOf("isoWeek").format("DD MMM")} -{" "}
+                {moment(date).endOf("isoWeek").format("DD MMM YYYY")}
+              </span>
+            )}
+            {view === "month" && <span>{moment(date).format("MMMM YYYY")}</span>}
+            {view === "list" && <span>All Shifts</span>}
+          </div>
+
+          <div className="flex gap-2">
+            <button onClick={() => setView("week")} className="btn-secondary">Week</button>
+            <button onClick={() => setView("month")} className="btn-secondary">Month</button>
+            <button onClick={() => setView("list")} className="btn-secondary">List</button>
+
+            <button onClick={prev} className="btn-secondary">←</button>
+            <button onClick={() => setDate(new Date())} className="btn-secondary">Today</button>
+            <button onClick={next} className="btn-secondary">→</button>
+
+            <button onClick={runAutoFill} className="btn-ai">🤖 AI</button>
+            <button onClick={() => setShowAdd(true)} className="btn-primary">+ Shift</button>
+          </div>
+        </div>
+
+        {/* CONTENT */}
+        <div className="flex-1 overflow-auto p-6">
+
+          {/* WEEK VIEW */}
+          {view === "week" && (
+            <div className="overflow-x-auto border border-white/10">
+
+              {/* TIME HEADER */}
+              <div className="flex border-b border-white/10 bg-[#020617]">
+                <div className="w-[160px]" />
+                {Array.from({ length: END_HOUR - START_HOUR }).map((_, i) => (
+                  <div
+                    key={i}
+                    style={{ width: HOUR_WIDTH }}
+                    className="text-xs text-gray-400 text-center py-1 border-l border-white/5"
+                  >
+                    {START_HOUR + i}:00
+                  </div>
+                ))}
+              </div>
+
+              {/* USERS ROWS */}
+              {users.map(user => (
+                <div key={user.id} className="flex border-b border-white/10">
+
+                  <div className="w-[160px] p-2 bg-[#020617]">
+                    {user.name}
+                  </div>
+
+                  {days.map(day => {
+                    const ds = day.format("YYYY-MM-DD");
+
+                    const dayShifts = shifts.filter(
+                      s => s.date === ds && s.user_id === user.id
+                    );
+
+                    return (
+                      <div
+                        key={ds}
+                        className="relative border-l border-white/10"
+                        style={{
+                          width: (END_HOUR - START_HOUR) * HOUR_WIDTH,
+                          height: ROW_HEIGHT
+                        }}
+                        onMouseDown={(e) => {
+                          if (dragging) return;
+                          startCreate(e, day, user.id);
+                        }}
+                        onMouseMove={moveCreate}
+                        onMouseUp={endCreate}
+                      >
+
+                        {/* GRID */}
+                        {Array.from({ length: END_HOUR - START_HOUR }).map((_, i) => (
+                          <div
+                            key={`grid-${i}`}
+                            className="absolute top-0 bottom-0 border-l border-white/5"
+                            style={{ left: i * HOUR_WIDTH }}
+                          />
+                        ))}
+
+                        {/* DROP ZONES */}
+                        {Array.from({ length: END_HOUR - START_HOUR }).map((_, i) => (
+                          <div
+                            key={`drop-${i}`}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={() => handleDrop(day, user.id, START_HOUR + i)}
+                            style={{
+                              position: "absolute",
+                              left: i * HOUR_WIDTH,
+                              width: HOUR_WIDTH,
+                              height: "100%"
+                            }}
+                          />
+                        ))}
+
+                        {/* SHIFTS */}
+                        {dayShifts.map(shift => {
+                          const pos = getPosition(shift.start_time, shift.end_time);
+                          const assignedUser = users.find(u => u.id === shift.user_id);
+
+                          return (
+                            <div
+                              key={shift.id}
+                              draggable
+                              onDragStart={() => setDragging(shift)}
+                              className="absolute rounded-lg px-2 py-1 text-xs shadow-lg cursor-pointer"
+                              style={{
+                                top: 8,
+                                left: pos.left,
+                                width: pos.width,
+                                minWidth: 100,
+                                background: shift.user_id ? "#4f46e5" : "#6b7280",
+                              }}
+                            >
+                              <div className="font-semibold truncate">
+                                {assignedUser?.name || "Open Shift"}
+                              </div>
+                              <div className="text-[10px] opacity-80">
+                                {moment(shift.start_time).format("HH:mm")} -{" "}
+                                {moment(shift.end_time).format("HH:mm")}
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                      </div>
+                    );
+                  })}
+
                 </div>
               ))}
             </div>
+          )}
 
-            {users.map(user => (
-              <div key={user.id} className="flex border-b border-white/10">
+          {/* MONTH VIEW */}
+          {view === "month" && (
+            <div className="grid grid-cols-7 gap-2">
+              {Array.from({ length: 42 }).map((_, i) => {
+                const start = moment(date).startOf("month").startOf("isoWeek");
+                const d = start.clone().add(i, "days");
 
-                <div className="w-[160px] p-2 bg-[#020617]">
-                  {user.name}
-                </div>
+                return (
+                  <div key={i} className="border p-2 min-h-[100px]">
+                    <div className="text-xs text-gray-400">{d.format("DD")}</div>
 
-                {days.map(day => {
-                  const ds = day.format("YYYY-MM-DD");
-
-                  const dayShifts = shifts.filter(
-                    s => s.date === ds && s.user_id === user.id
-                  );
-
-                  return (
-                    <div
-                      key={ds}
-                      className="relative border-l border-white/10"
-                      style={{
-                        width: (END_HOUR - START_HOUR) * HOUR_WIDTH,
-                        height: ROW_HEIGHT
-                      }}
-                      onMouseDown={(e)=>{
-                     if (dragging) return; // ✅ FIX
-                     startCreate(e,day,user.id); 
-                      }}
-                      onMouseMove={moveCreate}
-                      onMouseUp={endCreate}
-                    >
-                      {/* GRID LINES */}
-                    {Array.from({ length: END_HOUR - START_HOUR }).map((_, i) => (
-                       <div
-                     key={i}
-                     className="absolute top-0 bottom-0 border-l border-white/5"
-                     style={{ left: i * HOUR_WIDTH }}
-                     />
-                    ))}
-
-                      {/* DROP ZONES */}
-                      {Array.from({ length: END_HOUR - START_HOUR }).map((_, i) => (
-                        <div
-                          key={i}
-                          onDragOver={(e)=>e.preventDefault()}
-                          onDrop={()=>handleDrop(day,user.id,START_HOUR+i)}
-                          style={{
-                            position:"absolute",
-                            left:i*HOUR_WIDTH,
-                            width:HOUR_WIDTH,
-                            height:"100%"
-                          }}
-                        />
+                    {shifts
+                      .filter(s => s.date === d.format("YYYY-MM-DD"))
+                      .map(s => (
+                        <div key={s.id} className="text-xs bg-indigo-600 mt-1 p-1 rounded">
+                          {moment(s.start_time).format("HH:mm")}
+                        </div>
                       ))}
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
-                      {/* SHIFTS */}
-                      {dayShifts.map(s => {
-                        const pos = getPosition(s.start_time, s.end_time);
+          {/* LIST VIEW */}
+          {view === "list" && (
+            <div className="space-y-2">
+              {shifts.map(s => (
+                <div key={s.id} className="p-3 border rounded">
+                  {moment(s.date).format("DD MMM")} —{" "}
+                  {moment(s.start_time).format("HH:mm")}
+                </div>
+              ))}
+            </div>
+          )}
 
-                        return (
-                          <div
-                            key={s.id}
-                            draggable
-                            onDragStart={()=>setDragging(s)}
-                            className="absolute bg-indigo-600 text-xs px-2 py-1 rounded"
-                            style={{ top:10, left:pos.left, width:pos.width }}
-                          >
-                            {moment(s.start_time).format("HH:mm")} - {moment(s.end_time).format("HH:mm")}
-                          </div>
-                        );
-                      })}
-
-                    </div>
-                  );
-                })}
-
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* MONTH VIEW */}
-        {view === "month" && (
-  <div className="grid grid-cols-7 gap-2">
-
-    {Array.from({ length: 42 }).map((_, i) => {
-      const start = moment(date).startOf("month").startOf("isoWeek");
-      const d = start.clone().add(i, "days");
-
-      return (
-        <div
-          key={i}
-          className={`border p-2 min-h-[100px] ${
-            d.month() !== moment(date).month()
-              ? "opacity-30"
-              : ""
-          }`}
-        >
-          <div className="text-xs text-gray-400">
-            {d.format("DD")}
-          </div>
-
-          {shifts
-            .filter(s => s.date === d.format("YYYY-MM-DD"))
-            .map(s => (
-              <div
-                key={s.id}
-                className="text-xs bg-indigo-600 mt-1 p-1 rounded"
-              >
-                {moment(s.start_time).format("HH:mm")}
-              </div>
-            ))}
         </div>
-      );
-    })}
-
-  </div>
-)}
-
-        {/* LIST VIEW */}
-        {view === "list" && (
-          <div className="space-y-2">
-            {shifts.map(s => (
-              <div key={s.id} className="p-3 border rounded">
-                {moment(s.date).format("DD MMM")} — {moment(s.start_time).format("HH:mm")}
-              </div>
-            ))}
-          </div>
-        )}
-
       </div>
     </div>
 
@@ -452,7 +433,6 @@ function next() {
         </div>
       </div>
     )}
-
-  </div>
-  );
+  </>
+);
 }
