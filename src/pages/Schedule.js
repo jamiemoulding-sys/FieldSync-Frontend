@@ -29,19 +29,6 @@ function hours(start, end) {
   return (new Date(end) - new Date(start)) / 3600000;
 }
 
-/* ================= DEMAND ================= */
-
-function forecastDemand(revenue = 12000) {
-  const labourTarget = revenue * 0.3;
-  const avgRate = 12;
-
-  const totalHours = labourTarget / avgRate;
-
-  return {
-    hoursPerDay: totalHours / 7,
-  };
-}
-
 /* ================= AVAILABILITY ================= */
 
 function isUserAvailable(user, shift, allShifts) {
@@ -81,12 +68,14 @@ export default function Schedule() {
   const [shifts, setShifts] = useState([]);
 
   const [date, setDate] = useState(new Date());
+  const [view, setView] = useState("week");
+  const [editMode, setEditMode] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
 
   const [dragging, setDragging] = useState(null);
   const [creating, setCreating] = useState(null);
 
   const [toast, setToast] = useState(null);
-  const [templates, setTemplates] = useState([]);
 
   useEffect(() => {
     load();
@@ -121,28 +110,71 @@ export default function Schedule() {
     setTimeout(() => setToast(null), 2500);
   }
 
-  /* ================= CREATE ================= */
+  /* ================= CREATE DRAG ================= */
 
-  async function createShift(data) {
-    await scheduleAPI.create(data);
-    notify("Shift created");
-    load();
+  function startCreate(e, day, userId) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+
+    const hour = snap(START_HOUR + x / HOUR_WIDTH);
+
+    setCreating({ day, userId, start: hour, end: hour });
   }
 
-  /* ================= UPDATE ================= */
+  function moveCreate(e) {
+    if (!creating) return;
 
-  async function updateShift(id, data) {
-    socket.emit("shift:update", { id, ...data });
-    await scheduleAPI.update(id, data);
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+
+    const hour = snap(START_HOUR + x / HOUR_WIDTH);
+
+    setCreating((c) => ({ ...c, end: hour }));
+  }
+
+  function endCreate() {
+    if (!creating) return;
+
+    const start = Math.min(creating.start, creating.end);
+    const end = Math.max(creating.start, creating.end);
+
+    if (end - start < 0.25) {
+      setCreating(null);
+      return;
+    }
+
+    const startTime = moment(creating.day)
+      .hour(Math.floor(start))
+      .minute((start % 1) * 60);
+
+    const endTime = moment(creating.day)
+      .hour(Math.floor(end))
+      .minute((end % 1) * 60);
+
+    scheduleAPI.create({
+      user_id: creating.userId,
+      date: creating.day.format("YYYY-MM-DD"),
+      start_time: startTime.toISOString(),
+      end_time: endTime.toISOString(),
+      type: "assigned",
+      status: "filled",
+    });
+
+    notify("Shift created");
     load();
+    setCreating(null);
   }
 
   /* ================= AUTO FILL ================= */
 
   async function runAutoFill() {
     const openShifts = shifts.filter(
-      (s) => s.type === "open" && s.status === "open"
+      (s) =>
+        (!s.user_id || s.type === "open") &&
+        s.status !== "filled"
     );
+
+    let filled = 0;
 
     for (const shift of openShifts) {
       const available = users.filter((u) =>
@@ -163,132 +195,33 @@ export default function Schedule() {
         type: "assigned",
         status: "filled",
       });
+
+      filled++;
     }
 
-    notify("AI filled shifts");
+    notify(`AI filled ${filled} shifts`);
     load();
   }
-
-  /* ================= AUTO WEEK ================= */
-
-  async function autoScheduleWeek() {
-    await runAutoFill();
-    notify("Week auto scheduled");
-  }
-
-
-  /* ================= CREATE DRAG ================= */
-
-function startCreate(e, day, userId) {
-  const rect = e.currentTarget.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-
-  const hour = snap(START_HOUR + x / HOUR_WIDTH);
-
-  setCreating({
-    day,
-    userId,
-    start: hour,
-    end: hour,
-  });
-}
-
-function moveCreate(e) {
-  if (!creating) return;
-
-  const rect = e.currentTarget.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-
-  const hour = snap(START_HOUR + x / HOUR_WIDTH);
-
-  setCreating((c) => ({
-    ...c,
-    end: hour,
-  }));
-}
-
-function endCreate() {
-  if (!creating) return;
-
-  const start = Math.min(creating.start, creating.end);
-  const end = Math.max(creating.start, creating.end);
-
-  // prevent tiny clicks creating 0-length shifts
-  if (end - start < 0.25) {
-    setCreating(null);
-    return;
-  }
-
-  const startTime = moment(creating.day)
-    .hour(Math.floor(start))
-    .minute((start % 1) * 60);
-
-  const endTime = moment(creating.day)
-    .hour(Math.floor(end))
-    .minute((end % 1) * 60);
-
-  createShift({
-    user_id: creating.userId,
-    date: creating.day.format("YYYY-MM-DD"),
-    start_time: startTime.toISOString(),
-    end_time: endTime.toISOString(),
-    type: "assigned",
-    status: "filled",
-  });
-
-  setCreating(null);
-}
-  /* ================= TEMPLATE ================= */
-
-  function saveTemplate() {
-    setTemplates([
-      ...templates,
-      shifts.filter((s) => s.type === "assigned"),
-    ]);
-
-    notify("Template saved");
-  }
-
-  async function applyTemplate(template) {
-    for (const s of template) {
-      await scheduleAPI.create({
-        ...s,
-        id: undefined,
-      });
-    }
-
-    notify("Template applied");
-    load();
-  }
-
-  /* ================= LABOUR ================= */
-
-  const labour = useMemo(() => {
-    const cost = shifts.reduce((sum, s) => {
-      const user = users.find((u) => u.id === s.user_id);
-      if (!user) return sum;
-
-      return sum + hours(s.start_time, s.end_time) * (user.hourly_rate || 0);
-    }, 0);
-
-    const revenue = 12000;
-
-    return {
-      cost,
-      percent: ((cost / revenue) * 100).toFixed(1),
-    };
-  }, [shifts, users]);
-
-  const demand = forecastDemand(12000);
 
   /* ================= DAYS ================= */
 
   const days = useMemo(() => {
-    const start = moment(date).startOf("week");
-    return Array.from({ length: 7 }).map((_, i) =>
-      start.clone().add(i, "days")
-    );
-  }, [date]);
+    if (view === "week") {
+      const start = moment(date).startOf("week");
+      return Array.from({ length: 7 }).map((_, i) =>
+        start.clone().add(i, "days")
+      );
+    }
+
+    if (view === "month") {
+      const start = moment(date).startOf("month");
+      return Array.from({ length: start.daysInMonth() }).map((_, i) =>
+        start.clone().add(i, "days")
+      );
+    }
+
+    return [];
+  }, [date, view]);
 
   /* ================= UI ================= */
 
@@ -296,7 +229,7 @@ function endCreate() {
     <div className="p-6 space-y-6 text-white">
 
       {/* HEADER */}
-      <div className="flex justify-between">
+      <div className="flex justify-between items-center flex-wrap gap-3">
 
         <div className="flex gap-2">
           <button onClick={() => setDate(moment(date).subtract(7,"days").toDate())}>←</button>
@@ -304,124 +237,123 @@ function endCreate() {
           <button onClick={() => setDate(moment(date).add(7,"days").toDate())}>→</button>
         </div>
 
-        <div className="flex gap-2">
+        <div className="font-semibold">
+          {moment(date).format("MMMM YYYY")}
+        </div>
+
+        <div className="flex gap-2 flex-wrap">
+
+          <button onClick={() => setView("week")} className="bg-indigo-600 px-3 py-1 rounded">Week</button>
+          <button onClick={() => setView("month")} className="bg-[#111827] px-3 py-1 rounded">Month</button>
+          <button onClick={() => setView("list")} className="bg-[#111827] px-3 py-1 rounded">List</button>
+
+          <button onClick={() => setEditMode(e=>!e)} className="bg-yellow-600 px-3 py-1 rounded">
+            {editMode ? "Done" : "Edit"}
+          </button>
+
+          <button onClick={() => setShowAdd(true)} className="bg-emerald-600 px-3 py-1 rounded">
+            + Add
+          </button>
+
           <button onClick={runAutoFill} className="bg-purple-600 px-3 py-1 rounded">
-            Auto Fill
+            🤖 Auto Fill
           </button>
 
-          <button onClick={autoScheduleWeek} className="bg-indigo-600 px-3 py-1 rounded">
-            Auto Week
-          </button>
         </div>
-
-      </div>
-
-      {/* DASHBOARD */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-[#020617] p-4 rounded">
-          <p className="text-xs text-gray-400">Demand</p>
-          <p>{demand.hoursPerDay.toFixed(1)} hrs/day</p>
-        </div>
-
-        <div className="bg-[#020617] p-4 rounded">
-          <p className="text-xs text-gray-400">Labour Cost</p>
-          <p>£{labour.cost.toFixed(0)}</p>
-        </div>
-
-        <div className="bg-[#020617] p-4 rounded">
-          <p className="text-xs text-gray-400">Labour %</p>
-          <p>{labour.percent}%</p>
-        </div>
-      </div>
-
-      {/* TEMPLATE */}
-      <div className="flex gap-2">
-        <button onClick={saveTemplate} className="bg-indigo-600 px-3 py-1 rounded">
-          Save Template
-        </button>
-
-        {templates.map((t, i) => (
-          <button key={i} onClick={() => applyTemplate(t)} className="bg-gray-700 px-3 py-1 rounded">
-            Template {i + 1}
-          </button>
-        ))}
       </div>
 
       {/* GRID */}
-      <div className="overflow-x-auto border border-white/20">
+      {view !== "list" && (
+        <div className="overflow-x-auto border border-white/20">
 
-        {users.map((user) => (
-          <div key={user.id} className="flex border-b border-white/20">
+          {users.map((user) => (
+            <div key={user.id} className="flex border-b border-white/20">
 
-            <div className="w-[180px] p-2 bg-[#020617]">
-              {user.name}
-            </div>
+              <div className="w-[180px] p-2 bg-[#020617] font-medium">
+                {user.name}
+              </div>
 
-            {days.map((day) => {
-              const ds = day.format("YYYY-MM-DD");
+              {days.map((day) => {
+                const ds = day.format("YYYY-MM-DD");
 
-              const dayShifts = shifts.filter(
-                (s) => s.user_id === user.id && s.date === ds
-              );
+                const dayShifts = shifts.filter(
+                  (s) =>
+                    s.date === ds &&
+                    (s.user_id === user.id || !s.user_id)
+                );
 
-              return (
-                <div
-                  key={ds}
-                  className="relative border-l border-white/10"
-                  style={{
-                    width: (END_HOUR - START_HOUR) * HOUR_WIDTH,
-                    height: 60,
-                  }}
-                  onMouseDown={(e)=>startCreate(e,day,user.id)}
-                  onMouseMove={moveCreate}
-                  onMouseUp={endCreate}
-                >
+                return (
+                  <div
+                    key={ds}
+                    className="relative border-l border-white/10"
+                    style={{
+                      width: (END_HOUR - START_HOUR) * HOUR_WIDTH,
+                      height: 60,
+                    }}
+                    onMouseDown={(e)=>startCreate(e,day,user.id)}
+                    onMouseMove={moveCreate}
+                    onMouseUp={endCreate}
+                  >
 
-                  {dayShifts.map((s) => {
-                    const start = moment(s.start_time);
-                    const end = moment(s.end_time);
+                    {dayShifts.map((s) => {
+                      const start = moment(s.start_time);
+                      const end = moment(s.end_time);
 
-                    const left =
-                      (start.hours() - START_HOUR) * HOUR_WIDTH;
+                      const left =
+                        (start.hours() - START_HOUR) * HOUR_WIDTH;
 
-                    const width =
-                      (end.hours() - start.hours()) * HOUR_WIDTH;
+                      const width =
+                        (end.hours() - start.hours()) * HOUR_WIDTH;
 
-                    return (
+                      return (
+                        <div
+                          key={s.id}
+                          draggable
+                          onDragStart={()=>setDragging(s)}
+                          className={`absolute text-xs px-2 rounded ${
+                            s.user_id ? "bg-indigo-600" : "bg-gray-500"
+                          }`}
+                          style={{ top:5,left,width,height:20 }}
+                        >
+                          {start.format("HH:mm")}
+                        </div>
+                      );
+                    })}
+
+                    {creating && creating.userId===user.id && (
                       <div
-                        key={s.id}
-                        draggable
-                        onDragStart={()=>setDragging(s)}
-                        className="absolute bg-indigo-600 text-xs px-2 rounded"
-                        style={{ top:5,left,width,height:20 }}
+                        className="absolute bg-green-500/40 text-xs"
+                        style={{
+                          top:5,
+                          left: Math.min(creating.start,creating.end)*HOUR_WIDTH,
+                          width: Math.abs(creating.end-creating.start)*HOUR_WIDTH,
+                          height:20
+                        }}
                       >
-                        {start.format("HH:mm")}
+                        {formatHour(creating.start)} - {formatHour(creating.end)}
                       </div>
-                    );
-                  })}
+                    )}
 
-                  {creating && creating.userId===user.id && (
-                    <div
-                      className="absolute bg-green-500/40 text-xs"
-                      style={{
-                        top:5,
-                        left: Math.min(creating.start,creating.end)*HOUR_WIDTH,
-                        width: Math.abs(creating.end-creating.start)*HOUR_WIDTH,
-                        height:20
-                      }}
-                    >
-                      {formatHour(creating.start)} - {formatHour(creating.end)}
-                    </div>
-                  )}
+                  </div>
+                );
+              })}
 
-                </div>
-              );
-            })}
+            </div>
+          ))}
 
-          </div>
-        ))}
+        </div>
+      )}
 
-      </div>
+      {/* LIST VIEW */}
+      {view === "list" && (
+        <div className="space-y-2">
+          {shifts.map((s) => (
+            <div key={s.id} className="p-3 border rounded">
+              {moment(s.date).format("DD MMM")} — {s.start_time}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* TOAST */}
       {toast && (
