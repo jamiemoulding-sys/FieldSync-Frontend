@@ -206,18 +206,14 @@ export default function Schedule() {
       <div className="w-[220px] bg-[#020617] border-r border-white/10 p-4 space-y-4">
         <div className="text-lg font-bold">YourApp</div>
 
-        <div className="space-y-2 text-sm">
-          <div className="nav-item active">Scheduler</div>
-          <div className="nav-item">Payroll</div>
-          <div className="nav-item">Employees</div>
-        </div>
+        
       </div>
 
       {/* MAIN */}
       <div className="flex-1 flex flex-col">
 
         {/* TOP BAR */}
-        <div className="flex justify-between items-center px-6 py-4 bg-[#111827] border-b border-white/10">
+       <div className="sticky top-0 z-20 flex justify-between items-center px-6 py-4 bg-[#111827] border-b border-white/10">
 
           <div className="text-lg font-semibold">
             {view === "week" && (
@@ -383,17 +379,32 @@ export default function Schedule() {
             </div>
           )}
 
-          {/* LIST VIEW */}
-          {view === "list" && (
-            <div className="space-y-2">
-              {shifts.map(s => (
-                <div key={s.id} className="p-3 border rounded">
-                  {moment(s.date).format("DD MMM")} —{" "}
-                  {moment(s.start_time).format("HH:mm")}
-                </div>
-              ))}
+         {/* LIST VIEW */}
+{view === "list" && (
+  <div className="space-y-2">
+    {shifts.map((s) => {
+      const user = users.find((u) => u.id === s.user_id);
+
+      return (
+        <div key={s.id} className="p-3 border rounded flex justify-between">
+          <div>
+            <div className="font-semibold">
+              {user?.name || "Unassigned"}
             </div>
-          )}
+            <div className="text-xs text-gray-400">
+              {moment(s.date).format("DD MMM YYYY")}
+            </div>
+          </div>
+
+          <div className="text-sm">
+            {moment(s.start_time).format("HH:mm")} - {moment(s.end_time).format("HH:mm")}
+          </div>
+        </div>
+      );
+    })}
+  </div>
+)}
+  
 
         </div>
       </div>
