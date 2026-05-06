@@ -128,11 +128,14 @@ export default function WorkSession() {
     return Math.round(R * c);
   }
 
-  /* ========================================= */
-/* GPS TRACKING ULTRA FIX */
+/* ========================================= */
+/* BATTERY SAVER GPS TRACKING FIXED */
+/* Replace your ENTIRE GPS TRACKING section */
 /* ========================================= */
 
 const intervalRef = useRef(null);
+const lastLatRef = useRef(null);
+const lastLngRef = useRef(null);
 
 useEffect(() => {
   if (!activeShift) {
@@ -167,57 +170,119 @@ function stopTracking() {
   }
 }
 
-function savePoint(pos) {
-  shiftAPI.updateLiveLocation(
-    activeShift.id,
-    pos.coords.latitude,
-    pos.coords.longitude
-  );
+function metersBetween(
+  lat1,
+  lon1,
+  lat2,
+  lon2
+) {
+  const R = 6371000;
 
-  setGpsText("GPS tracking active");
+  const dLat =
+    ((lat2 - lat1) * Math.PI) / 180;
+
+  const dLon =
+    ((lon2 - lon1) * Math.PI) / 180;
+
+  const a =
+    Math.sin(dLat / 2) *
+      Math.sin(dLat / 2) +
+    Math.cos(
+      (lat1 * Math.PI) / 180
+    ) *
+      Math.cos(
+        (lat2 * Math.PI) / 180
+      ) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+
+  return (
+    R *
+    2 *
+    Math.atan2(
+      Math.sqrt(a),
+      Math.sqrt(1 - a)
+    )
+  );
+}
+
+async function savePoint(pos) {
+  const lat = pos.coords.latitude;
+  const lng = pos.coords.longitude;
+
+  if (
+    lastLatRef.current !== null &&
+    lastLngRef.current !== null
+  ) {
+    const moved = metersBetween(
+      lastLatRef.current,
+      lastLngRef.current,
+      lat,
+      lng
+    );
+
+    if (moved < 20) {
+      setGpsText(
+        "Stationary mode (battery saver)"
+      );
+      return;
+    }
+  }
+
+  lastLatRef.current = lat;
+  lastLngRef.current = lng;
+
+  try {
+    await shiftAPI.updateLiveLocation(
+      activeShift.id,
+      lat,
+      lng
+    );
+
+    setGpsText("Tracking route");
+  } catch (err) {
+    console.error(err);
+  }
 }
 
 function startTracking() {
   if (!navigator.geolocation) return;
   if (!activeShift?.id) return;
 
-  /* instant point */
+  /* save first point instantly */
   navigator.geolocation.getCurrentPosition(
     savePoint,
-    () =>
-      setGpsText("GPS unavailable"),
+    () => {},
     {
       enableHighAccuracy: true,
       timeout: 10000,
     }
   );
 
-  /* movement watcher */
+  /* low battery live tracking */
   watchRef.current =
     navigator.geolocation.watchPosition(
       savePoint,
-      () =>
-        setGpsText("GPS weak signal"),
+      () => {},
       {
-        enableHighAccuracy: true,
-        maximumAge: 0,
-        timeout: 10000,
+        enableHighAccuracy: false,
+        maximumAge: 15000,
+        timeout: 15000,
       }
     );
 
-  /* forced save every 60 sec */
+  /* backup save every 2 mins */
   intervalRef.current = setInterval(() => {
     navigator.geolocation.getCurrentPosition(
       savePoint,
       () => {},
       {
-        enableHighAccuracy: true,
+        enableHighAccuracy: false,
         timeout: 10000,
       }
     );
-  }, 60000);
+  }, 120000);
 }
-
   /* ========================================= */
   /* TIMER */
   /* ========================================= */

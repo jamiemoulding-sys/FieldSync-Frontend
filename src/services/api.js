@@ -310,8 +310,13 @@ export const taskAPI = {
 };
 
 /* =====================================================
-HOLIDAYS
+HOLIDAYS (FIXED + SAFE)
 ===================================================== */
+
+function toDateInput(date) {
+  if (!date) return "";
+  return new Date(date).toISOString().slice(0, 10);
+}
 
 export const holidayAPI = {
   getAll: async () => {
@@ -324,7 +329,12 @@ export const holidayAPI = {
       .order("created_at", { ascending: false });
 
     if (error) throw error;
-    return data || [];
+
+    return (data || []).map((h) => ({
+      ...h,
+      start_date: toDateInput(h.start_date),
+      end_date: toDateInput(h.end_date),
+    }));
   },
 
   getMine: async () => {
@@ -338,69 +348,77 @@ export const holidayAPI = {
       .order("created_at", { ascending: false });
 
     if (error) throw error;
-    return data || [];
+
+    return (data || []).map((h) => ({
+      ...h,
+      start_date: toDateInput(h.start_date),
+      end_date: toDateInput(h.end_date),
+    }));
   },
 
   create: async (payload) => {
-  const user = await getCurrentUser();
+    const user = await getCurrentUser();
 
-  const { error } = await supabase
-    .from("holidays")
-    .insert({
-      ...payload,
-      user_id: payload.user_id || user.id,
-      company_id: user.company_id,
-      status: "pending",
-    });
+    const { error } = await supabase
+      .from("holidays")
+      .insert({
+        ...payload,
+        user_id: payload.user_id || user.id,
+        company_id: user.company_id,
+        status: "pending",
+      });
 
     if (error) throw error;
+    return true;
   },
 
-approve: async (id, days) => {
-  const { data: holiday, error: getErr } = await supabase
-    .from("holidays")
-    .select("*")
-    .eq("id", id)
-    .single();
+  approve: async (id, days) => {
+    const { data: holiday, error: getErr } = await supabase
+      .from("holidays")
+      .select("*")
+      .eq("id", id)
+      .single();
 
-  if (getErr) throw getErr;
+    if (getErr) throw getErr;
 
-  /* approve holiday first */
-  const { error } = await supabase
-    .from("holidays")
-    .update({
-      status: "approved",
-      days_requested: days,
-    })
-    .eq("id", id);
+    const { error } = await supabase
+      .from("holidays")
+      .update({
+        status: "approved",
+        days_requested: days,
+      })
+      .eq("id", id);
 
-  if (error) throw error;
+    if (error) throw error;
 
-  /* remove scheduled shifts covered by leave */
-  const { error: deleteErr } = await supabase
-    .from("schedules")
-    .delete()
-    .eq("user_id", holiday.user_id)
-    .gte("date", holiday.start_date)
-    .lte("date", holiday.end_date);
+    // ✅ ensure correct format for DB comparison
+    const start = toDateInput(holiday.start_date);
+    const end = toDateInput(holiday.end_date);
 
-  if (deleteErr) throw deleteErr;
+    const { error: deleteErr } = await supabase
+      .from("schedules")
+      .delete()
+      .eq("user_id", holiday.user_id)
+      .gte("date", start)
+      .lte("date", end);
 
-  return true;
-},
+    if (deleteErr) throw deleteErr;
+
+    return true;
+  },
 
   reject: async (id, reason = "") => {
-  const { error } = await supabase
-    .from("holidays")
-    .update({
-      status: "rejected",
-      reason,
-    })
-    .eq("id", id);
+    const { error } = await supabase
+      .from("holidays")
+      .update({
+        status: "rejected",
+        reason,
+      })
+      .eq("id", id);
 
-  if (error) throw error;
-  return true;
-},
+    if (error) throw error;
+    return true;
+  },
 
   delete: async (id) => {
     const { error } = await supabase
