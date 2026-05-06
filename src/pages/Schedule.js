@@ -176,6 +176,68 @@ export default function Schedule() {
     notify("Week auto scheduled");
   }
 
+
+  /* ================= CREATE DRAG ================= */
+
+function startCreate(e, day, userId) {
+  const rect = e.currentTarget.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+
+  const hour = snap(START_HOUR + x / HOUR_WIDTH);
+
+  setCreating({
+    day,
+    userId,
+    start: hour,
+    end: hour,
+  });
+}
+
+function moveCreate(e) {
+  if (!creating) return;
+
+  const rect = e.currentTarget.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+
+  const hour = snap(START_HOUR + x / HOUR_WIDTH);
+
+  setCreating((c) => ({
+    ...c,
+    end: hour,
+  }));
+}
+
+function endCreate() {
+  if (!creating) return;
+
+  const start = Math.min(creating.start, creating.end);
+  const end = Math.max(creating.start, creating.end);
+
+  // prevent tiny clicks creating 0-length shifts
+  if (end - start < 0.25) {
+    setCreating(null);
+    return;
+  }
+
+  const startTime = moment(creating.day)
+    .hour(Math.floor(start))
+    .minute((start % 1) * 60);
+
+  const endTime = moment(creating.day)
+    .hour(Math.floor(end))
+    .minute((end % 1) * 60);
+
+  createShift({
+    user_id: creating.userId,
+    date: creating.day.format("YYYY-MM-DD"),
+    start_time: startTime.toISOString(),
+    end_time: endTime.toISOString(),
+    type: "assigned",
+    status: "filled",
+  });
+
+  setCreating(null);
+}
   /* ================= TEMPLATE ================= */
 
   function saveTemplate() {
