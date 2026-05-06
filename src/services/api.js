@@ -362,7 +362,8 @@ export const holidayAPI = {
     const { error } = await supabase
       .from("holidays")
       .insert({
-        ...payload,
+        start_date: payload.start_date, // IMPORTANT
+        end_date: payload.end_date,     // IMPORTANT
         user_id: payload.user_id || user.id,
         company_id: user.company_id,
         status: "pending",
@@ -391,7 +392,6 @@ export const holidayAPI = {
 
     if (error) throw error;
 
-    // ✅ ensure correct format for DB comparison
     const start = toDateInput(holiday.start_date);
     const end = toDateInput(holiday.end_date);
 
