@@ -1,34 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { reportAPI, userAPI } from "../services/api";
+import { reportAPI, userAPI, companyAPI } from "../services/api";
+import jsPDF from "jspdf";
 
-/* =========================================
-CONFIG
-========================================= */
-
-const TAX = {
-  personalAllowance: 12570,
-  basicRate: 0.2,
-  higherRate: 0.4,
-  threshold: 50270,
-};
-
-const NI = {
-  threshold: 12570,
-  rate: 0.12,
-};
-
-const STUDENT = {
-  plan1: { threshold: 22015, rate: 0.09 },
-  plan2: { threshold: 27295, rate: 0.09 },
-};
-
-const PENSION = {
-  rate: 0.05,
-};
-
-/* =========================================
-HELPERS
-========================================= */
+/* ================= HELPERS ================= */
 
 function hours(start, end, breakSec = 0) {
   if (!start || !end) return 0;
@@ -38,21 +12,13 @@ function hours(start, end, breakSec = 0) {
   );
 }
 
-function parseTaxCode(code = "1257L") {
-  const num = parseInt(code.replace(/\D/g, "")) || 1257;
-  return num * 10;
-}
-
 function money(v) {
   return `£${Number(v || 0).toFixed(2)}`;
 }
 
-/* =========================================
-CALC
-========================================= */
+/* ================= CALC ================= */
 
 function calculate(user, shifts) {
-  let totalHours = 0;
   let gross = 0;
 
   shifts.forEach((s) => {
@@ -61,66 +27,94 @@ function calculate(user, shifts) {
       s.clock_out_time,
       s.total_break_seconds
     );
-
-    totalHours += h;
     gross += h * Number(user.hourly_rate || 0);
   });
 
-  const allowance = parseTaxCode(user.tax_code);
-  const annual = gross * 12;
+  const tax = gross * 0.2;
+  const ni = gross * 0.12;
+  const pension = gross * 0.05;
+  const net = gross - tax - ni - pension;
 
-  const taxable = Math.max(annual - allowance, 0);
-
-  let taxAnnual =
-    taxable <= TAX.threshold
-      ? taxable * TAX.basicRate
-      : (TAX.threshold - allowance) * TAX.basicRate +
-        (annual - TAX.threshold) * TAX.higherRate;
-
-  const tax = taxAnnual / 12;
-
-  const ni =
-    annual > NI.threshold
-      ? ((annual - NI.threshold) * NI.rate) / 12
-      : 0;
-
-  let student = 0;
-
-  if (user.student_loan_plan === "1" && annual > STUDENT.plan1.threshold) {
-    student =
-      ((annual - STUDENT.plan1.threshold) *
-        STUDENT.plan1.rate) /
-      12;
-  }
-
-  if (user.student_loan_plan === "2" && annual > STUDENT.plan2.threshold) {
-    student =
-      ((annual - STUDENT.plan2.threshold) *
-        STUDENT.plan2.rate) /
-      12;
-  }
-
-  const pension = gross * PENSION.rate;
-  const net = gross - tax - ni - student - pension;
-
-  return {
-    totalHours,
-    gross,
-    tax,
-    ni,
-    student,
-    pension,
-    net,
-  };
+  return { gross, tax, ni, pension, net };
 }
 
-/* =========================================
-MAIN
-========================================= */
+/* ================= PDF ================= */
+
+function generatePayslip(emp, company) {
+  const doc = new jsPDF();
+
+  const color = company?.primary_color || [30, 64, 175];
+
+  // HEADER BAR
+  doc.setFillColor(...color);
+  doc.rect(0, 0, 210, 30, "F");
+
+  // COMPANY NAME
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(16);
+  doc.text(company?.name || "Company", 20, 18);
+
+  // LOGO
+  if (company?.logo) {
+    const img = new Image();
+    img.src = company.logo;
+    doc.addImage(img, "PNG", 150, 5, 40, 20);
+  }
+
+  doc.setTextColor(0, 0, 0);
+
+  // EMPLOYEE INFO
+  doc.setFontSize(12);
+  doc.text(`Employee: ${emp.name}`, 20, 50);
+  doc.text(`Company: ${company?.name}`, 20, 60);
+
+  // EARNINGS
+  doc.setFontSize(13);
+  doc.text("Earnings", 20, 80);
+
+  doc.setFontSize(11);
+  doc.text("Gross", 20, 90);
+  doc.text(money(emp.gross), 150, 90);
+
+  // DEDUCTIONS
+  doc.setFontSize(13);
+  doc.text("Deductions", 20, 110);
+
+  doc.setFontSize(11);
+  doc.text("Tax", 20, 120);
+  doc.text(`-${money(emp.tax)}`, 150, 120);
+
+  doc.text("NI", 20, 130);
+  doc.text(`-${money(emp.ni)}`, 150, 130);
+
+  doc.text("Pension", 20, 140);
+  doc.text(`-${money(emp.pension)}`, 150, 140);
+
+  // NET BOX
+  doc.setFillColor(220, 252, 231);
+  doc.rect(20, 155, 170, 20, "F");
+
+  doc.setFontSize(14);
+  doc.text("Net Pay", 25, 168);
+  doc.text(money(emp.net), 140, 168);
+
+  // FOOTER
+  doc.setFontSize(8);
+  doc.text(
+    company?.address || "",
+    20,
+    190
+  );
+
+  doc.save(`payslip_${emp.name}.pdf`);
+}
+
+/* ================= MAIN ================= */
 
 export default function PayrollExport() {
   const [rows, setRows] = useState([]);
   const [users, setUsers] = useState([]);
+  const [companies, setCompanies] = useState([]);
 
   const [fromDate, setFromDate] = useState(
     new Date(Date.now() - 7 * 86400000)
@@ -137,13 +131,15 @@ export default function PayrollExport() {
   }, []);
 
   async function load() {
-    const [timesheets, staff] = await Promise.all([
+    const [timesheets, staff, comps] = await Promise.all([
       reportAPI.getTimesheets(),
       userAPI.getAll(),
+      companyAPI.getAll(), // 🔥 NEW
     ]);
 
     setRows(timesheets || []);
     setUsers(staff || []);
+    setCompanies(comps || []);
   }
 
   const filtered = useMemo(() => {
@@ -161,132 +157,74 @@ export default function PayrollExport() {
 
       const calc = calculate(u, userRows);
 
+      const company = companies.find(
+        (c) => c.id === u.company_id
+      );
+
       return {
         ...u,
         ...calc,
+        company,
       };
     });
-  }, [users, filtered]);
-
-  const totals = useMemo(() => {
-    return payroll.reduce(
-      (acc, r) => {
-        acc.gross += r.gross;
-        acc.net += r.net;
-        acc.tax += r.tax;
-        return acc;
-      },
-      { gross: 0, net: 0, tax: 0 }
-    );
-  }, [payroll]);
-
-  function exportCSV() {
-    const csv = [
-      ["Employee", "Hours", "Gross", "Tax", "NI", "Net"],
-      ...payroll.map((r) => [
-        r.name,
-        r.totalHours.toFixed(2),
-        r.gross.toFixed(2),
-        r.tax.toFixed(2),
-        r.ni.toFixed(2),
-        r.net.toFixed(2),
-      ]),
-    ]
-      .map((r) => r.join(","))
-      .join("\n");
-
-    const blob = new Blob([csv]);
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "payroll.csv";
-    a.click();
-  }
+  }, [users, filtered, companies]);
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="p-6 space-y-6">
 
-      {/* HEADER */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">
-          Payroll Dashboard
-        </h1>
-
-        <button
-          onClick={exportCSV}
-          className="bg-indigo-600 px-4 py-2 rounded-xl"
-        >
-          Export CSV
-        </button>
-      </div>
+      <h1 className="text-2xl font-bold">
+        Multi-Company Payroll
+      </h1>
 
       {/* FILTERS */}
-      <div className="grid md:grid-cols-3 gap-4">
+      <div className="flex gap-4">
         <input
           type="date"
           value={fromDate}
           onChange={(e) =>
             setFromDate(e.target.value)
           }
-          className="bg-[#020617] p-3 rounded-xl"
         />
-
         <input
           type="date"
           value={toDate}
           onChange={(e) =>
             setToDate(e.target.value)
           }
-          className="bg-[#020617] p-3 rounded-xl"
         />
       </div>
 
-      {/* KPI */}
-      <div className="grid md:grid-cols-3 gap-4">
-        <Card title="Gross" value={money(totals.gross)} />
-        <Card title="Tax" value={money(totals.tax)} />
-        <Card title="Net Pay" value={money(totals.net)} />
-      </div>
-
       {/* TABLE */}
-      <div className="rounded-2xl border border-white/10 overflow-auto">
+      <div className="border rounded-xl overflow-auto">
         <table className="w-full text-sm">
 
-          <thead className="bg-white/5 text-gray-400 sticky top-0">
+          <thead className="bg-white/5">
             <tr>
-              <th className="p-4 text-left">Employee</th>
-              <th className="p-4">Hours</th>
-              <th className="p-4">Gross</th>
-              <th className="p-4">Tax</th>
-              <th className="p-4">NI</th>
-              <th className="p-4">Pension</th>
-              <th className="p-4">Net</th>
+              <th className="p-3 text-left">Employee</th>
+              <th>Company</th>
+              <th>Gross</th>
+              <th>Net</th>
+              <th></th>
             </tr>
           </thead>
 
           <tbody>
             {payroll.map((r) => (
-              <tr
-                key={r.id}
-                className="border-t border-white/5"
-              >
-                <td className="p-4">{r.name}</td>
-                <td className="p-4 text-center">
-                  {r.totalHours.toFixed(2)}
-                </td>
-                <td className="p-4 text-green-400">
-                  {money(r.gross)}
-                </td>
-                <td className="p-4 text-red-400">
-                  {money(r.tax)}
-                </td>
-                <td className="p-4">{money(r.ni)}</td>
-                <td className="p-4">
-                  {money(r.pension)}
-                </td>
-                <td className="p-4 font-semibold">
-                  {money(r.net)}
+              <tr key={r.id} className="border-t">
+                <td className="p-3">{r.name}</td>
+                <td>{r.company?.name}</td>
+                <td>{money(r.gross)}</td>
+                <td>{money(r.net)}</td>
+
+                <td>
+                  <button
+                    onClick={() =>
+                      generatePayslip(r, r.company)
+                    }
+                    className="bg-indigo-600 px-3 py-1 rounded"
+                  >
+                    Payslip
+                  </button>
                 </td>
               </tr>
             ))}
@@ -295,18 +233,6 @@ export default function PayrollExport() {
         </table>
       </div>
 
-    </div>
-  );
-}
-
-/* CARD */
-function Card({ title, value }) {
-  return (
-    <div className="bg-[#020617] border border-white/10 rounded-2xl p-5">
-      <p className="text-xs text-gray-400">{title}</p>
-      <h2 className="text-2xl font-semibold mt-2">
-        {value}
-      </h2>
     </div>
   );
 }
