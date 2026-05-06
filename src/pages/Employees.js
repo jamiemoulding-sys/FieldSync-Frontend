@@ -103,7 +103,9 @@ export default function Employees() {
       job_title: emp.job_title || "",
       payroll_id: emp.payroll_id || "",
       emergency_contact: emp.emergency_contact || "",
-      start_date: emp.start_date || "",
+      start_date: emp.start_date
+  ? new Date(emp.start_date).toISOString().slice(0, 10)
+  : "",
       hourly_rate: emp.hourly_rate ?? "",
       overtime_rate: emp.overtime_rate ?? "",
       night_rate: emp.night_rate ?? "",
@@ -534,6 +536,11 @@ function Field({
   onChange,
   type = "text",
 }) {
+  function formatDate(v) {
+    if (!v) return "";
+    return new Date(v).toISOString().slice(0, 10);
+  }
+
   return (
     <div>
       <p className="text-xs text-gray-400 mb-2">
@@ -542,8 +549,12 @@ function Field({
 
       <input
         type={type}
-        value={value || ""}
-        onChange={(e)=>onChange(e.target.value)}
+        value={
+          type === "date"
+            ? formatDate(value)
+            : value || ""
+        }
+        onChange={(e) => onChange(e.target.value)}
         className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-white/10"
       />
     </div>
