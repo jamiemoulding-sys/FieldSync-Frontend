@@ -7,17 +7,13 @@ import { scheduleAPI, userAPI } from "../services/api";
 const START_HOUR = 6;
 const END_HOUR = 22;
 const HOUR_WIDTH = 80;
-const ROW_HEIGHT = 64;
+const ROW_HEIGHT = 70;
 
 /* ================= HELPERS ================= */
 
-function snap(hour) {
-  return Math.round(hour * 4) / 4;
-}
+const snap = (h) => Math.round(h * 4) / 4;
 
-function toDecimal(m) {
-  return m.hours() + m.minutes() / 60;
-}
+const toDecimal = (m) => m.hours() + m.minutes() / 60;
 
 function getPosition(start, end) {
   const s = moment(start);
@@ -30,18 +26,6 @@ function getPosition(start, end) {
     left: startH * HOUR_WIDTH,
     width: (endH - startH) * HOUR_WIDTH,
   };
-}
-
-/* ================= AVAILABILITY ================= */
-
-function isAvailable(user, shift, shifts) {
-  return !shifts.some(
-    (s) =>
-      s.user_id === user.id &&
-      s.date === shift.date &&
-      new Date(shift.start_time) < new Date(s.end_time) &&
-      new Date(shift.end_time) > new Date(s.start_time)
-  );
 }
 
 /* ================= COLLISION ================= */
@@ -78,19 +62,20 @@ export default function Schedule() {
   const [users, setUsers] = useState([]);
   const [shifts, setShifts] = useState([]);
 
-  const [date, setDate] = useState(new Date());
   const [view, setView] = useState("week");
+  const [date, setDate] = useState(new Date());
 
   const [dragging, setDragging] = useState(null);
   const [creating, setCreating] = useState(null);
 
-  const [toast, setToast] = useState(null);
-  const [swapTarget, setSwapTarget] = useState(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [swapShift, setSwapShift] = useState(null);
 
-  const currentUser = {
-    id: 1,
-    role: "manager", // change to "staff" to test
-  };
+  const [toast, setToast] = useState(null);
+
+  const currentUser = { id: 1, role: "manager" }; // change to staff to test
+
+  /* ================= LOAD ================= */
 
   useEffect(() => {
     load();
@@ -121,34 +106,18 @@ export default function Schedule() {
     load();
   }
 
-  /* ================= SWAP ================= */
+  /* ================= NAV ================= */
 
-  async function requestSwap(shift, targetUserId) {
-    const target = users.find((u) => u.id === targetUserId);
-
-    if (!isAvailable(target, shift, shifts)) {
-      notify("User not available");
-      return;
-    }
-
-    await updateShift(shift.id, {
-      swap_requests: [
-        ...(shift.swap_requests || []),
-        { user_id: targetUserId },
-      ],
-    });
-
-    notify("Swap requested");
-    setSwapTarget(null);
+  function prev() {
+    setDate(
+      moment(date).subtract(view === "month" ? 1 : 1, view === "month" ? "month" : "week").toDate()
+    );
   }
 
-  async function approveSwap(shift, userId) {
-    await updateShift(shift.id, {
-      user_id: userId,
-      swap_requests: [],
-    });
-
-    notify("Swap approved");
+  function next() {
+    setDate(
+      moment(date).add(view === "month" ? 1 : 1, view === "month" ? "month" : "week").toDate()
+    );
   }
 
   /* ================= DRAG ================= */
@@ -183,9 +152,7 @@ export default function Schedule() {
 
   function startCreate(e, day, userId) {
     const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-
-    const hour = snap(START_HOUR + x / HOUR_WIDTH);
+    const hour = snap(START_HOUR + (e.clientX - rect.left) / HOUR_WIDTH);
 
     setCreating({ day, userId, start: hour, end: hour });
   }
@@ -194,9 +161,7 @@ export default function Schedule() {
     if (!creating) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-
-    const hour = snap(START_HOUR + x / HOUR_WIDTH);
+    const hour = snap(START_HOUR + (e.clientX - rect.left) / HOUR_WIDTH);
 
     setCreating((c) => ({ ...c, end: hour }));
   }
@@ -207,37 +172,58 @@ export default function Schedule() {
     const start = Math.min(creating.start, creating.end);
     const end = Math.max(creating.start, creating.end);
 
-    if (end - start < 0.25) {
-      setCreating(null);
-      return;
-    }
+    if (end - start < 0.25) return setCreating(null);
 
-    const startTime = moment(creating.day)
+    const s = moment(creating.day)
       .hour(Math.floor(start))
       .minute((start % 1) * 60);
 
-    const endTime = moment(creating.day)
+    const e = moment(creating.day)
       .hour(Math.floor(end))
       .minute((end % 1) * 60);
 
     createShift({
       user_id: creating.userId,
       date: creating.day.format("YYYY-MM-DD"),
-      start_time: startTime.toISOString(),
-      end_time: endTime.toISOString(),
+      start_time: s.toISOString(),
+      end_time: e.toISOString(),
     });
 
     setCreating(null);
   }
 
+  /* ================= SWAP ================= */
+
+  async function requestSwap(shift, userId) {
+    await updateShift(shift.id, {
+      swap_requests: [...(shift.swap_requests || []), { user_id: userId }],
+    });
+    notify("Swap requested");
+    setSwapShift(null);
+  }
+
+  async function approveSwap(shift, userId) {
+    await updateShift(shift.id, {
+      user_id: userId,
+      swap_requests: [],
+    });
+    notify("Swap approved");
+  }
+
   /* ================= DAYS ================= */
 
-  const weekDays = useMemo(() => {
-    const start = moment(date).startOf("week");
-    return Array.from({ length: 7 }).map((_, i) =>
+  const days = useMemo(() => {
+    const start =
+      view === "month"
+        ? moment(date).startOf("month").startOf("week")
+        : moment(date).startOf("week");
+
+    const count = view === "month" ? 42 : 7;
+
+    return Array.from({ length: count }).map((_, i) =>
       start.clone().add(i, "days")
     );
-  }, [date]);
+  }, [date, view]);
 
   /* ================= UI ================= */
 
@@ -245,150 +231,155 @@ export default function Schedule() {
     <div className="p-6 text-white space-y-6">
 
       {/* HEADER */}
-      <div className="flex justify-between">
+      <div className="flex justify-between items-center">
 
         <div className="flex gap-2">
-          <button onClick={() => setDate(moment(date).subtract(1,"week").toDate())}>←</button>
+          <button onClick={prev}>←</button>
           <button onClick={() => setDate(new Date())}>Today</button>
-          <button onClick={() => setDate(moment(date).add(1,"week").toDate())}>→</button>
+          <button onClick={next}>→</button>
         </div>
 
-        <div>{moment(date).format("MMMM YYYY")}</div>
+        <div className="font-semibold">
+          {moment(date).format("MMMM YYYY")}
+        </div>
 
         <div className="flex gap-2">
-          <button onClick={()=>setView("week")} className="bg-indigo-600 px-2">Week</button>
+
+          <button onClick={()=>setView("week")} className={view==="week"?"bg-indigo-600 px-3":"bg-gray-700 px-3"}>
+            Week
+          </button>
+
+          <button onClick={()=>setView("month")} className={view==="month"?"bg-indigo-600 px-3":"bg-gray-700 px-3"}>
+            Month
+          </button>
+
+          <button onClick={()=>setView("list")} className={view==="list"?"bg-indigo-600 px-3":"bg-gray-700 px-3"}>
+            List
+          </button>
+
+          <button onClick={()=>setShowAdd(true)} className="bg-green-600 px-3">
+            + Add
+          </button>
+
         </div>
       </div>
 
-      {/* WEEK */}
-      <div>
-
-        <div className="grid grid-cols-7 text-xs text-gray-400 mb-2">
-          {weekDays.map(d=>(
-            <div key={d.format()}>{d.format("ddd DD")}</div>
-          ))}
-        </div>
-
-        {users.map(user=>(
-          <div key={user.id} className="flex border-b border-white/10">
-
-            <div className="w-[140px] p-2">{user.name}</div>
-
-            {weekDays.map(day=>{
-              const ds = day.format("YYYY-MM-DD");
-
-              const userShifts = shifts.filter(
-                s=>s.user_id===user.id && s.date===ds
-              );
-
-              const lanes = buildLanes(userShifts);
-
-              return (
-                <div
-                  key={ds}
-                  className="relative border-l border-white/10"
-                  style={{
-                    width:(END_HOUR-START_HOUR)*HOUR_WIDTH,
-                    height:ROW_HEIGHT
-                  }}
-                  onMouseDown={(e)=>startCreate(e,day,user.id)}
-                  onMouseMove={moveCreate}
-                  onMouseUp={endCreate}
-                >
-
-                  {Array.from({length:END_HOUR-START_HOUR}).map((_,i)=>(
-                    <div
-                      key={i}
-                      onDragOver={e=>e.preventDefault()}
-                      onDrop={()=>handleDrop(day,user.id,START_HOUR+i)}
-                      style={{
-                        position:"absolute",
-                        left:i*HOUR_WIDTH,
-                        width:HOUR_WIDTH,
-                        height:"100%"
-                      }}
-                    />
-                  ))}
-
-                  {lanes.map((lane,laneIndex)=>
-                    lane.map(s=>{
-                      const pos = getPosition(s.start_time,s.end_time);
-
-                      return (
-                        <div
-                          key={s.id}
-                          draggable
-                          onDragStart={()=>setDragging(s)}
-                          className="absolute bg-indigo-600 text-xs px-2 rounded"
-                          style={{
-                            top:laneIndex*22,
-                            left:pos.left,
-                            width:pos.width,
-                            height:20
-                          }}
-                        >
-                          {moment(s.start_time).format("HH:mm")}
-
-                          {/* STAFF ACTIONS */}
-                          {currentUser.role==="staff" && (
-                            <button
-                              onClick={()=>setSwapTarget(s)}
-                              className="block text-[10px]"
-                            >
-                              Swap
-                            </button>
-                          )}
-
-                          {/* MANAGER APPROVAL */}
-                          {currentUser.role==="manager" &&
-                            s.swap_requests?.map((r,i)=>(
-                              <button
-                                key={i}
-                                onClick={()=>approveSwap(s,r.user_id)}
-                                className="block text-[10px]"
-                              >
-                                Approve {r.user_id}
-                              </button>
-                            ))}
-                        </div>
-                      );
-                    })
-                  )}
-
-                  {creating && creating.userId===user.id && (
-                    <div
-                      className="absolute bg-green-500/40"
-                      style={{
-                        top:4,
-                        left:Math.min(creating.start,creating.end)*HOUR_WIDTH,
-                        width:Math.abs(creating.end-creating.start)*HOUR_WIDTH,
-                        height:20
-                      }}
-                    />
-                  )}
-
-                </div>
-              );
-            })}
-
+      {/* WEEK VIEW */}
+      {view === "week" && (
+        <>
+          <div className="grid grid-cols-7 text-xs text-gray-400">
+            {days.map((d) => (
+              <div key={d}>{d.format("ddd DD")}</div>
+            ))}
           </div>
-        ))}
 
-      </div>
+          {users.map((user) => (
+            <div key={user.id} className="flex border-b border-white/10">
 
-      {/* SWAP PICKER */}
-      {swapTarget && (
+              <div className="w-[140px] p-2">{user.name}</div>
+
+              {days.map((day) => {
+                const ds = day.format("YYYY-MM-DD");
+
+                const userShifts = shifts.filter(
+                  (s) => s.user_id === user.id && s.date === ds
+                );
+
+                const lanes = buildLanes(userShifts);
+
+                return (
+                  <div
+                    key={ds}
+                    className="relative border-l border-white/10"
+                    style={{
+                      width: (END_HOUR - START_HOUR) * HOUR_WIDTH,
+                      height: ROW_HEIGHT,
+                    }}
+                    onMouseDown={(e)=>startCreate(e,day,user.id)}
+                    onMouseMove={moveCreate}
+                    onMouseUp={endCreate}
+                  >
+
+                    {Array.from({ length: END_HOUR - START_HOUR }).map((_, i) => (
+                      <div
+                        key={i}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={() => handleDrop(day, user.id, START_HOUR + i)}
+                        style={{
+                          position: "absolute",
+                          left: i * HOUR_WIDTH,
+                          width: HOUR_WIDTH,
+                          height: "100%",
+                        }}
+                      />
+                    ))}
+
+                    {lanes.map((lane, laneIndex) =>
+                      lane.map((s) => {
+                        const pos = getPosition(s.start_time, s.end_time);
+
+                        return (
+                          <div
+                            key={s.id}
+                            draggable
+                            onDragStart={()=>setDragging(s)}
+                            className="absolute bg-indigo-600 text-xs px-2 rounded"
+                            style={{
+                              top: laneIndex * 22,
+                              left: pos.left,
+                              width: pos.width,
+                              height: 20,
+                            }}
+                          >
+                            {moment(s.start_time).format("HH:mm")}
+
+                            {currentUser.role==="staff" && (
+                              <button onClick={()=>setSwapShift(s)} className="block text-[10px]">
+                                Swap
+                              </button>
+                            )}
+
+                            {currentUser.role==="manager" &&
+                              s.swap_requests?.map((r,i)=>(
+                                <button key={i} onClick={()=>approveSwap(s,r.user_id)} className="block text-[10px]">
+                                  Approve
+                                </button>
+                              ))}
+                          </div>
+                        );
+                      })
+                    )}
+
+                    {creating && creating.userId===user.id && (
+                      <div
+                        className="absolute bg-green-500/40"
+                        style={{
+                          top:4,
+                          left:Math.min(creating.start,creating.end)*HOUR_WIDTH,
+                          width:Math.abs(creating.end-creating.start)*HOUR_WIDTH,
+                          height:20
+                        }}
+                      />
+                    )}
+
+                  </div>
+                );
+              })}
+
+            </div>
+          ))}
+        </>
+      )}
+
+      {/* SWAP MODAL */}
+      {swapShift && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center">
           <div className="bg-[#020617] p-6 space-y-3">
 
             <h3>Select user</h3>
 
             {users.map(u=>(
-              <button
-                key={u.id}
-                onClick={()=>requestSwap(swapTarget,u.id)}
-                className="block w-full text-left"
-              >
+              <button key={u.id} onClick={()=>requestSwap(swapShift,u.id)}>
                 {u.name}
               </button>
             ))}
@@ -397,12 +388,34 @@ export default function Schedule() {
         </div>
       )}
 
-      {/* TOAST */}
-      {toast && (
-        <div className="fixed bottom-4 right-4 bg-black px-4 py-2 rounded">
-          {toast}
+      {/* ADD MODAL */}
+      {showAdd && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center">
+          <div className="bg-[#020617] p-6 space-y-3">
+
+            <input type="date" id="date"/>
+            <input type="time" id="start"/>
+            <input type="time" id="end"/>
+
+            <button
+              onClick={()=>{
+                createShift({
+                  user_id: users[0]?.id,
+                  date: document.getElementById("date").value,
+                  start_time: `${document.getElementById("date").value}T${document.getElementById("start").value}:00`,
+                  end_time: `${document.getElementById("date").value}T${document.getElementById("end").value}:00`,
+                });
+                setShowAdd(false);
+              }}
+            >
+              Save
+            </button>
+
+          </div>
         </div>
       )}
+
+      {toast && <div className="fixed bottom-4 right-4 bg-black p-2">{toast}</div>}
 
     </div>
   );
