@@ -55,6 +55,14 @@ export default function Schedule() {
     setDate(moment(date).add(1, view === "month" ? "month" : "week").toDate());
   }
 
+  function quickAddShift(userId, day) {
+  createShift({
+    user_id: userId,
+    date: day.format("YYYY-MM-DD"),
+    start_time: `${day.format("YYYY-MM-DD")}T09:00:00`,
+    end_time: `${day.format("YYYY-MM-DD")}T17:00:00`,
+  });
+}
   /* ================= DAYS ================= */
 
   const days = useMemo(() => {
@@ -138,7 +146,7 @@ export default function Schedule() {
           {/* WEEK VIEW */}
           {view === "week" && (
             <div className="border border-white/10 rounded overflow-hidden">
-
+          
               {/* HEADER */}
               <div className="grid grid-cols-8 bg-[#020617] border-b border-white/10">
                 <div className="p-2 text-xs text-gray-400">Employee</div>
@@ -153,7 +161,7 @@ export default function Schedule() {
               {/* ROWS */}
               {users.map(user => (
                 <div key={user.id} className="grid grid-cols-8 border-b border-white/10">
-
+                
                   <div className="p-2 bg-[#020617] text-sm">
                     {user.name}
                   </div>
@@ -164,19 +172,50 @@ export default function Schedule() {
                     const dayShifts = shifts.filter(
                       s => s.date === ds && s.user_id === user.id
                     );
-
+                    const isHoliday = holidays.includes(ds);
+                    
                     return (
-                      <div key={i} className="p-1 space-y-1 min-h-[70px]">
+                      <div
+  key={i}
+  className="p-1 space-y-1 min-h-[70px] cursor-pointer hover:bg-white/5"
+  onClick={() => quickAddShift(user.id, day)}
+>
 
-                        {dayShifts.map(s => (
-                          <div
-                            key={s.id}
-                            className="bg-indigo-600 text-xs px-2 py-1 rounded"
-                          >
-                            {moment(s.start_time).format("HH:mm")} -{" "}
-                            {moment(s.end_time).format("HH:mm")}
-                          </div>
-                        ))}
+                       {dayShifts.map(s => (
+  <div
+    key={s.id}
+    className="bg-indigo-600 text-xs px-2 py-1 rounded flex justify-between items-center"
+  >
+    <span>
+      {moment(s.start_time).format("HH:mm")} - {moment(s.end_time).format("HH:mm")}
+    </span>
+
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+
+        const newStart = prompt(
+          "New start time (HH:mm)",
+          moment(s.start_time).format("HH:mm")
+        );
+        const newEnd = prompt(
+          "New end time (HH:mm)",
+          moment(s.end_time).format("HH:mm")
+        );
+
+        if (!newStart || !newEnd) return;
+
+        updateShift(s.id, {
+          start_time: `${s.date}T${newStart}:00`,
+          end_time: `${s.date}T${newEnd}:00`,
+        });
+      }}
+      className="text-[10px] bg-black/30 px-1 rounded"
+    >
+      Edit
+    </button>
+  </div>
+))}
 
                       </div>
                     );
@@ -261,19 +300,24 @@ export default function Schedule() {
             <input className="w-full p-2" type="time" onChange={e=>setForm({...form,end:e.target.value})}/>
 
             <button
-              onClick={()=>{
-                createShift({
-                  user_id: form.user_id,
-                  date: form.date,
-                  start_time: `${form.date}T${form.start}:00`,
-                  end_time: `${form.date}T${form.end}:00`,
-                });
-                setShowAdd(false);
-              }}
-              className="bg-green-600 w-full p-2"
-            >
-              Save
-            </button>
+  className="bg-blue-600 w-full p-2"
+  onClick={() => {
+    if (!form.date) return alert("Pick a date first");
+
+    users.forEach(u => {
+      createShift({
+        user_id: u.id,
+        date: form.date,
+        start_time: `${form.date}T${form.start}:00`,
+        end_time: `${form.date}T${form.end}:00`,
+      });
+    });
+
+    setShowAdd(false);
+  }}
+>
+  Bulk Add (All Staff)
+</button>
 
           </div>
         </div>
