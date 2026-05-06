@@ -1,480 +1,323 @@
-// src/pages/PayrollExport.js
-// FULL COPY / PASTE READY
-// FIELDSYNC ENTERPRISE VERSION
-// ✅ Weekly payroll totals
-// ✅ Employee selector
-// ✅ Date range
-// ✅ Standard + overtime pay
-// ✅ Mileage pay
-// ✅ CSV export
-// ✅ HMRC ready layout
-// ✅ Premium UI
-
 import { useEffect, useMemo, useState } from "react";
-import {
-  reportAPI,
-  userAPI,
-} from "../services/api";
+import { reportAPI, userAPI } from "../services/api";
 
-import {
-  Download,
-  PoundSterling,
-  Users,
-  Clock3,
-  Truck,
-  CalendarDays,
-  Loader2,
-} from "lucide-react";
+/* =========================================
+UK CONFIG (2024/25 BASELINE)
+========================================= */
+
+const TAX = {
+  personalAllowance: 12570,
+  basicRate: 0.2,
+  higherRate: 0.4,
+  threshold: 50270,
+};
+
+const NI = {
+  threshold: 12570,
+  rate: 0.12,
+};
+
+const STUDENT = {
+  plan1: { threshold: 22015, rate: 0.09 },
+  plan2: { threshold: 27295, rate: 0.09 },
+};
+
+const PENSION = {
+  rate: 0.05,
+};
+
+/* =========================================
+HELPERS
+========================================= */
+
+function hours(start, end, breakSec = 0) {
+  if (!start || !end) return 0;
+  return (
+    (new Date(end) - new Date(start)) / 3600000 -
+    breakSec / 3600
+  );
+}
+
+function parseTaxCode(code = "1257L") {
+  const num = parseInt(code.replace(/\D/g, "")) || 1257;
+  return num * 10;
+}
+
+/* =========================================
+CALC ENGINE
+========================================= */
+
+function calculate(user, shifts) {
+  let totalHours = 0;
+  let gross = 0;
+
+  shifts.forEach((s) => {
+    const h = hours(
+      s.clock_in_time,
+      s.clock_out_time,
+      s.total_break_seconds
+    );
+
+    totalHours += h;
+    gross += h * Number(user.hourly_rate || 0);
+  });
+
+  const allowance = parseTaxCode(user.tax_code);
+  const annual = gross * 12;
+
+  const taxable = Math.max(annual - allowance, 0);
+
+  let taxAnnual =
+    taxable <= TAX.threshold
+      ? taxable * TAX.basicRate
+      : (TAX.threshold - allowance) * TAX.basicRate +
+        (annual - TAX.threshold) * TAX.higherRate;
+
+  const tax = taxAnnual / 12;
+
+  const ni =
+    annual > NI.threshold
+      ? ((annual - NI.threshold) * NI.rate) / 12
+      : 0;
+
+  let student = 0;
+
+  if (user.student_loan_plan === "1") {
+    if (annual > STUDENT.plan1.threshold) {
+      student =
+        ((annual - STUDENT.plan1.threshold) *
+          STUDENT.plan1.rate) /
+        12;
+    }
+  }
+
+  if (user.student_loan_plan === "2") {
+    if (annual > STUDENT.plan2.threshold) {
+      student =
+        ((annual - STUDENT.plan2.threshold) *
+          STUDENT.plan2.rate) /
+        12;
+    }
+  }
+
+  const pension = gross * PENSION.rate;
+
+  const net = gross - tax - ni - student - pension;
+
+  return {
+    totalHours,
+    gross,
+    tax,
+    ni,
+    student,
+    pension,
+    net,
+  };
+}
+
+/* =========================================
+FPS GENERATOR (HMRC STYLE)
+========================================= */
+
+function buildFPS(user, calc) {
+  return {
+    employee: {
+      name: user.name,
+      ni_number: user.ni_number || "",
+      tax_code: user.tax_code || "1257L",
+    },
+    pay: {
+      gross: calc.gross,
+      tax: calc.tax,
+      ni: calc.ni,
+      pension: calc.pension,
+      student_loan: calc.student,
+      net: calc.net,
+    },
+  };
+}
+
+/* =========================================
+MAIN COMPONENT
+========================================= */
 
 export default function PayrollExport() {
   const [rows, setRows] = useState([]);
-  const [users, setUsers] =
-    useState([]);
+  const [users, setUsers] = useState([]);
 
-  const [loading, setLoading] =
-    useState(true);
+  const [fromDate, setFromDate] = useState(
+    new Date(Date.now() - 7 * 86400000)
+      .toISOString()
+      .split("T")[0]
+  );
 
-  const [fromDate, setFromDate] =
-    useState(
-      new Date(
-        Date.now() -
-          7 * 86400000
-      )
-        .toISOString()
-        .split("T")[0]
-    );
-
-  const [toDate, setToDate] =
-    useState(
-      new Date()
-        .toISOString()
-        .split("T")[0]
-    );
-
-  const [mileageRate, setMileageRate] =
-    useState("0.45");
+  const [toDate, setToDate] = useState(
+    new Date().toISOString().split("T")[0]
+  );
 
   useEffect(() => {
     load();
   }, []);
 
   async function load() {
-    try {
-      setLoading(true);
+    const [timesheets, staff] = await Promise.all([
+      reportAPI.getTimesheets(),
+      userAPI.getAll(),
+    ]);
 
-      const [timesheets, staff] =
-        await Promise.all([
-          reportAPI.getTimesheets(),
-          userAPI.getAll(),
-        ]);
-
-      setRows(
-        Array.isArray(
-          timesheets
-        )
-          ? timesheets
-          : []
-      );
-
-      setUsers(
-        Array.isArray(staff)
-          ? staff
-          : []
-      );
-    } finally {
-      setLoading(false);
-    }
+    setRows(timesheets || []);
+    setUsers(staff || []);
   }
 
-  function hours(
-    start,
-    end,
-    breakSec = 0
-  ) {
-    if (!start || !end)
-      return 0;
-
-    const total =
-      (new Date(end) -
-        new Date(start)) /
-        3600000 -
-      breakSec / 3600;
-
-    return Math.max(
-      total,
-      0
-    );
-  }
-
+  /* FILTER */
   const filtered = useMemo(() => {
     return rows.filter((r) => {
-      const day =
-        r.clock_in_time?.split(
-          "T"
-        )[0];
-
-      return (
-        day >= fromDate &&
-        day <= toDate
-      );
+      const d = r.clock_in_time?.split("T")[0];
+      return d >= fromDate && d <= toDate;
     });
-  }, [
-    rows,
-    fromDate,
-    toDate,
-  ]);
+  }, [rows, fromDate, toDate]);
 
+  /* PAYROLL */
   const payroll = useMemo(() => {
-    return users.map(
-      (user) => {
-        const userRows =
-          filtered.filter(
-            (r) =>
-              r.user_id ===
-              user.id
-          );
+    return users.map((u) => {
+      const userRows = filtered.filter(
+        (r) => r.user_id === u.id
+      );
 
-        let totalHours = 0;
-        let overtime = 0;
+      const calc = calculate(u, userRows);
+      const fps = buildFPS(u, calc);
 
-        userRows.forEach(
-          (r) => {
-            const h =
-              hours(
-                r.clock_in_time,
-                r.clock_out_time,
-                r.total_break_seconds
-              );
+      return {
+        ...u,
+        ...calc,
+        fps,
+      };
+    });
+  }, [users, filtered]);
 
-            totalHours += h;
-
-            if (h > 8)
-              overtime +=
-                h - 8;
-          }
-        );
-
-        const rate =
-          Number(
-            user.hourly_rate ||
-              0
-          );
-
-        const otRate =
-          Number(
-            user.overtime_rate ||
-              rate * 1.5
-          );
-
-        const mileage =
-          Number(
-            user.mileage_km ||
-              0
-          );
-
-        const mileagePay =
-          mileage *
-          Number(
-            mileageRate
-          );
-
-        const pay =
-          totalHours *
-            rate +
-          overtime *
-            (otRate -
-              rate) +
-          mileagePay;
-
-        return {
-          ...user,
-          totalHours:
-            totalHours.toFixed(
-              2
-            ),
-          overtime:
-            overtime.toFixed(
-              2
-            ),
-          mileage:
-            mileage.toFixed(
-              2
-            ),
-          pay: pay.toFixed(2),
-        };
-      }
-    );
-  }, [
-    users,
-    filtered,
-    mileageRate,
-  ]);
-
-  const totalPay =
-    payroll
-      .reduce(
-        (sum, r) =>
-          sum +
-          Number(r.pay),
-        0
-      )
-      .toFixed(2);
-
+  /* EXPORT CSV */
   function exportCSV() {
     const csv = [
       [
         "Employee",
         "Hours",
-        "Overtime",
-        "Mileage",
-        "Gross Pay",
+        "Gross",
+        "Tax",
+        "NI",
+        "Student Loan",
+        "Pension",
+        "Net",
       ],
-      ...payroll.map(
-        (r) => [
-          r.name,
-          r.totalHours,
-          r.overtime,
-          r.mileage,
-          r.pay,
-        ]
-      ),
+      ...payroll.map((r) => [
+        r.name,
+        r.totalHours.toFixed(2),
+        r.gross.toFixed(2),
+        r.tax.toFixed(2),
+        r.ni.toFixed(2),
+        r.student.toFixed(2),
+        r.pension.toFixed(2),
+        r.net.toFixed(2),
+      ]),
     ]
-      .map((x) =>
-        x.join(",")
-      )
+      .map((r) => r.join(","))
       .join("\n");
 
-    const blob =
-      new Blob([csv], {
-        type: "text/csv",
-      });
+    const blob = new Blob([csv]);
+    const url = URL.createObjectURL(blob);
 
-    const url =
-      URL.createObjectURL(
-        blob
-      );
-
-    const a =
-      document.createElement(
-        "a"
-      );
-
+    const a = document.createElement("a");
     a.href = url;
-    a.download =
-      "fieldsync_payroll.csv";
+    a.download = "hmrc_payroll.csv";
     a.click();
   }
 
-  if (loading) {
-    return (
-      <div className="text-gray-400 flex gap-2 items-center">
-        <Loader2
-          size={16}
-          className="animate-spin"
-        />
-        Loading payroll...
-      </div>
+  /* EXPORT FPS JSON */
+  function exportFPS() {
+    const fpsPayload = payroll.map((p) => p.fps);
+
+    const blob = new Blob(
+      [JSON.stringify(fpsPayload, null, 2)],
+      { type: "application/json" }
     );
+
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "hmrc_fps.json";
+    a.click();
   }
 
   return (
     <div className="space-y-6">
 
-      {/* HEADER */}
-      <div className="flex justify-between items-center flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">
-            Payroll Export
-          </h1>
+      <h1 className="text-2xl font-bold">
+        HMRC RTI Payroll (FPS Ready)
+      </h1>
 
-          <p className="text-sm text-gray-400">
-            HMRC ready wages
-          </p>
-        </div>
-
-        <button
-          onClick={
-            exportCSV
-          }
-          className="px-4 py-3 rounded-2xl bg-indigo-600"
-        >
-          <Download size={16} />
-        </button>
-      </div>
-
-      {/* FILTERS */}
-      <div className="grid md:grid-cols-3 gap-4">
-
+      <div className="grid grid-cols-3 gap-4">
         <input
           type="date"
-          value={
-            fromDate
-          }
+          value={fromDate}
           onChange={(e) =>
-            setFromDate(
-              e.target
-                .value
-            )
+            setFromDate(e.target.value)
           }
-          className="px-4 py-3 rounded-2xl bg-[#020617]"
         />
-
         <input
           type="date"
           value={toDate}
           onChange={(e) =>
-            setToDate(
-              e.target
-                .value
-            )
-          }
-          className="px-4 py-3 rounded-2xl bg-[#020617]"
-        />
-
-        <input
-          value={
-            mileageRate
-          }
-          onChange={(e) =>
-            setMileageRate(
-              e.target
-                .value
-            )
-          }
-          placeholder="Mileage £/km"
-          className="px-4 py-3 rounded-2xl bg-[#020617]"
-        />
-
-      </div>
-
-      {/* KPI */}
-      <div className="grid md:grid-cols-4 gap-4">
-
-        <Card
-          title="Employees"
-          value={
-            payroll.length
-          }
-          icon={
-            <Users size={16} />
+            setToDate(e.target.value)
           }
         />
 
-        <Card
-          title="Gross Payroll"
-          value={`£${totalPay}`}
-          icon={
-            <PoundSterling size={16} />
-          }
-        />
+        <div className="flex gap-2">
+          <button
+            onClick={exportCSV}
+            className="bg-indigo-600 px-4 py-2 rounded"
+          >
+            CSV
+          </button>
 
-        <Card
-          title="Entries"
-          value={
-            filtered.length
-          }
-          icon={
-            <CalendarDays size={16} />
-          }
-        />
-
-        <Card
-          title="Mileage Rate"
-          value={`£${mileageRate}`}
-          icon={
-            <Truck size={16} />
-          }
-        />
-
-      </div>
-
-      {/* TABLE */}
-      <div className="rounded-3xl overflow-auto border border-white/10 bg-[#020617]">
-        <table className="w-full text-sm">
-
-          <thead className="bg-white/5 text-gray-400">
-            <tr>
-              <th className="p-4 text-left">
-                Employee
-              </th>
-              <th className="p-4 text-left">
-                Hours
-              </th>
-              <th className="p-4 text-left">
-                OT
-              </th>
-              <th className="p-4 text-left">
-                Mileage
-              </th>
-              <th className="p-4 text-left">
-                Pay
-              </th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {payroll.map(
-              (r) => (
-                <tr
-                  key={r.id}
-                  className="border-t border-white/5"
-                >
-                  <td className="p-4">
-                    {r.name}
-                  </td>
-
-                  <td className="p-4">
-                    {
-                      r.totalHours
-                    }
-                  </td>
-
-                  <td className="p-4 text-amber-400">
-                    {
-                      r.overtime
-                    }
-                  </td>
-
-                  <td className="p-4">
-                    {
-                      r.mileage
-                    }
-                  </td>
-
-                  <td className="p-4 text-green-400">
-                    £{r.pay}
-                  </td>
-                </tr>
-              )
-            )}
-          </tbody>
-
-        </table>
-      </div>
-
-    </div>
-  );
-}
-
-function Card({
-  title,
-  value,
-  icon,
-}) {
-  return (
-    <div className="rounded-2xl bg-[#020617] border border-white/10 p-5">
-      <div className="flex justify-between">
-        <p className="text-xs text-gray-400">
-          {title}
-        </p>
-        <div className="text-indigo-400">
-          {icon}
+          <button
+            onClick={exportFPS}
+            className="bg-emerald-600 px-4 py-2 rounded"
+          >
+            FPS JSON
+          </button>
         </div>
       </div>
 
-      <h2 className="text-2xl font-semibold mt-3">
-        {value}
-      </h2>
+      <table className="w-full text-sm">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Hours</th>
+            <th>Gross</th>
+            <th>Tax</th>
+            <th>NI</th>
+            <th>Student</th>
+            <th>Pension</th>
+            <th>Net</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {payroll.map((r) => (
+            <tr key={r.id}>
+              <td>{r.name}</td>
+              <td>{r.totalHours.toFixed(2)}</td>
+              <td>£{r.gross.toFixed(2)}</td>
+              <td>£{r.tax.toFixed(2)}</td>
+              <td>£{r.ni.toFixed(2)}</td>
+              <td>£{r.student.toFixed(2)}</td>
+              <td>£{r.pension.toFixed(2)}</td>
+              <td>£{r.net.toFixed(2)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
     </div>
   );
 }
