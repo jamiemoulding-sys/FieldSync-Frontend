@@ -4,28 +4,25 @@ import {
   scheduleAPI,
   holidayAPI,
   userAPI,
-  locationAPI,
 } from "../services/api";
+
+/* ================= CONFIG ================= */
+
+const START_HOUR = 6;
+const END_HOUR = 22;
+const HOUR_WIDTH = 80;
+const ROW_HEIGHT = 60;
+
+/* ================= MAIN ================= */
 
 export default function Schedule() {
   const [users, setUsers] = useState([]);
   const [shifts, setShifts] = useState([]);
   const [holidays, setHolidays] = useState([]);
 
-  const [view, setView] = useState("week");
   const [date, setDate] = useState(new Date());
-  const [editMode, setEditMode] = useState(false);
-  const [showAdd, setShowAdd] = useState(false);
-
   const [dragging, setDragging] = useState(null);
-
-  const [form, setForm] = useState({
-    from: "",
-    to: "",
-    start: "09:00",
-    end: "17:00",
-    user_ids: [],
-  });
+  const [ghost, setGhost] = useState(null);
 
   useEffect(() => {
     load();
@@ -43,294 +40,258 @@ export default function Schedule() {
     setHolidays(h || []);
   }
 
-  function isHoliday(uid, ds) {
-    return holidays.some(
-      (h) =>
-        h.user_id === uid &&
-        h.status === "approved" &&
-        ds >= h.start_date &&
-        ds <= h.end_date
-    );
-  }
-
-  async function createBulk() {
-    let d = moment(form.from);
-    const end = moment(form.to);
-
-    while (d.isSameOrBefore(end, "day")) {
-      const ds = d.format("YYYY-MM-DD");
-
-      for (const uid of form.user_ids) {
-        if (isHoliday(uid, ds)) continue;
-
-        await scheduleAPI.create({
-          user_id: uid,
-          date: ds,
-          start_time: `${ds}T${form.start}:00`,
-          end_time: `${ds}T${form.end}:00`,
-        });
-      }
-
-      d.add(1, "day");
-    }
-
-    setShowAdd(false);
-    load();
-  }
-
   async function updateShift(id, data) {
     await scheduleAPI.update(id, data);
     load();
   }
 
-  async function deleteShift(id) {
-    await scheduleAPI.delete(id);
-    load();
-  }
+  /* ================= DAYS ================= */
 
   const days = useMemo(() => {
-    const start =
-      view === "week"
-        ? moment(date).startOf("week")
-        : moment(date).startOf("month");
-
-    const count = view === "week" ? 7 : 30;
-
-    return Array.from({ length: count }).map((_, i) =>
+    const start = moment(date).startOf("week");
+    return Array.from({ length: 7 }).map((_, i) =>
       start.clone().add(i, "days")
     );
-  }, [date, view]);
+  }, [date]);
 
-  function handleDrop(day) {
+  /* ================= POSITION ================= */
+
+  function getPosition(start, end) {
+    const s = moment(start);
+    const e = moment(end);
+
+    const startH =
+      s.hours() + s.minutes() / 60 - START_HOUR;
+
+    const endH =
+      e.hours() + e.minutes() / 60 - START_HOUR;
+
+    return {
+      left: startH * HOUR_WIDTH,
+      width: (endH - startH) * HOUR_WIDTH,
+    };
+  }
+
+  /* ================= COLLISION ================= */
+
+  function buildLanes(dayShifts) {
+    const lanes = [];
+
+    dayShifts.forEach((shift) => {
+      let placed = false;
+
+      for (let lane of lanes) {
+        const conflict = lane.some((s) => {
+          return (
+            moment(shift.start_time).isBefore(s.end_time) &&
+            moment(shift.end_time).isAfter(s.start_time)
+          );
+        });
+
+        if (!conflict) {
+          lane.push(shift);
+          placed = true;
+          break;
+        }
+      }
+
+      if (!placed) lanes.push([shift]);
+    });
+
+    return lanes;
+  }
+
+  /* ================= DRAG ================= */
+
+  function handleDrop(day, userId, hour) {
     if (!dragging) return;
 
+    const newStart = moment(day)
+      .hour(hour)
+      .minute(0);
+
+    const duration = moment(dragging.end_time).diff(
+      dragging.start_time,
+      "minutes"
+    );
+
+    const newEnd = newStart.clone().add(duration, "minutes");
+
     updateShift(dragging.id, {
+      user_id: userId,
       date: day.format("YYYY-MM-DD"),
+      start_time: newStart.toISOString(),
+      end_time: newEnd.toISOString(),
     });
 
     setDragging(null);
+    setGhost(null);
   }
 
+  /* ================= RESIZE ================= */
+
+  function resizeShift(e, shift, side) {
+    e.preventDefault();
+
+    const startX = e.clientX;
+
+    const origStart = moment(shift.start_time);
+    const origEnd = moment(shift.end_time);
+
+    function move(ev) {
+      const diff = ev.clientX - startX;
+      const mins = Math.round(diff / 10) * 15;
+
+      if (side === "right") {
+        const newEnd = origEnd.clone().add(mins, "minutes");
+
+        updateShift(shift.id, {
+          end_time: newEnd.toISOString(),
+        });
+      }
+
+      if (side === "left") {
+        const newStart = origStart.clone().add(mins, "minutes");
+
+        updateShift(shift.id, {
+          start_time: newStart.toISOString(),
+        });
+      }
+    }
+
+    function stop() {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", stop);
+    }
+
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", stop);
+  }
+
+  /* ================= UI ================= */
+
   return (
-    <div className="space-y-6">
+    <div className="p-4 space-y-4">
 
       {/* HEADER */}
-      <div className="flex gap-2">
-        <button onClick={() => setView("week")}>Week</button>
-        <button onClick={() => setView("month")}>Month</button>
-        <button onClick={() => setView("list")}>List</button>
+      <div className="flex justify-between">
 
-        <button onClick={() => setEditMode(!editMode)}>
-          {editMode ? "Done" : "Edit"}
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => setDate(moment(date).subtract(7, "days").toDate())}>←</button>
+          <button onClick={() => setDate(new Date())}>Today</button>
+          <button onClick={() => setDate(moment(date).add(7, "days").toDate())}>→</button>
+        </div>
 
-        <button onClick={() => setShowAdd(true)}>
-          Add
-        </button>
+        <div>{moment(date).format("MMMM YYYY")}</div>
+
+      </div>
+
+      {/* HOURS */}
+      <div className="flex overflow-x-auto border-b border-white/10">
+        <div className="w-[200px]" />
+        {Array.from({ length: END_HOUR - START_HOUR }).map((_, i) => (
+          <div key={i} style={{ width: HOUR_WIDTH }} className="text-xs text-center text-gray-400">
+            {START_HOUR + i}:00
+          </div>
+        ))}
       </div>
 
       {/* GRID */}
-      {view !== "list" && (
-        <div className="grid grid-cols-7 gap-2">
+      <div className="overflow-x-auto">
 
-          {days.map((d) => {
-            const ds = d.format("YYYY-MM-DD");
+        {users.map((user) => (
+          <div key={user.id} className="flex border-b border-white/10">
 
-            const dayShifts = shifts.filter(
-              (s) => s.date === ds
-            );
+            {/* USER */}
+            <div className="w-[200px] p-2 sticky left-0 bg-[#020617] z-10">
+              {user.name}
+            </div>
 
-            return (
-              <div
-                key={ds}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={() => handleDrop(d)}
-                className="border p-2 min-h-[140px]"
-              >
-                <p className="text-xs text-gray-400">
-                  {d.format("DD MMM")}
-                </p>
+            {/* DAYS */}
+            {days.map((day) => {
+              const ds = day.format("YYYY-MM-DD");
 
-                {/* HOLIDAYS */}
-                {holidays
-                  .filter(
-                    (h) =>
-                      h.status === "approved" &&
-                      ds >= h.start_date &&
-                      ds <= h.end_date
-                  )
-                  .map((h) => (
-                    <div
-                      key={h.id}
-                      className="bg-green-600 text-xs p-1 rounded"
-                    >
-                      HOLIDAY
-                    </div>
-                  ))}
+              const dayShifts = shifts.filter(
+                (s) =>
+                  s.user_id === user.id &&
+                  s.date === ds
+              );
 
-                {/* SHIFTS */}
-                {dayShifts.map((s) => {
-                  const start = moment(s.start_time);
-                  const end = moment(s.end_time);
+              const lanes = buildLanes(dayShifts);
 
-                  return (
-                    <div
-                      key={s.id}
-                      draggable
-                      onDragStart={() => setDragging(s)}
-                      className="bg-indigo-600 p-2 rounded text-xs mt-2 relative cursor-move"
-                    >
-                      {editMode && (
-                        <button
-                          onClick={() => deleteShift(s.id)}
-                          className="absolute right-1 top-1"
-                        >
-                          ✕
-                        </button>
-                      )}
+              return (
+                <div
+                  key={ds}
+                  className="relative border-l border-white/5"
+                  style={{
+                    width: (END_HOUR - START_HOUR) * HOUR_WIDTH,
+                    height: ROW_HEIGHT,
+                  }}
+                >
 
-                      {
-                        users.find(
-                          (u) => u.id === s.user_id
-                        )?.name
-                      }
+                  {/* DROP GRID */}
+                  {Array.from({ length: END_HOUR - START_HOUR }).map((_, i) => {
+                    const hour = START_HOUR + i;
 
-                      <br />
-
-                      {start.format("HH:mm")} -{" "}
-                      {end.format("HH:mm")}
-
-                      {/* RESIZE */}
+                    return (
                       <div
-                        className="absolute bottom-0 left-0 right-0 h-2 cursor-ns-resize bg-white/20"
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-
-                          const startY = e.clientY;
-                          const original = moment(s.end_time);
-
-                          function move(ev) {
-                            const diff = ev.clientY - startY;
-                            const mins = Math.round(diff / 2) * 15;
-
-                            const newEnd = original.clone().add(mins, "minutes");
-
-                            updateShift(s.id, {
-                              end_time: newEnd.toISOString(),
-                            });
-                          }
-
-                          function stop() {
-                            window.removeEventListener("mousemove", move);
-                            window.removeEventListener("mouseup", stop);
-                          }
-
-                          window.addEventListener("mousemove", move);
-                          window.addEventListener("mouseup", stop);
+                        key={i}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={() => handleDrop(day, user.id, hour)}
+                        style={{
+                          position: "absolute",
+                          left: i * HOUR_WIDTH,
+                          width: HOUR_WIDTH,
+                          height: "100%",
                         }}
                       />
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
-        </div>
-      )}
+                    );
+                  })}
 
-      {/* LIST */}
-      {view === "list" && (
-        <div className="space-y-2">
-          {shifts.map((s) => (
-            <div key={s.id} className="p-3 border rounded">
-              {moment(s.date).format("DD MMM")} —{" "}
-              {
-                users.find(
-                  (u) => u.id === s.user_id
-                )?.name
-              }
-            </div>
-          ))}
-        </div>
-      )}
+                  {/* SHIFTS */}
+                  {lanes.map((lane, laneIndex) =>
+                    lane.map((s) => {
+                      const pos = getPosition(s.start_time, s.end_time);
 
-      {/* BULK ADD */}
-      {showAdd && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center">
-          <div className="bg-[#020617] p-6 rounded-xl space-y-4 w-[400px]">
+                      return (
+                        <div
+                          key={s.id}
+                          draggable
+                          onDragStart={() => setDragging(s)}
+                          className="absolute bg-indigo-600 rounded text-xs px-2 cursor-move group"
+                          style={{
+                            top: laneIndex * 22,
+                            left: pos.left,
+                            width: pos.width,
+                            height: 20,
+                          }}
+                        >
+                          {moment(s.start_time).format("HH:mm")} - {moment(s.end_time).format("HH:mm")}
 
-            <input
-              type="date"
-              value={form.from}
-              onChange={(e) =>
-                setForm({ ...form, from: e.target.value })
-              }
-            />
+                          {/* RESIZE LEFT */}
+                          <div
+                            onMouseDown={(e) => resizeShift(e, s, "left")}
+                            className="absolute left-0 top-0 bottom-0 w-1 bg-white/30 cursor-ew-resize opacity-0 group-hover:opacity-100"
+                          />
 
-            <input
-              type="date"
-              value={form.to}
-              onChange={(e) =>
-                setForm({ ...form, to: e.target.value })
-              }
-            />
+                          {/* RESIZE RIGHT */}
+                          <div
+                            onMouseDown={(e) => resizeShift(e, s, "right")}
+                            className="absolute right-0 top-0 bottom-0 w-1 bg-white/30 cursor-ew-resize opacity-0 group-hover:opacity-100"
+                          />
+                        </div>
+                      );
+                    })
+                  )}
 
-            <input
-              type="time"
-              value={form.start}
-              onChange={(e) =>
-                setForm({ ...form, start: e.target.value })
-              }
-            />
-
-            <input
-              type="time"
-              value={form.end}
-              onChange={(e) =>
-                setForm({ ...form, end: e.target.value })
-              }
-            />
-
-            <div className="max-h-40 overflow-auto">
-              {users.map((u) => (
-                <label key={u.id} className="block">
-                  <input
-                    type="checkbox"
-                    checked={form.user_ids.includes(u.id)}
-                    onChange={() => {
-                      const exists =
-                        form.user_ids.includes(u.id);
-
-                      setForm({
-                        ...form,
-                        user_ids: exists
-                          ? form.user_ids.filter((x) => x !== u.id)
-                          : [...form.user_ids, u.id],
-                      });
-                    }}
-                  />
-                  {u.name}
-                </label>
-              ))}
-            </div>
-
-            <button
-              onClick={createBulk}
-              className="w-full bg-emerald-600 py-2 rounded"
-            >
-              Save
-            </button>
-
-            <button
-              onClick={() => setShowAdd(false)}
-              className="w-full bg-gray-600 py-2 rounded"
-            >
-              Cancel
-            </button>
+                </div>
+              );
+            })}
 
           </div>
-        </div>
-      )}
+        ))}
+
+      </div>
 
     </div>
   );
