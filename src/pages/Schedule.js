@@ -73,7 +73,14 @@ export default function Schedule() {
 
   const [toast, setToast] = useState(null);
 
-  const currentUser = { id: 1, role: "manager" }; // change to staff to test
+  const [form, setForm] = useState({
+    user_id: "",
+    date: "",
+    start: "09:00",
+    end: "17:00",
+  });
+
+  const currentUser = { id: 1, role: "manager" }; // change to "staff" to test
 
   /* ================= LOAD ================= */
 
@@ -110,15 +117,35 @@ export default function Schedule() {
 
   function prev() {
     setDate(
-      moment(date).subtract(view === "month" ? 1 : 1, view === "month" ? "month" : "week").toDate()
+      moment(date)
+        .subtract(1, view === "month" ? "month" : "week")
+        .toDate()
     );
   }
 
   function next() {
     setDate(
-      moment(date).add(view === "month" ? 1 : 1, view === "month" ? "month" : "week").toDate()
+      moment(date)
+        .add(1, view === "month" ? "month" : "week")
+        .toDate()
     );
   }
+
+  /* ================= DAYS ================= */
+
+  const weekDays = useMemo(() => {
+    const start = moment(date).startOf("week");
+    return Array.from({ length: 7 }).map((_, i) =>
+      start.clone().add(i, "days")
+    );
+  }, [date]);
+
+  const monthDays = useMemo(() => {
+    const start = moment(date).startOf("month").startOf("week");
+    return Array.from({ length: 42 }).map((_, i) =>
+      start.clone().add(i, "days")
+    );
+  }, [date]);
 
   /* ================= DRAG ================= */
 
@@ -210,21 +237,6 @@ export default function Schedule() {
     notify("Swap approved");
   }
 
-  /* ================= DAYS ================= */
-
-  const days = useMemo(() => {
-    const start =
-      view === "month"
-        ? moment(date).startOf("month").startOf("week")
-        : moment(date).startOf("week");
-
-    const count = view === "month" ? 42 : 7;
-
-    return Array.from({ length: count }).map((_, i) =>
-      start.clone().add(i, "days")
-    );
-  }, [date, view]);
-
   /* ================= UI ================= */
 
   return (
@@ -239,50 +251,32 @@ export default function Schedule() {
           <button onClick={next}>→</button>
         </div>
 
-        <div className="font-semibold">
-          {moment(date).format("MMMM YYYY")}
-        </div>
+        <div>{moment(date).format("MMMM YYYY")}</div>
 
         <div className="flex gap-2">
-
-          <button onClick={()=>setView("week")} className={view==="week"?"bg-indigo-600 px-3":"bg-gray-700 px-3"}>
-            Week
-          </button>
-
-          <button onClick={()=>setView("month")} className={view==="month"?"bg-indigo-600 px-3":"bg-gray-700 px-3"}>
-            Month
-          </button>
-
-          <button onClick={()=>setView("list")} className={view==="list"?"bg-indigo-600 px-3":"bg-gray-700 px-3"}>
-            List
-          </button>
-
-          <button onClick={()=>setShowAdd(true)} className="bg-green-600 px-3">
-            + Add
-          </button>
-
+          <button onClick={()=>setView("week")} className={view==="week"?"bg-indigo-600 px-3":"bg-gray-700 px-3"}>Week</button>
+          <button onClick={()=>setView("month")} className={view==="month"?"bg-indigo-600 px-3":"bg-gray-700 px-3"}>Month</button>
+          <button onClick={()=>setView("list")} className={view==="list"?"bg-indigo-600 px-3":"bg-gray-700 px-3"}>List</button>
+          <button onClick={()=>setShowAdd(true)} className="bg-green-600 px-3">+ Add</button>
         </div>
       </div>
 
-      {/* WEEK VIEW */}
+      {/* WEEK */}
       {view === "week" && (
         <>
           <div className="grid grid-cols-7 text-xs text-gray-400">
-            {days.map((d) => (
-              <div key={d}>{d.format("ddd DD")}</div>
-            ))}
+            {weekDays.map(d => <div key={d}>{d.format("ddd DD")}</div>)}
           </div>
 
-          {users.map((user) => (
+          {users.map(user => (
             <div key={user.id} className="flex border-b border-white/10">
-
               <div className="w-[140px] p-2">{user.name}</div>
 
-              {days.map((day) => {
+              {weekDays.map(day => {
                 const ds = day.format("YYYY-MM-DD");
 
                 const userShifts = shifts.filter(
-                  (s) => s.user_id === user.id && s.date === ds
+                  s => s.user_id === user.id && s.date === ds
                 );
 
                 const lanes = buildLanes(userShifts);
@@ -291,31 +285,13 @@ export default function Schedule() {
                   <div
                     key={ds}
                     className="relative border-l border-white/10"
-                    style={{
-                      width: (END_HOUR - START_HOUR) * HOUR_WIDTH,
-                      height: ROW_HEIGHT,
-                    }}
+                    style={{ width: (END_HOUR - START_HOUR)*HOUR_WIDTH, height: ROW_HEIGHT }}
                     onMouseDown={(e)=>startCreate(e,day,user.id)}
                     onMouseMove={moveCreate}
                     onMouseUp={endCreate}
                   >
-
-                    {Array.from({ length: END_HOUR - START_HOUR }).map((_, i) => (
-                      <div
-                        key={i}
-                        onDragOver={(e) => e.preventDefault()}
-                        onDrop={() => handleDrop(day, user.id, START_HOUR + i)}
-                        style={{
-                          position: "absolute",
-                          left: i * HOUR_WIDTH,
-                          width: HOUR_WIDTH,
-                          height: "100%",
-                        }}
-                      />
-                    ))}
-
-                    {lanes.map((lane, laneIndex) =>
-                      lane.map((s) => {
+                    {lanes.map((lane, i) =>
+                      lane.map(s => {
                         const pos = getPosition(s.start_time, s.end_time);
 
                         return (
@@ -324,19 +300,12 @@ export default function Schedule() {
                             draggable
                             onDragStart={()=>setDragging(s)}
                             className="absolute bg-indigo-600 text-xs px-2 rounded"
-                            style={{
-                              top: laneIndex * 22,
-                              left: pos.left,
-                              width: pos.width,
-                              height: 20,
-                            }}
+                            style={{ top:i*22, left:pos.left, width:pos.width, height:20 }}
                           >
                             {moment(s.start_time).format("HH:mm")}
 
                             {currentUser.role==="staff" && (
-                              <button onClick={()=>setSwapShift(s)} className="block text-[10px]">
-                                Swap
-                              </button>
+                              <button onClick={()=>setSwapShift(s)} className="block text-[10px]">Swap</button>
                             )}
 
                             {currentUser.role==="manager" &&
@@ -349,42 +318,40 @@ export default function Schedule() {
                         );
                       })
                     )}
-
-                    {creating && creating.userId===user.id && (
-                      <div
-                        className="absolute bg-green-500/40"
-                        style={{
-                          top:4,
-                          left:Math.min(creating.start,creating.end)*HOUR_WIDTH,
-                          width:Math.abs(creating.end-creating.start)*HOUR_WIDTH,
-                          height:20
-                        }}
-                      />
-                    )}
-
                   </div>
                 );
               })}
-
             </div>
           ))}
         </>
       )}
 
-      {/* SWAP MODAL */}
-      {swapShift && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center">
-          <div className="bg-[#020617] p-6 space-y-3">
+      {/* MONTH */}
+      {view === "month" && (
+        <div className="grid grid-cols-7 gap-2">
+          {monthDays.map(d => (
+            <div key={d} className="border p-2 min-h-[100px]">
+              <div className="text-xs text-gray-400">{d.format("DD")}</div>
+              {shifts
+                .filter(s => s.date === d.format("YYYY-MM-DD"))
+                .map(s => (
+                  <div key={s.id} className="bg-indigo-600 text-xs mt-1 p-1 rounded">
+                    {moment(s.start_time).format("HH:mm")}
+                  </div>
+                ))}
+            </div>
+          ))}
+        </div>
+      )}
 
-            <h3>Select user</h3>
-
-            {users.map(u=>(
-              <button key={u.id} onClick={()=>requestSwap(swapShift,u.id)}>
-                {u.name}
-              </button>
-            ))}
-
-          </div>
+      {/* LIST */}
+      {view === "list" && (
+        <div>
+          {shifts.map(s => (
+            <div key={s.id} className="border p-2 mb-2">
+              {moment(s.date).format("DD MMM")} — {moment(s.start_time).format("HH:mm")}
+            </div>
+          ))}
         </div>
       )}
 
@@ -393,24 +360,45 @@ export default function Schedule() {
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center">
           <div className="bg-[#020617] p-6 space-y-3">
 
-            <input type="date" id="date"/>
-            <input type="time" id="start"/>
-            <input type="time" id="end"/>
+            <select onChange={e=>setForm({...form,user_id:e.target.value})}>
+              <option>Select user</option>
+              {users.map(u=>(
+                <option key={u.id} value={u.id}>{u.name}</option>
+              ))}
+            </select>
+
+            <input type="date" onChange={e=>setForm({...form,date:e.target.value})}/>
+            <input type="time" onChange={e=>setForm({...form,start:e.target.value})}/>
+            <input type="time" onChange={e=>setForm({...form,end:e.target.value})}/>
 
             <button
               onClick={()=>{
                 createShift({
-                  user_id: users[0]?.id,
-                  date: document.getElementById("date").value,
-                  start_time: `${document.getElementById("date").value}T${document.getElementById("start").value}:00`,
-                  end_time: `${document.getElementById("date").value}T${document.getElementById("end").value}:00`,
+                  user_id: form.user_id,
+                  date: form.date,
+                  start_time: `${form.date}T${form.start}:00`,
+                  end_time: `${form.date}T${form.end}:00`,
                 });
                 setShowAdd(false);
               }}
+              className="bg-green-600 w-full"
             >
               Save
             </button>
 
+          </div>
+        </div>
+      )}
+
+      {/* SWAP MODAL */}
+      {swapShift && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center">
+          <div className="bg-[#020617] p-6 space-y-2">
+            {users.map(u=>(
+              <button key={u.id} onClick={()=>requestSwap(swapShift,u.id)}>
+                {u.name}
+              </button>
+            ))}
           </div>
         </div>
       )}
