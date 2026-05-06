@@ -1,296 +1,281 @@
-import React, { useEffect, useMemo, useState } from "react";
-import moment from "moment";
-import {
-  scheduleAPI,
-  holidayAPI,
-  userAPI,
-} from "../services/api";
+import { useEffect, useMemo, useState } from "react";
+import { reportAPI, userAPI } from "../services/api";
+import jsPDF from "jspdf";
 
 /* ================= CONFIG ================= */
 
-const START_HOUR = 6;
-const END_HOUR = 22;
-const HOUR_WIDTH = 80;
-const ROW_HEIGHT = 60;
+const COMPANY = {
+  name: "FIELDSYNC LTD",
+  address: "London, UK",
+  logo: "/logo.png",
+};
+
+/* ================= HELPERS ================= */
+
+function hours(start, end, breakSec = 0) {
+  if (!start || !end) return 0;
+  return (
+    (new Date(end) - new Date(start)) / 3600000 -
+    breakSec / 3600
+  );
+}
+
+function money(v) {
+  return `£${Number(v || 0).toFixed(2)}`;
+}
+
+function validateTaxCode(code) {
+  return /^[0-9]{3,4}[A-Z]$/.test(code)
+    ? code
+    : "1257L";
+}
+
+function getNIRate(cat) {
+  switch (cat) {
+    case "A":
+      return 0.12;
+    case "B":
+      return 0.0585;
+    case "C":
+      return 0;
+    default:
+      return 0.12;
+  }
+}
+
+/* ================= CALC ================= */
+
+function calculate(user, shifts) {
+  let totalHours = 0;
+  let gross = 0;
+
+  shifts.forEach((s) => {
+    const h = hours(
+      s.clock_in_time,
+      s.clock_out_time,
+      s.total_break_seconds
+    );
+
+    totalHours += h;
+    gross += h * Number(user.hourly_rate || 0);
+  });
+
+  const taxCode = validateTaxCode(user.tax_code);
+  const annual = gross * 12;
+
+  const tax =
+    annual <= 50270
+      ? (annual * 0.2) / 12
+      : (annual * 0.4) / 12;
+
+  const niRate = getNIRate(user.ni_category);
+
+  const ni =
+    annual > 12570
+      ? ((annual - 12570) * niRate) / 12
+      : 0;
+
+  const pension = gross * 0.05;
+  const net = gross - tax - ni - pension;
+
+  return {
+    totalHours,
+    gross,
+    tax,
+    ni,
+    pension,
+    net,
+    taxCode,
+  };
+}
+
+/* ================= PDF ================= */
+
+function generatePayslip(emp) {
+  const doc = new jsPDF();
+  const today = new Date().toLocaleDateString();
+
+  // HEADER
+  doc.setFillColor(30, 64, 175);
+  doc.rect(0, 0, 210, 30, "F");
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(16);
+  doc.text(COMPANY.name, 20, 18);
+  doc.setFontSize(10);
+  doc.text(today, 160, 18);
+
+  // LOGO
+  if (COMPANY.logo) {
+    const img = new Image();
+    img.src = COMPANY.logo;
+    try {
+      doc.addImage(img, "PNG", 150, 5, 40, 20);
+    } catch {}
+  }
+
+  doc.setTextColor(0, 0, 0);
+
+  // EMPLOYEE
+  doc.setFontSize(12);
+  doc.text(`Employee: ${emp.name}`, 20, 50);
+  doc.text(`Tax Code: ${emp.taxCode}`, 20, 58);
+
+  // EARNINGS
+  doc.setFontSize(13);
+  doc.text("Earnings", 20, 75);
+
+  doc.setFontSize(11);
+  doc.text("Gross Pay", 20, 85);
+  doc.text(money(emp.gross), 150, 85);
+
+  // DEDUCTIONS
+  doc.setFontSize(13);
+  doc.text("Deductions", 20, 105);
+
+  doc.setFontSize(11);
+  doc.text("Tax", 20, 115);
+  doc.text(`-${money(emp.tax)}`, 150, 115);
+
+  doc.text("National Insurance", 20, 125);
+  doc.text(`-${money(emp.ni)}`, 150, 125);
+
+  doc.text("Pension", 20, 135);
+  doc.text(`-${money(emp.pension)}`, 150, 135);
+
+  // NET
+  doc.setFillColor(220, 252, 231);
+  doc.rect(20, 150, 170, 20, "F");
+
+  doc.setFontSize(14);
+  doc.text("Net Pay", 25, 163);
+  doc.text(money(emp.net), 140, 163);
+
+  // FOOTER
+  doc.setFontSize(8);
+  doc.text(
+    "This is a computer generated payslip.",
+    20,
+    190
+  );
+
+  doc.save(`payslip_${emp.name}.pdf`);
+}
 
 /* ================= MAIN ================= */
 
-export default function Schedule() {
+export default function PayrollExport() {
+  const [rows, setRows] = useState([]);
   const [users, setUsers] = useState([]);
-  const [shifts, setShifts] = useState([]);
-  const [holidays, setHolidays] = useState([]);
 
-  const [date, setDate] = useState(new Date());
-  const [dragging, setDragging] = useState(null);
-  const [ghost, setGhost] = useState(null);
+  const [fromDate, setFromDate] = useState(
+    new Date(Date.now() - 7 * 86400000)
+      .toISOString()
+      .split("T")[0]
+  );
+
+  const [toDate, setToDate] = useState(
+    new Date().toISOString().split("T")[0]
+  );
 
   useEffect(() => {
     load();
   }, []);
 
   async function load() {
-    const [u, s, h] = await Promise.all([
+    const [timesheets, staff] = await Promise.all([
+      reportAPI.getTimesheets(),
       userAPI.getAll(),
-      scheduleAPI.getAll(),
-      holidayAPI.getAll(),
     ]);
 
-    setUsers(u || []);
-    setShifts(s || []);
-    setHolidays(h || []);
+    setRows(timesheets || []);
+    setUsers(staff || []);
   }
 
-  async function updateShift(id, data) {
-    await scheduleAPI.update(id, data);
-    load();
-  }
-
-  /* ================= DAYS ================= */
-
-  const days = useMemo(() => {
-    const start = moment(date).startOf("week");
-    return Array.from({ length: 7 }).map((_, i) =>
-      start.clone().add(i, "days")
-    );
-  }, [date]);
-
-  /* ================= POSITION ================= */
-
-  function getPosition(start, end) {
-    const s = moment(start);
-    const e = moment(end);
-
-    const startH =
-      s.hours() + s.minutes() / 60 - START_HOUR;
-
-    const endH =
-      e.hours() + e.minutes() / 60 - START_HOUR;
-
-    return {
-      left: startH * HOUR_WIDTH,
-      width: (endH - startH) * HOUR_WIDTH,
-    };
-  }
-
-  /* ================= COLLISION ================= */
-
-  function buildLanes(dayShifts) {
-    const lanes = [];
-
-    dayShifts.forEach((shift) => {
-      let placed = false;
-
-      for (let lane of lanes) {
-        const conflict = lane.some((s) => {
-          return (
-            moment(shift.start_time).isBefore(s.end_time) &&
-            moment(shift.end_time).isAfter(s.start_time)
-          );
-        });
-
-        if (!conflict) {
-          lane.push(shift);
-          placed = true;
-          break;
-        }
-      }
-
-      if (!placed) lanes.push([shift]);
+  const filtered = useMemo(() => {
+    return rows.filter((r) => {
+      const d = r.clock_in_time?.split("T")[0];
+      return d >= fromDate && d <= toDate;
     });
+  }, [rows, fromDate, toDate]);
 
-    return lanes;
-  }
+  const payroll = useMemo(() => {
+    return users.map((u) => {
+      const userRows = filtered.filter(
+        (r) => r.user_id === u.id
+      );
 
-  /* ================= DRAG ================= */
-
-  function handleDrop(day, userId, hour) {
-    if (!dragging) return;
-
-    const newStart = moment(day)
-      .hour(hour)
-      .minute(0);
-
-    const duration = moment(dragging.end_time).diff(
-      dragging.start_time,
-      "minutes"
-    );
-
-    const newEnd = newStart.clone().add(duration, "minutes");
-
-    updateShift(dragging.id, {
-      user_id: userId,
-      date: day.format("YYYY-MM-DD"),
-      start_time: newStart.toISOString(),
-      end_time: newEnd.toISOString(),
+      return {
+        ...u,
+        ...calculate(u, userRows),
+      };
     });
-
-    setDragging(null);
-    setGhost(null);
-  }
-
-  /* ================= RESIZE ================= */
-
-  function resizeShift(e, shift, side) {
-    e.preventDefault();
-
-    const startX = e.clientX;
-
-    const origStart = moment(shift.start_time);
-    const origEnd = moment(shift.end_time);
-
-    function move(ev) {
-      const diff = ev.clientX - startX;
-      const mins = Math.round(diff / 10) * 15;
-
-      if (side === "right") {
-        const newEnd = origEnd.clone().add(mins, "minutes");
-
-        updateShift(shift.id, {
-          end_time: newEnd.toISOString(),
-        });
-      }
-
-      if (side === "left") {
-        const newStart = origStart.clone().add(mins, "minutes");
-
-        updateShift(shift.id, {
-          start_time: newStart.toISOString(),
-        });
-      }
-    }
-
-    function stop() {
-      window.removeEventListener("mousemove", move);
-      window.removeEventListener("mouseup", stop);
-    }
-
-    window.addEventListener("mousemove", move);
-    window.addEventListener("mouseup", stop);
-  }
-
-  /* ================= UI ================= */
+  }, [users, filtered]);
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-6 space-y-6">
 
-      {/* HEADER */}
-      <div className="flex justify-between">
+      <h1 className="text-2xl font-bold">
+        Payroll System
+      </h1>
 
-        <div className="flex gap-2">
-          <button onClick={() => setDate(moment(date).subtract(7, "days").toDate())}>←</button>
-          <button onClick={() => setDate(new Date())}>Today</button>
-          <button onClick={() => setDate(moment(date).add(7, "days").toDate())}>→</button>
-        </div>
-
-        <div>{moment(date).format("MMMM YYYY")}</div>
-
+      {/* FILTERS */}
+      <div className="flex gap-4">
+        <input
+          type="date"
+          value={fromDate}
+          onChange={(e) =>
+            setFromDate(e.target.value)
+          }
+        />
+        <input
+          type="date"
+          value={toDate}
+          onChange={(e) =>
+            setToDate(e.target.value)
+          }
+        />
       </div>
 
-      {/* HOURS */}
-      <div className="flex overflow-x-auto border-b border-white/10">
-        <div className="w-[200px]" />
-        {Array.from({ length: END_HOUR - START_HOUR }).map((_, i) => (
-          <div key={i} style={{ width: HOUR_WIDTH }} className="text-xs text-center text-gray-400">
-            {START_HOUR + i}:00
-          </div>
-        ))}
-      </div>
+      {/* TABLE */}
+      <div className="rounded-xl border border-white/10 overflow-auto">
+        <table className="w-full text-sm">
 
-      {/* GRID */}
-      <div className="overflow-x-auto">
+          <thead className="bg-white/5">
+            <tr>
+              <th className="p-3 text-left">Employee</th>
+              <th>Gross</th>
+              <th>Tax</th>
+              <th>NI</th>
+              <th>Net</th>
+              <th></th>
+            </tr>
+          </thead>
 
-        {users.map((user) => (
-          <div key={user.id} className="flex border-b border-white/10">
+          <tbody>
+            {payroll.map((r) => (
+              <tr key={r.id} className="border-t border-white/5">
+                <td className="p-3">{r.name}</td>
+                <td>{money(r.gross)}</td>
+                <td>{money(r.tax)}</td>
+                <td>{money(r.ni)}</td>
+                <td className="font-semibold">
+                  {money(r.net)}
+                </td>
 
-            {/* USER */}
-            <div className="w-[200px] p-2 sticky left-0 bg-[#020617] z-10">
-              {user.name}
-            </div>
+                <td>
+                  <button
+                    onClick={() => generatePayslip(r)}
+                    className="bg-indigo-600 px-3 py-1 rounded"
+                  >
+                    Payslip
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
 
-            {/* DAYS */}
-            {days.map((day) => {
-              const ds = day.format("YYYY-MM-DD");
-
-              const dayShifts = shifts.filter(
-                (s) =>
-                  s.user_id === user.id &&
-                  s.date === ds
-              );
-
-              const lanes = buildLanes(dayShifts);
-
-              return (
-                <div
-                  key={ds}
-                  className="relative border-l border-white/5"
-                  style={{
-                    width: (END_HOUR - START_HOUR) * HOUR_WIDTH,
-                    height: ROW_HEIGHT,
-                  }}
-                >
-
-                  {/* DROP GRID */}
-                  {Array.from({ length: END_HOUR - START_HOUR }).map((_, i) => {
-                    const hour = START_HOUR + i;
-
-                    return (
-                      <div
-                        key={i}
-                        onDragOver={(e) => e.preventDefault()}
-                        onDrop={() => handleDrop(day, user.id, hour)}
-                        style={{
-                          position: "absolute",
-                          left: i * HOUR_WIDTH,
-                          width: HOUR_WIDTH,
-                          height: "100%",
-                        }}
-                      />
-                    );
-                  })}
-
-                  {/* SHIFTS */}
-                  {lanes.map((lane, laneIndex) =>
-                    lane.map((s) => {
-                      const pos = getPosition(s.start_time, s.end_time);
-
-                      return (
-                        <div
-                          key={s.id}
-                          draggable
-                          onDragStart={() => setDragging(s)}
-                          className="absolute bg-indigo-600 rounded text-xs px-2 cursor-move group"
-                          style={{
-                            top: laneIndex * 22,
-                            left: pos.left,
-                            width: pos.width,
-                            height: 20,
-                          }}
-                        >
-                          {moment(s.start_time).format("HH:mm")} - {moment(s.end_time).format("HH:mm")}
-
-                          {/* RESIZE LEFT */}
-                          <div
-                            onMouseDown={(e) => resizeShift(e, s, "left")}
-                            className="absolute left-0 top-0 bottom-0 w-1 bg-white/30 cursor-ew-resize opacity-0 group-hover:opacity-100"
-                          />
-
-                          {/* RESIZE RIGHT */}
-                          <div
-                            onMouseDown={(e) => resizeShift(e, s, "right")}
-                            className="absolute right-0 top-0 bottom-0 w-1 bg-white/30 cursor-ew-resize opacity-0 group-hover:opacity-100"
-                          />
-                        </div>
-                      );
-                    })
-                  )}
-
-                </div>
-              );
-            })}
-
-          </div>
-        ))}
-
+        </table>
       </div>
 
     </div>
