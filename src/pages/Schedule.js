@@ -1,65 +1,34 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import moment from "moment";
 import {
   scheduleAPI,
   holidayAPI,
   userAPI,
+  locationAPI,
 } from "../services/api";
-import supabase from "../lib/supabase";
-
-/*
-=========================================
-V11 PRODUCTION HARDENED
-=========================================
-✅ Optimistic UI
-✅ Backend validation ready
-✅ Offline queue
-✅ Batch updates
-✅ Conflict safe
-=========================================
-*/
-
-const GRID = 15;
-const PX = 1;
-const DAYS = 5;
 
 export default function Schedule() {
   const [users, setUsers] = useState([]);
   const [shifts, setShifts] = useState([]);
   const [holidays, setHolidays] = useState([]);
 
-  const [ghost, setGhost] = useState(null);
+  const [view, setView] = useState("week");
+  const [date, setDate] = useState(new Date());
+  const [editMode, setEditMode] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
+
   const [dragging, setDragging] = useState(null);
-  const [resizing, setResizing] = useState(null);
 
-  const queueRef = useRef([]);
-  const syncingRef = useRef(false);
-
-  const gridRef = useRef();
-  const startDate = moment().startOf("week");
-
-  /* =========================
-  LOAD
-  ========================= */
+  const [form, setForm] = useState({
+    from: "",
+    to: "",
+    start: "09:00",
+    end: "17:00",
+    user_ids: [],
+  });
 
   useEffect(() => {
     load();
-
-    const ch = supabase
-      .channel("sched-v11")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "schedules" },
-        load
-      )
-      .subscribe();
-
-    window.addEventListener("online", flushQueue);
-
-    return () => {
-      supabase.removeChannel(ch);
-      window.removeEventListener("online", flushQueue);
-    };
   }, []);
 
   async function load() {
@@ -74,33 +43,6 @@ export default function Schedule() {
     setHolidays(h || []);
   }
 
-  /* =========================
-  HELPERS
-  ========================= */
-
-  const snap = (m) => Math.round(m / GRID) * GRID;
-  const pxToMin = (px) => snap(px / PX);
-  const minToPx = (m) => m * PX;
-
-  function toISO(day, mins) {
-    return moment(day)
-      .startOf("day")
-      .add(mins, "minutes")
-      .toISOString();
-  }
-
-  function hasConflict(uid, start, end, ignoreId = null) {
-    return shifts.some((s) => {
-      if (s.user_id !== uid) return false;
-      if (ignoreId && s.id === ignoreId) return false;
-
-      return (
-        new Date(start) < new Date(s.end_time) &&
-        new Date(end) > new Date(s.start_time)
-      );
-    });
-  }
-
   function isHoliday(uid, ds) {
     return holidays.some(
       (h) =>
@@ -111,264 +53,285 @@ export default function Schedule() {
     );
   }
 
-  /* =========================
-  OPTIMISTIC UPDATE
-  ========================= */
+  async function createBulk() {
+    let d = moment(form.from);
+    const end = moment(form.to);
 
-  function applyLocalUpdate(id, updates) {
-    setShifts((prev) =>
-      prev.map((s) =>
-        s.id === id ? { ...s, ...updates } : s
-      )
+    while (d.isSameOrBefore(end, "day")) {
+      const ds = d.format("YYYY-MM-DD");
+
+      for (const uid of form.user_ids) {
+        if (isHoliday(uid, ds)) continue;
+
+        await scheduleAPI.create({
+          user_id: uid,
+          date: ds,
+          start_time: `${ds}T${form.start}:00`,
+          end_time: `${ds}T${form.end}:00`,
+        });
+      }
+
+      d.add(1, "day");
+    }
+
+    setShowAdd(false);
+    load();
+  }
+
+  async function updateShift(id, data) {
+    await scheduleAPI.update(id, data);
+    load();
+  }
+
+  async function deleteShift(id) {
+    await scheduleAPI.delete(id);
+    load();
+  }
+
+  const days = useMemo(() => {
+    const start =
+      view === "week"
+        ? moment(date).startOf("week")
+        : moment(date).startOf("month");
+
+    const count = view === "week" ? 7 : 30;
+
+    return Array.from({ length: count }).map((_, i) =>
+      start.clone().add(i, "days")
     );
-  }
+  }, [date, view]);
 
-  /* =========================
-  OFFLINE QUEUE
-  ========================= */
+  function handleDrop(day) {
+    if (!dragging) return;
 
-  function queueUpdate(payload) {
-    queueRef.current.push(payload);
-  }
-
-  async function flushQueue() {
-    if (syncingRef.current) return;
-    if (!navigator.onLine) return;
-
-    syncingRef.current = true;
-
-    try {
-      while (queueRef.current.length) {
-        const job = queueRef.current.shift();
-        await scheduleAPI.update(job.id, job.data);
-      }
-    } catch (err) {
-      console.error("QUEUE ERROR:", err);
-    } finally {
-      syncingRef.current = false;
-    }
-  }
-
-  /* =========================
-  SAVE (SAFE)
-  ========================= */
-
-  async function saveShift(id, data) {
-    // optimistic
-    applyLocalUpdate(id, data);
-
-    if (!navigator.onLine) {
-      queueUpdate({ id, data });
-      return;
-    }
-
-    try {
-      await scheduleAPI.update(id, data);
-    } catch (err) {
-      console.error("SAVE FAILED:", err);
-      load(); // rollback
-    }
-  }
-
-  /* =========================
-  DRAG / RESIZE
-  ========================= */
-
-  function startDrag(e, shift) {
-    e.stopPropagation();
-    setDragging(shift);
-  }
-
-  function startResize(e, shift, type) {
-    e.stopPropagation();
-    setResizing({ shift, type });
-  }
-
-  function onMove(e) {
-    const rect = gridRef.current.getBoundingClientRect();
-
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    const dayIndex = Math.floor(
-      x / (rect.width / DAYS)
-    );
-
-    const day = moment(startDate).add(dayIndex, "days");
-
-    const mins = pxToMin(y);
-
-    if (dragging) {
-      const dur =
-        (new Date(dragging.end_time) -
-          new Date(dragging.start_time)) /
-        60000;
-
-      const start = mins;
-      const end = mins + dur;
-
-      setGhost({
-        id: dragging.id,
-        user_id: dragging.user_id,
-        start,
-        end,
-        date: day.format("YYYY-MM-DD"),
-        conflict: hasConflict(
-          dragging.user_id,
-          toISO(day, start),
-          toISO(day, end),
-          dragging.id
-        ),
-      });
-    }
-
-    if (resizing) {
-      let start = moment(resizing.shift.start_time);
-      let end = moment(resizing.shift.end_time);
-
-      if (resizing.type === "top") {
-        start = moment(day)
-          .startOf("day")
-          .add(mins, "minutes");
-      }
-
-      if (resizing.type === "bottom") {
-        end = moment(day)
-          .startOf("day")
-          .add(mins, "minutes");
-      }
-
-      setGhost({
-        id: resizing.shift.id,
-        user_id: resizing.shift.user_id,
-        start: start.diff(moment(day).startOf("day"), "minutes"),
-        end: end.diff(moment(day).startOf("day"), "minutes"),
-        date: day.format("YYYY-MM-DD"),
-        conflict: hasConflict(
-          resizing.shift.user_id,
-          start,
-          end,
-          resizing.shift.id
-        ),
-      });
-    }
-  }
-
-  async function onDrop() {
-    if (!ghost || ghost.conflict) return;
-
-    await saveShift(ghost.id, {
-      user_id: ghost.user_id,
-      date: ghost.date,
-      start_time: toISO(ghost.date, ghost.start),
-      end_time: toISO(ghost.date, ghost.end),
+    updateShift(dragging.id, {
+      date: day.format("YYYY-MM-DD"),
     });
 
     setDragging(null);
-    setResizing(null);
-    setGhost(null);
   }
 
-  /* =========================
-  RENDER
-  ========================= */
-
-  const days = Array.from({ length: DAYS }).map((_, i) =>
-    moment(startDate).add(i, "days")
-  );
-
   return (
-    <div
-      ref={gridRef}
-      onMouseMove={onMove}
-      onMouseUp={onDrop}
-      className="flex border h-[800px]"
-    >
-      {days.map((day) => {
-        const ds = day.format("YYYY-MM-DD");
+    <div className="space-y-6">
 
-        const dayShifts = shifts.filter(
-          (s) => s.date === ds
-        );
+      {/* HEADER */}
+      <div className="flex gap-2">
+        <button onClick={() => setView("week")}>Week</button>
+        <button onClick={() => setView("month")}>Month</button>
+        <button onClick={() => setView("list")}>List</button>
 
-        return (
-          <div
-            key={ds}
-            className="flex-1 border relative h-[1440px]"
-          >
-            {/* GRID */}
-            {Array.from({ length: 24 }).map((_, h) => (
+        <button onClick={() => setEditMode(!editMode)}>
+          {editMode ? "Done" : "Edit"}
+        </button>
+
+        <button onClick={() => setShowAdd(true)}>
+          Add
+        </button>
+      </div>
+
+      {/* GRID */}
+      {view !== "list" && (
+        <div className="grid grid-cols-7 gap-2">
+
+          {days.map((d) => {
+            const ds = d.format("YYYY-MM-DD");
+
+            const dayShifts = shifts.filter(
+              (s) => s.date === ds
+            );
+
+            return (
               <div
-                key={h}
-                className="absolute w-full border-t border-white/10"
-                style={{ top: h * 60 }}
-              />
-            ))}
+                key={ds}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={() => handleDrop(d)}
+                className="border p-2 min-h-[140px]"
+              >
+                <p className="text-xs text-gray-400">
+                  {d.format("DD MMM")}
+                </p>
 
-            {/* SHIFTS */}
-            {dayShifts.map((s) => {
-              const start =
-                moment(s.start_time).hour() * 60 +
-                moment(s.start_time).minute();
+                {/* HOLIDAYS */}
+                {holidays
+                  .filter(
+                    (h) =>
+                      h.status === "approved" &&
+                      ds >= h.start_date &&
+                      ds <= h.end_date
+                  )
+                  .map((h) => (
+                    <div
+                      key={h.id}
+                      className="bg-green-600 text-xs p-1 rounded"
+                    >
+                      HOLIDAY
+                    </div>
+                  ))}
 
-              const end =
-                moment(s.end_time).hour() * 60 +
-                moment(s.end_time).minute();
+                {/* SHIFTS */}
+                {dayShifts.map((s) => {
+                  const start = moment(s.start_time);
+                  const end = moment(s.end_time);
 
-              return (
-                <div
-                  key={s.id}
-                  onMouseDown={(e) =>
-                    startDrag(e, s)
-                  }
-                  className="absolute bg-indigo-600 text-xs p-1 rounded"
-                  style={{
-                    top: minToPx(start),
-                    height: minToPx(end - start),
-                    left: 2,
-                    right: 2,
-                  }}
-                >
-                  {users.find((u) => u.id === s.user_id)?.name}
+                  return (
+                    <div
+                      key={s.id}
+                      draggable
+                      onDragStart={() => setDragging(s)}
+                      className="bg-indigo-600 p-2 rounded text-xs mt-2 relative cursor-move"
+                    >
+                      {editMode && (
+                        <button
+                          onClick={() => deleteShift(s.id)}
+                          className="absolute right-1 top-1"
+                        >
+                          ✕
+                        </button>
+                      )}
 
-                  <div
-                    onMouseDown={(e) =>
-                      startResize(e, s, "top")
-                    }
-                    className="absolute top-0 left-0 right-0 h-2 cursor-ns-resize"
+                      {
+                        users.find(
+                          (u) => u.id === s.user_id
+                        )?.name
+                      }
+
+                      <br />
+
+                      {start.format("HH:mm")} -{" "}
+                      {end.format("HH:mm")}
+
+                      {/* RESIZE */}
+                      <div
+                        className="absolute bottom-0 left-0 right-0 h-2 cursor-ns-resize bg-white/20"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+
+                          const startY = e.clientY;
+                          const original = moment(s.end_time);
+
+                          function move(ev) {
+                            const diff = ev.clientY - startY;
+                            const mins = Math.round(diff / 2) * 15;
+
+                            const newEnd = original.clone().add(mins, "minutes");
+
+                            updateShift(s.id, {
+                              end_time: newEnd.toISOString(),
+                            });
+                          }
+
+                          function stop() {
+                            window.removeEventListener("mousemove", move);
+                            window.removeEventListener("mouseup", stop);
+                          }
+
+                          window.addEventListener("mousemove", move);
+                          window.addEventListener("mouseup", stop);
+                        }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* LIST */}
+      {view === "list" && (
+        <div className="space-y-2">
+          {shifts.map((s) => (
+            <div key={s.id} className="p-3 border rounded">
+              {moment(s.date).format("DD MMM")} —{" "}
+              {
+                users.find(
+                  (u) => u.id === s.user_id
+                )?.name
+              }
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* BULK ADD */}
+      {showAdd && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center">
+          <div className="bg-[#020617] p-6 rounded-xl space-y-4 w-[400px]">
+
+            <input
+              type="date"
+              value={form.from}
+              onChange={(e) =>
+                setForm({ ...form, from: e.target.value })
+              }
+            />
+
+            <input
+              type="date"
+              value={form.to}
+              onChange={(e) =>
+                setForm({ ...form, to: e.target.value })
+              }
+            />
+
+            <input
+              type="time"
+              value={form.start}
+              onChange={(e) =>
+                setForm({ ...form, start: e.target.value })
+              }
+            />
+
+            <input
+              type="time"
+              value={form.end}
+              onChange={(e) =>
+                setForm({ ...form, end: e.target.value })
+              }
+            />
+
+            <div className="max-h-40 overflow-auto">
+              {users.map((u) => (
+                <label key={u.id} className="block">
+                  <input
+                    type="checkbox"
+                    checked={form.user_ids.includes(u.id)}
+                    onChange={() => {
+                      const exists =
+                        form.user_ids.includes(u.id);
+
+                      setForm({
+                        ...form,
+                        user_ids: exists
+                          ? form.user_ids.filter((x) => x !== u.id)
+                          : [...form.user_ids, u.id],
+                      });
+                    }}
                   />
+                  {u.name}
+                </label>
+              ))}
+            </div>
 
-                  <div
-                    onMouseDown={(e) =>
-                      startResize(e, s, "bottom")
-                    }
-                    className="absolute bottom-0 left-0 right-0 h-2 cursor-ns-resize"
-                  />
-                </div>
-              );
-            })}
+            <button
+              onClick={createBulk}
+              className="w-full bg-emerald-600 py-2 rounded"
+            >
+              Save
+            </button>
 
-            {/* GHOST */}
-            {ghost && ghost.date === ds && (
-              <div
-                className={`absolute ${
-                  ghost.conflict
-                    ? "bg-red-500/50"
-                    : "bg-emerald-400/50"
-                }`}
-                style={{
-                  top: minToPx(ghost.start),
-                  height: minToPx(
-                    ghost.end - ghost.start
-                  ),
-                  left: 0,
-                  right: 0,
-                }}
-              />
-            )}
+            <button
+              onClick={() => setShowAdd(false)}
+              className="w-full bg-gray-600 py-2 rounded"
+            >
+              Cancel
+            </button>
+
           </div>
-        );
-      })}
+        </div>
+      )}
+
     </div>
   );
 }

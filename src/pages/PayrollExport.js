@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { reportAPI, userAPI } from "../services/api";
 
 /* =========================================
-UK CONFIG (2024/25 BASELINE)
+CONFIG
 ========================================= */
 
 const TAX = {
@@ -43,8 +43,12 @@ function parseTaxCode(code = "1257L") {
   return num * 10;
 }
 
+function money(v) {
+  return `£${Number(v || 0).toFixed(2)}`;
+}
+
 /* =========================================
-CALC ENGINE
+CALC
 ========================================= */
 
 function calculate(user, shifts) {
@@ -82,26 +86,21 @@ function calculate(user, shifts) {
 
   let student = 0;
 
-  if (user.student_loan_plan === "1") {
-    if (annual > STUDENT.plan1.threshold) {
-      student =
-        ((annual - STUDENT.plan1.threshold) *
-          STUDENT.plan1.rate) /
-        12;
-    }
+  if (user.student_loan_plan === "1" && annual > STUDENT.plan1.threshold) {
+    student =
+      ((annual - STUDENT.plan1.threshold) *
+        STUDENT.plan1.rate) /
+      12;
   }
 
-  if (user.student_loan_plan === "2") {
-    if (annual > STUDENT.plan2.threshold) {
-      student =
-        ((annual - STUDENT.plan2.threshold) *
-          STUDENT.plan2.rate) /
-        12;
-    }
+  if (user.student_loan_plan === "2" && annual > STUDENT.plan2.threshold) {
+    student =
+      ((annual - STUDENT.plan2.threshold) *
+        STUDENT.plan2.rate) /
+      12;
   }
 
   const pension = gross * PENSION.rate;
-
   const net = gross - tax - ni - student - pension;
 
   return {
@@ -116,29 +115,7 @@ function calculate(user, shifts) {
 }
 
 /* =========================================
-FPS GENERATOR (HMRC STYLE)
-========================================= */
-
-function buildFPS(user, calc) {
-  return {
-    employee: {
-      name: user.name,
-      ni_number: user.ni_number || "",
-      tax_code: user.tax_code || "1257L",
-    },
-    pay: {
-      gross: calc.gross,
-      tax: calc.tax,
-      ni: calc.ni,
-      pension: calc.pension,
-      student_loan: calc.student,
-      net: calc.net,
-    },
-  };
-}
-
-/* =========================================
-MAIN COMPONENT
+MAIN
 ========================================= */
 
 export default function PayrollExport() {
@@ -169,7 +146,6 @@ export default function PayrollExport() {
     setUsers(staff || []);
   }
 
-  /* FILTER */
   const filtered = useMemo(() => {
     return rows.filter((r) => {
       const d = r.clock_in_time?.split("T")[0];
@@ -177,7 +153,6 @@ export default function PayrollExport() {
     });
   }, [rows, fromDate, toDate]);
 
-  /* PAYROLL */
   const payroll = useMemo(() => {
     return users.map((u) => {
       const userRows = filtered.filter(
@@ -185,37 +160,35 @@ export default function PayrollExport() {
       );
 
       const calc = calculate(u, userRows);
-      const fps = buildFPS(u, calc);
 
       return {
         ...u,
         ...calc,
-        fps,
       };
     });
   }, [users, filtered]);
 
-  /* EXPORT CSV */
+  const totals = useMemo(() => {
+    return payroll.reduce(
+      (acc, r) => {
+        acc.gross += r.gross;
+        acc.net += r.net;
+        acc.tax += r.tax;
+        return acc;
+      },
+      { gross: 0, net: 0, tax: 0 }
+    );
+  }, [payroll]);
+
   function exportCSV() {
     const csv = [
-      [
-        "Employee",
-        "Hours",
-        "Gross",
-        "Tax",
-        "NI",
-        "Student Loan",
-        "Pension",
-        "Net",
-      ],
+      ["Employee", "Hours", "Gross", "Tax", "NI", "Net"],
       ...payroll.map((r) => [
         r.name,
         r.totalHours.toFixed(2),
         r.gross.toFixed(2),
         r.tax.toFixed(2),
         r.ni.toFixed(2),
-        r.student.toFixed(2),
-        r.pension.toFixed(2),
         r.net.toFixed(2),
       ]),
     ]
@@ -227,97 +200,113 @@ export default function PayrollExport() {
 
     const a = document.createElement("a");
     a.href = url;
-    a.download = "hmrc_payroll.csv";
-    a.click();
-  }
-
-  /* EXPORT FPS JSON */
-  function exportFPS() {
-    const fpsPayload = payroll.map((p) => p.fps);
-
-    const blob = new Blob(
-      [JSON.stringify(fpsPayload, null, 2)],
-      { type: "application/json" }
-    );
-
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "hmrc_fps.json";
+    a.download = "payroll.csv";
     a.click();
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
 
-      <h1 className="text-2xl font-bold">
-        HMRC RTI Payroll (FPS Ready)
-      </h1>
+      {/* HEADER */}
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">
+          Payroll Dashboard
+        </h1>
 
-      <div className="grid grid-cols-3 gap-4">
+        <button
+          onClick={exportCSV}
+          className="bg-indigo-600 px-4 py-2 rounded-xl"
+        >
+          Export CSV
+        </button>
+      </div>
+
+      {/* FILTERS */}
+      <div className="grid md:grid-cols-3 gap-4">
         <input
           type="date"
           value={fromDate}
           onChange={(e) =>
             setFromDate(e.target.value)
           }
+          className="bg-[#020617] p-3 rounded-xl"
         />
+
         <input
           type="date"
           value={toDate}
           onChange={(e) =>
             setToDate(e.target.value)
           }
+          className="bg-[#020617] p-3 rounded-xl"
         />
-
-        <div className="flex gap-2">
-          <button
-            onClick={exportCSV}
-            className="bg-indigo-600 px-4 py-2 rounded"
-          >
-            CSV
-          </button>
-
-          <button
-            onClick={exportFPS}
-            className="bg-emerald-600 px-4 py-2 rounded"
-          >
-            FPS JSON
-          </button>
-        </div>
       </div>
 
-      <table className="w-full text-sm">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Hours</th>
-            <th>Gross</th>
-            <th>Tax</th>
-            <th>NI</th>
-            <th>Student</th>
-            <th>Pension</th>
-            <th>Net</th>
-          </tr>
-        </thead>
+      {/* KPI */}
+      <div className="grid md:grid-cols-3 gap-4">
+        <Card title="Gross" value={money(totals.gross)} />
+        <Card title="Tax" value={money(totals.tax)} />
+        <Card title="Net Pay" value={money(totals.net)} />
+      </div>
 
-        <tbody>
-          {payroll.map((r) => (
-            <tr key={r.id}>
-              <td>{r.name}</td>
-              <td>{r.totalHours.toFixed(2)}</td>
-              <td>£{r.gross.toFixed(2)}</td>
-              <td>£{r.tax.toFixed(2)}</td>
-              <td>£{r.ni.toFixed(2)}</td>
-              <td>£{r.student.toFixed(2)}</td>
-              <td>£{r.pension.toFixed(2)}</td>
-              <td>£{r.net.toFixed(2)}</td>
+      {/* TABLE */}
+      <div className="rounded-2xl border border-white/10 overflow-auto">
+        <table className="w-full text-sm">
+
+          <thead className="bg-white/5 text-gray-400 sticky top-0">
+            <tr>
+              <th className="p-4 text-left">Employee</th>
+              <th className="p-4">Hours</th>
+              <th className="p-4">Gross</th>
+              <th className="p-4">Tax</th>
+              <th className="p-4">NI</th>
+              <th className="p-4">Pension</th>
+              <th className="p-4">Net</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
 
+          <tbody>
+            {payroll.map((r) => (
+              <tr
+                key={r.id}
+                className="border-t border-white/5"
+              >
+                <td className="p-4">{r.name}</td>
+                <td className="p-4 text-center">
+                  {r.totalHours.toFixed(2)}
+                </td>
+                <td className="p-4 text-green-400">
+                  {money(r.gross)}
+                </td>
+                <td className="p-4 text-red-400">
+                  {money(r.tax)}
+                </td>
+                <td className="p-4">{money(r.ni)}</td>
+                <td className="p-4">
+                  {money(r.pension)}
+                </td>
+                <td className="p-4 font-semibold">
+                  {money(r.net)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+
+        </table>
+      </div>
+
+    </div>
+  );
+}
+
+/* CARD */
+function Card({ title, value }) {
+  return (
+    <div className="bg-[#020617] border border-white/10 rounded-2xl p-5">
+      <p className="text-xs text-gray-400">{title}</p>
+      <h2 className="text-2xl font-semibold mt-2">
+        {value}
+      </h2>
     </div>
   );
 }
