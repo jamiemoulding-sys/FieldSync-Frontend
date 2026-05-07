@@ -1,18 +1,18 @@
 import React, { useEffect, useMemo, useState } from "react";
 import moment from "moment";
 import { scheduleAPI, userAPI } from "../services/api";
+import AddShiftModal from "../components/AddShiftModal";
 
 /* ================= MAIN ================= */
 
 export default function Schedule() {
   const [users, setUsers] = useState([]);
   const [shifts, setShifts] = useState([]);
-
+  
   const [view, setView] = useState("week");
   const [date, setDate] = useState(new Date());
 
   const [showAdd, setShowAdd] = useState(false);
-  const [selectedUsers, setSelectedUsers] = useState([]);
   const holidays = [];
 
   const [form, setForm] = useState({
@@ -279,71 +279,22 @@ export default function Schedule() {
             </div>
           )}
 
-        </div>
-      </div>
+            </div> {/* CONTENT */}
+    
 
-      {/* ADD MODAL */}
+            </div> {/* CONTENT */}
+      
+
       {showAdd && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center">
-          <div className="bg-[#020617] p-6 space-y-3 w-[300px]">
-
-            <div className="text-xs text-gray-400">Select staff:</div>
-
-<div className="max-h-[150px] overflow-y-auto border p-2 space-y-1">
-  {users.map((u) => (
-    <label key={u.id} className="flex items-center gap-2 text-sm">
-      <input
-        type="checkbox"
-        checked={selectedUsers.includes(u.id)}
-        onChange={(e) => {
-          if (e.target.checked) {
-            setSelectedUsers([...selectedUsers, u.id]);
-          } else {
-            setSelectedUsers(selectedUsers.filter(id => id !== u.id));
-          }
-        }}
-      />
-      {u.name}
-    </label>
-  ))}
-</div>
-
-            <input className="w-full p-2" type="date" onChange={e=>setForm({...form,date:e.target.value})}/>
-            <input className="w-full p-2" type="time" onChange={e=>setForm({...form,start:e.target.value})}/>
-            <input className="w-full p-2" type="time" onChange={e=>setForm({...form,end:e.target.value})}/>
-
-            <button
-  className="bg-blue-600 w-full p-2"
-  onClick={() => {
-    if (!form.date) {
-      alert("Pick a date first");
-      return;
-    }
-
-    if (selectedUsers.length === 0) {
-      alert("Select at least one user");
-      return;
-    }
-
-    selectedUsers.forEach((userId) => {
-      createShift({
-        user_id: userId,
-        date: form.date,
-        start_time: `${form.date}T${form.start}:00`,
-        end_time: `${form.date}T${form.end}:00`,
-      });
-    });
-
-    setSelectedUsers([]);
-    setShowAdd(false);
-  }}
->
-  Bulk Add (Selected Users)
-</button>
-
-          </div>
-        </div>
+        <AddShiftModal
+          users={users}
+          form={form}
+          setForm={setForm}
+          createShift={createShift}
+          onClose={() => setShowAdd(false)}
+        />
       )}
+
     </div>
   );
 }
