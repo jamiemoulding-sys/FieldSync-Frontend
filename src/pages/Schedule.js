@@ -3,23 +3,23 @@ import moment from "moment";
 import { scheduleAPI, userAPI } from "../services/api";
 import AddShiftModal from "../components/AddShiftModal";
 
+/* CONFIG */
 const START_HOUR = 6;
 const END_HOUR = 22;
-const HOUR_WIDTH = 80;
+const HOUR_WIDTH = 60;
 const ROW_HEIGHT = 70;
 
+/* MAIN */
 export default function Schedule() {
   const [users, setUsers] = useState([]);
   const [shifts, setShifts] = useState([]);
 
-  const [view, setView] = useState("week");
   const [date, setDate] = useState(new Date());
-
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState(null);
 
-  const [dragState, setDragState] = useState(null);
-  const [resizeState, setResizeState] = useState(null);
+  const [drag, setDrag] = useState(null);
+  const [resize, setResize] = useState(null);
 
   const [form, setForm] = useState({
     user_id: "",
@@ -28,6 +28,7 @@ export default function Schedule() {
     end: "17:00",
   });
 
+  /* LOAD */
   useEffect(() => {
     load();
   }, []);
@@ -41,27 +42,41 @@ export default function Schedule() {
     setShifts(s || []);
   }
 
-  async function createShift(data) {
-    if (hasConflict(data)) {
-      alert("⚠️ This person is already working during those hours");
-      return;
-    }
-    await scheduleAPI.create(data);
-    load();
+  /* HELPERS */
+  const SNAP = 15; // minutes
+
+function snapMoment(m) {
+  const mins = m.minutes();
+  const snapped = Math.round(mins / SNAP) * SNAP;
+  return m.clone().minutes(snapped).seconds(0);
+}
+
+function snapXToTime(x, day) {
+  const hour = START_HOUR + x / HOUR_WIDTH;
+
+  const m = moment(day)
+    .hour(Math.floor(hour))
+    .minute((hour % 1) * 60);
+
+  return snapMoment(m);
+}
+  
+  function formatName(name) {
+    const parts = name.split(" ");
+    return `${parts[0]} ${parts[1] ? parts[1][0] : ""}`;
   }
 
-  async function updateShift(id, data) {
-    if (hasConflict({ ...data, id })) {
-      alert("⚠️ Shift conflict detected");
-      return;
-    }
-    await scheduleAPI.update(id, data);
-    load();
+  function toX(time) {
+    const m = moment(time);
+    return (m.hours() + m.minutes() / 60 - START_HOUR) * HOUR_WIDTH;
   }
 
-  async function deleteShift(id) {
-    await scheduleAPI.delete(id);
-    load();
+  function fromX(x, day) {
+    const hour = START_HOUR + x / HOUR_WIDTH;
+    return moment(day)
+      .hour(Math.floor(hour))
+      .minute((hour % 1) * 60)
+      .toISOString();
   }
 
   function hasConflict(newShift) {
@@ -77,11 +92,31 @@ export default function Schedule() {
     });
   }
 
-  function formatName(name) {
-    const parts = name.split(" ");
-    return `${parts[0]} ${parts[1] ? parts[1][0] : ""}`;
+  /* CRUD */
+  async function createShift(data) {
+    if (hasConflict(data)) {
+      alert("⚠️ This person already has a shift here");
+      return;
+    }
+    await scheduleAPI.create(data);
+    load();
   }
 
+  async function updateShift(id, data) {
+    if (hasConflict({ ...data, id })) {
+      alert("⚠️ Shift conflict");
+      return;
+    }
+    await scheduleAPI.update(id, data);
+    load();
+  }
+
+  async function deleteShift(id) {
+    await scheduleAPI.delete(id);
+    load();
+  }
+
+  /* NAV */
   function prev() {
     setDate(moment(date).subtract(1, "week").toDate());
   }
@@ -90,6 +125,7 @@ export default function Schedule() {
     setDate(moment(date).add(1, "week").toDate());
   }
 
+  /* DAYS */
   const days = useMemo(() => {
     const start = moment(date).startOf("isoWeek");
     return Array.from({ length: 7 }).map((_, i) =>
@@ -97,30 +133,97 @@ export default function Schedule() {
     );
   }, [date]);
 
-  function toX(time) {
-    const m = moment(time);
-    return (m.hours() + m.minutes() / 60 - START_HOUR) * HOUR_WIDTH;
+  /* DRAG */
+  useEffect(() => {
+  function move(e) {
+    if (!drag) return;
+
+    const dx = e.clientX - drag.startX;
+
+    const snapped = snapXToTime(drag.origLeft + dx, drag.day);
+
+    const duration = moment(drag.shift.end_time).diff(
+      drag.shift.start_time,
+      "minutes"
+    );
+
+    const end = snapped.clone().add(duration, "minutes");
+
+    setDrag({
+      ...drag,
+      ghost: {
+        ...drag.shift,
+        start_time: snapped.toISOString(),
+        end_time: end.toISOString(),
+      },
+    });
   }
 
-  function fromX(x, day) {
-    const hour = START_HOUR + x / HOUR_WIDTH;
-    return moment(day)
-      .hour(Math.floor(hour))
-      .minute((hour % 1) * 60)
-      .toISOString();
+  function up() {
+    if (drag?.ghost) {
+      updateShift(drag.shift.id, drag.ghost);
+    }
+    setDrag(null);
   }
 
+  window.addEventListener("mousemove", move);
+  window.addEventListener("mouseup", up);
+
+  return () => {
+    window.removeEventListener("mousemove", move);
+    window.removeEventListener("mouseup", up);
+  };
+}, [drag]);
+
+  /* RESIZE */
+  useEffect(() => {
+  function move(e) {
+    if (!resize) return;
+
+    const dx = e.clientX - resize.startX;
+    const hours = dx / HOUR_WIDTH;
+
+    let end = moment(resize.shift.end_time).add(hours, "hours");
+    end = snapMoment(end);
+
+    if (end.diff(resize.shift.start_time, "minutes") < 30) return;
+
+    setResize({
+      ...resize,
+      ghost: {
+        ...resize.shift,
+        end_time: end.toISOString(),
+      },
+    });
+  }
+
+  function up() {
+    if (resize?.ghost) {
+      updateShift(resize.shift.id, resize.ghost);
+    }
+    setResize(null);
+  }
+
+  window.addEventListener("mousemove", move);
+  window.addEventListener("mouseup", up);
+
+  return () => {
+    window.removeEventListener("mousemove", move);
+    window.removeEventListener("mouseup", up);
+  };
+}, [resize]);
+
+  /* UI */
   return (
     <div className="h-screen flex bg-[#0B1220] text-white">
 
-      {/* MAIN */}
       <div className="flex-1 flex flex-col">
 
-        {/* TOP BAR */}
-        <div className="sticky top-0 z-20 flex justify-between px-6 py-4 bg-[#111827] border-b border-white/10">
+        {/* HEADER */}
+        <div className="flex justify-between p-4 bg-[#111827]">
           <div>
-            {moment(date).startOf("isoWeek").format("DD MMM")} -{" "}
-            {moment(date).endOf("isoWeek").format("DD MMM YYYY")}
+            {moment(date).format("DD MMM")} -{" "}
+            {moment(date).add(6, "days").format("DD MMM YYYY")}
           </div>
 
           <div className="flex gap-2">
@@ -137,81 +240,92 @@ export default function Schedule() {
           {/* USERS */}
           <div className="w-[140px]">
             {users.map((u) => (
-              <div
-                key={u.id}
-                className="h-[70px] flex items-center px-2 border-b border-white/10"
-              >
+              <div key={u.id} className="h-[70px] flex items-center px-2 border-b border-white/10">
                 {formatName(u.name)}
               </div>
             ))}
           </div>
 
           {/* DAYS */}
-          {days.map((day, dayIndex) => (
-            <div key={dayIndex}>
+          {days.map((day, di) => (
+            <div key={di}>
               <div className="text-center text-xs py-2 border-b border-white/10">
                 {day.format("ddd DD")}
               </div>
 
-              {users.map((user, userIndex) => {
+              {users.map((user) => {
+                const ds = day.format("YYYY-MM-DD");
+
                 const dayShifts = shifts.filter(
                   (s) =>
-                    s.user_id === user.id &&
-                    s.date === day.format("YYYY-MM-DD")
+                    String(s.user_id) === String(user.id) &&
+                    s.date === ds
                 );
 
                 return (
                   <div
-                    key={user.id}
-                    className="relative border-b border-l border-white/10 hover:bg-white/[0.02]"
+                    key={user.id + ds}
+                    className="relative border-b border-l border-white/10"
                     style={{
                       width: (END_HOUR - START_HOUR) * HOUR_WIDTH,
                       height: ROW_HEIGHT,
                     }}
                   >
-
                     {dayShifts.map((s) => {
-                      const left = toX(s.start_time);
-                      const width =
-                        (moment(s.end_time).diff(
-                          moment(s.start_time),
-                          "minutes"
-                        ) /
-                          60) *
-                        HOUR_WIDTH;
+                      const active =
+  drag?.shift?.id === s.id
+    ? drag.ghost
+    : resize?.shift?.id === s.id
+    ? resize.ghost
+    : s;
+
+const left = toX(active.start_time);
+
+const width =
+  (moment(active.end_time).diff(
+    moment(active.start_time),
+    "minutes"
+  ) /
+    60) *
+  HOUR_WIDTH;
 
                       return (
                         <div
                           key={s.id}
                           onMouseDown={(e) =>
-                            setDragState({
+                            setDrag({
                               shift: s,
                               startX: e.clientX,
+                              origLeft: left,
                               day,
-                              user,
                             })
                           }
                           onDoubleClick={() => setEditing(s)}
-                          className="absolute px-3 py-1 text-xs rounded-xl cursor-move transition hover:scale-[1.02]"
-                          style={{
-                            left,
-                            width,
-                            top: 6,
-                            background:
-                              "linear-gradient(135deg,#6366f1,#4f46e5)",
-                          }}
+                         className="absolute px-2 py-1 text-xs rounded-xl cursor-move select-none transition-all"
+style={{
+  left,
+  width,
+  top: 6,
+  background:
+    drag?.shift?.id === s.id
+      ? "linear-gradient(135deg,#818cf8,#6366f1)"
+      : "linear-gradient(135deg,#6366f1,#4f46e5)",
+  opacity: drag?.shift?.id === s.id ? 0.7 : 1,
+}}
                         >
                           <div>{formatName(user.name)}</div>
-                          <div className="text-[10px] opacity-80">
-                            {moment(s.start_time).format("HH:mm")} -{" "}
-                            {moment(s.end_time).format("HH:mm")}
+                          <div className="text-[10px]">
+                            {moment(active.start_time).format("HH:mm")} -{" "}
+                            {moment(active.end_time).format("HH:mm")}
                           </div>
 
-                          {/* RESIZE */}
                           <div
                             onMouseDown={(e) => {
                               e.stopPropagation();
-                              setResizeState({ shift: s });
+                              setResize({
+                                shift: s,
+                                startX: e.clientX,
+                              });
                             }}
                             className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize"
                           />
@@ -260,21 +374,17 @@ export default function Schedule() {
               }
             />
 
-            <button
-              onClick={() => {
-                updateShift(editing.id, editing);
-                setEditing(null);
-              }}
-            >
+            <button onClick={() => {
+              updateShift(editing.id, editing);
+              setEditing(null);
+            }}>
               Save
             </button>
 
-            <button
-              onClick={() => {
-                deleteShift(editing.id);
-                setEditing(null);
-              }}
-            >
+            <button onClick={() => {
+              deleteShift(editing.id);
+              setEditing(null);
+            }}>
               Delete
             </button>
 
