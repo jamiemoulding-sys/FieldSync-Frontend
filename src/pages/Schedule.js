@@ -3,19 +3,23 @@ import moment from "moment";
 import { scheduleAPI, userAPI } from "../services/api";
 import AddShiftModal from "../components/AddShiftModal";
 
-/* MAIN */
+const START_HOUR = 6;
+const END_HOUR = 22;
+const HOUR_WIDTH = 80;
+const ROW_HEIGHT = 70;
 
 export default function Schedule() {
   const [users, setUsers] = useState([]);
   const [shifts, setShifts] = useState([]);
-  const [availability, setAvailability] = useState([]);
-  const [holidays, setHolidays] = useState([]);
 
   const [view, setView] = useState("week");
   const [date, setDate] = useState(new Date());
 
   const [showAdd, setShowAdd] = useState(false);
-  const [selectedDay, setSelectedDay] = useState(null);
+  const [editing, setEditing] = useState(null);
+
+  const [dragState, setDragState] = useState(null);
+  const [resizeState, setResizeState] = useState(null);
 
   const [form, setForm] = useState({
     user_id: "",
@@ -24,36 +28,60 @@ export default function Schedule() {
     end: "17:00",
   });
 
-  /* LOAD */
   useEffect(() => {
     load();
   }, []);
 
   async function load() {
-    const [u, s, a, h] = await Promise.all([
+    const [u, s] = await Promise.all([
       userAPI.getAll(),
       scheduleAPI.getAll(),
-      scheduleAPI.getAvailability?.() || [],
-      scheduleAPI.getHolidays?.() || [],
     ]);
-
     setUsers(u || []);
     setShifts(s || []);
-    setAvailability(a || []);
-    setHolidays(h || []);
   }
 
   async function createShift(data) {
+    if (hasConflict(data)) {
+      alert("⚠️ This person is already working during those hours");
+      return;
+    }
     await scheduleAPI.create(data);
     load();
   }
 
   async function updateShift(id, data) {
+    if (hasConflict({ ...data, id })) {
+      alert("⚠️ Shift conflict detected");
+      return;
+    }
     await scheduleAPI.update(id, data);
     load();
   }
 
-  /* NAV */
+  async function deleteShift(id) {
+    await scheduleAPI.delete(id);
+    load();
+  }
+
+  function hasConflict(newShift) {
+    return shifts.some((s) => {
+      if (s.id === newShift.id) return false;
+      if (s.user_id !== newShift.user_id) return false;
+      if (s.date !== newShift.date) return false;
+
+      return (
+        new Date(newShift.start_time) < new Date(s.end_time) &&
+        new Date(newShift.end_time) > new Date(s.start_time)
+      );
+    });
+  }
+
+  function formatName(name) {
+    const parts = name.split(" ");
+    return `${parts[0]} ${parts[1] ? parts[1][0] : ""}`;
+  }
+
   function prev() {
     setDate(moment(date).subtract(1, "week").toDate());
   }
@@ -62,7 +90,6 @@ export default function Schedule() {
     setDate(moment(date).add(1, "week").toDate());
   }
 
-  /* DAYS */
   const days = useMemo(() => {
     const start = moment(date).startOf("isoWeek");
     return Array.from({ length: 7 }).map((_, i) =>
@@ -70,165 +97,136 @@ export default function Schedule() {
     );
   }, [date]);
 
-  /* HELPERS */
-  function formatName(name) {
-    if (!name) return "Open";
-    const [first, last] = name.split(" ");
-    return `${first} ${last ? last[0] + "." : ""}`;
+  function toX(time) {
+    const m = moment(time);
+    return (m.hours() + m.minutes() / 60 - START_HOUR) * HOUR_WIDTH;
   }
 
-  function getDayShifts(day) {
-    return shifts.filter(
-      (s) => s.date === day.format("YYYY-MM-DD")
-    );
+  function fromX(x, day) {
+    const hour = START_HOUR + x / HOUR_WIDTH;
+    return moment(day)
+      .hour(Math.floor(hour))
+      .minute((hour % 1) * 60)
+      .toISOString();
   }
 
-  function isHoliday(day) {
-    return holidays.includes(day.format("YYYY-MM-DD"));
-  }
-
-  function isAvailable(userId, day) {
-    return availability.some(
-      (a) =>
-        a.user_id === userId &&
-        a.date === day.format("YYYY-MM-DD")
-    );
-  }
-
-  /* UI */
   return (
     <div className="h-screen flex bg-[#0B1220] text-white">
 
+      {/* MAIN */}
       <div className="flex-1 flex flex-col">
 
         {/* TOP BAR */}
-        <div className="sticky top-0 z-20 flex justify-between items-center px-6 py-4 bg-[#111827] border-b border-white/10">
-          <div className="text-lg font-semibold">
+        <div className="sticky top-0 z-20 flex justify-between px-6 py-4 bg-[#111827] border-b border-white/10">
+          <div>
             {moment(date).startOf("isoWeek").format("DD MMM")} -{" "}
             {moment(date).endOf("isoWeek").format("DD MMM YYYY")}
           </div>
 
           <div className="flex gap-2">
-            <button onClick={() => setView("week")} className="btn-secondary">Week</button>
-            <button onClick={() => setView("month")} className="btn-secondary">Month</button>
-
-            <button onClick={prev} className="btn-secondary">←</button>
-            <button onClick={() => setDate(new Date())} className="btn-secondary">Today</button>
-            <button onClick={next} className="btn-secondary">→</button>
-
-            <button onClick={() => setShowAdd(true)} className="btn-primary">+ Shift</button>
+            <button onClick={prev}>←</button>
+            <button onClick={() => setDate(new Date())}>Today</button>
+            <button onClick={next}>→</button>
+            <button onClick={() => setShowAdd(true)}>+ Shift</button>
           </div>
         </div>
 
-        {/* CONTENT */}
-        <div className="flex-1 overflow-auto p-6">
+        {/* GRID */}
+        <div className="flex overflow-auto">
 
-          {/* WEEK VIEW */}
-          {view === "week" && (
-            <div className="grid grid-cols-7 gap-4">
+          {/* USERS */}
+          <div className="w-[140px]">
+            {users.map((u) => (
+              <div
+                key={u.id}
+                className="h-[70px] flex items-center px-2 border-b border-white/10"
+              >
+                {formatName(u.name)}
+              </div>
+            ))}
+          </div>
 
-              {days.map((day, i) => {
-                const dayShifts = getDayShifts(day);
+          {/* DAYS */}
+          {days.map((day, dayIndex) => (
+            <div key={dayIndex}>
+              <div className="text-center text-xs py-2 border-b border-white/10">
+                {day.format("ddd DD")}
+              </div>
 
-                return (
-                  <div
-                    key={i}
-                    onClick={() => setSelectedDay(day)}
-                    className={`rounded-xl p-3 cursor-pointer transition
-                      ${isHoliday(day)
-                        ? "bg-red-900/30 border border-red-500/30"
-                        : "bg-[#020617] hover:bg-[#0f172a]"
-                      }`}
-                  >
-                    <div className="flex justify-between text-sm text-gray-400 mb-2">
-                      <span>{day.format("ddd DD")}</span>
-                      {isHoliday(day) && (
-                        <span className="text-red-400 text-xs">Holiday</span>
-                      )}
-                    </div>
-
-                    <div className="space-y-1">
-                      {dayShifts.slice(0, 4).map((s) => {
-                        const u = users.find((x) => x.id === s.user_id);
-
-                        return (
-                          <div
-                            key={s.id}
-                            className="bg-indigo-600 text-xs px-2 py-1 rounded flex justify-between"
-                          >
-                            <span>{formatName(u?.name)}</span>
-                            <span>{moment(s.start_time).format("HH:mm")}</span>
-                          </div>
-                        );
-                      })}
-
-                      {/* AVAILABILITY */}
-                      <div className="text-[10px] text-gray-500 pt-1">
-                        {users
-                          .filter((u) => isAvailable(u.id, day))
-                          .slice(0, 3)
-                          .map((u) => formatName(u.name))
-                          .join(", ")}
-                      </div>
-
-                      {dayShifts.length > 4 && (
-                        <div className="text-xs text-gray-400">
-                          +{dayShifts.length - 4} more
-                        </div>
-                      )}
-                    </div>
-                  </div>
+              {users.map((user, userIndex) => {
+                const dayShifts = shifts.filter(
+                  (s) =>
+                    s.user_id === user.id &&
+                    s.date === day.format("YYYY-MM-DD")
                 );
-              })}
-            </div>
-          )}
-
-          {/* MONTH VIEW */}
-          {view === "month" && (
-            <div className="grid grid-cols-7 gap-2">
-              {Array.from({ length: 42 }).map((_, i) => {
-                const start = moment(date).startOf("month").startOf("isoWeek");
-                const d = start.clone().add(i, "days");
-
-                const dayShifts = getDayShifts(d);
 
                 return (
                   <div
-                    key={i}
-                    onClick={() => setSelectedDay(d)}
-                    className="border border-white/10 p-2 min-h-[100px] rounded hover:bg-white/5 cursor-pointer"
+                    key={user.id}
+                    className="relative border-b border-l border-white/10 hover:bg-white/[0.02]"
+                    style={{
+                      width: (END_HOUR - START_HOUR) * HOUR_WIDTH,
+                      height: ROW_HEIGHT,
+                    }}
                   >
-                    <div className="text-xs text-gray-400">
-                      {d.format("DD")}
-                    </div>
 
-                    {dayShifts.slice(0, 3).map((s) => {
-                      const u = users.find((x) => x.id === s.user_id);
+                    {dayShifts.map((s) => {
+                      const left = toX(s.start_time);
+                      const width =
+                        (moment(s.end_time).diff(
+                          moment(s.start_time),
+                          "minutes"
+                        ) /
+                          60) *
+                        HOUR_WIDTH;
 
                       return (
                         <div
                           key={s.id}
-                          className="text-xs bg-indigo-600 mt-1 p-1 rounded"
+                          onMouseDown={(e) =>
+                            setDragState({
+                              shift: s,
+                              startX: e.clientX,
+                              day,
+                              user,
+                            })
+                          }
+                          onDoubleClick={() => setEditing(s)}
+                          className="absolute px-3 py-1 text-xs rounded-xl cursor-move transition hover:scale-[1.02]"
+                          style={{
+                            left,
+                            width,
+                            top: 6,
+                            background:
+                              "linear-gradient(135deg,#6366f1,#4f46e5)",
+                          }}
                         >
-                          {formatName(u?.name)}
+                          <div>{formatName(user.name)}</div>
+                          <div className="text-[10px] opacity-80">
+                            {moment(s.start_time).format("HH:mm")} -{" "}
+                            {moment(s.end_time).format("HH:mm")}
+                          </div>
+
+                          {/* RESIZE */}
+                          <div
+                            onMouseDown={(e) => {
+                              e.stopPropagation();
+                              setResizeState({ shift: s });
+                            }}
+                            className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize"
+                          />
                         </div>
                       );
                     })}
-
-                    {dayShifts.length > 3 && (
-                      <div className="text-xs text-gray-400 mt-1">
-                        +{dayShifts.length - 3}
-                      </div>
-                    )}
                   </div>
                 );
               })}
             </div>
-          )}
+          ))}
         </div>
       </div>
 
-      {/* ADD SHIFT MODAL */}
+      {/* ADD */}
       {showAdd && (
         <AddShiftModal
           users={users}
@@ -239,70 +237,48 @@ export default function Schedule() {
         />
       )}
 
-      {/* DAY DETAIL MODAL */}
-      {selectedDay && (
-        <div
-          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50"
-          onClick={() => setSelectedDay(null)}
-        >
-          <div
-            className="bg-[#020617] p-6 w-[420px] rounded-xl space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex justify-between">
-              <div className="text-lg font-semibold">
-                {selectedDay.format("dddd DD MMM")}
-              </div>
-              <button onClick={() => setSelectedDay(null)}>✕</button>
-            </div>
+      {/* EDIT */}
+      {editing && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center">
+          <div className="bg-[#020617] p-6 space-y-3 rounded">
 
-            <div className="space-y-3 max-h-[400px] overflow-y-auto">
+            <div>Edit Shift</div>
 
-              {/* SHIFTS */}
-              <div>
-                <div className="text-xs text-gray-400 mb-1">Scheduled</div>
+            <input
+              type="time"
+              defaultValue={moment(editing.start_time).format("HH:mm")}
+              onChange={(e) =>
+                (editing.start_time = `${editing.date}T${e.target.value}:00`)
+              }
+            />
 
-                {getDayShifts(selectedDay).map((s) => {
-                  const u = users.find((x) => x.id === s.user_id);
+            <input
+              type="time"
+              defaultValue={moment(editing.end_time).format("HH:mm")}
+              onChange={(e) =>
+                (editing.end_time = `${editing.date}T${e.target.value}:00`)
+              }
+            />
 
-                  return (
-                    <div
-                      key={s.id}
-                      className="flex justify-between p-2 rounded bg-indigo-600/20 border border-indigo-500/20"
-                    >
-                      <div>{formatName(u?.name)}</div>
-                      <div>
-                        {moment(s.start_time).format("HH:mm")} -{" "}
-                        {moment(s.end_time).format("HH:mm")}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+            <button
+              onClick={() => {
+                updateShift(editing.id, editing);
+                setEditing(null);
+              }}
+            >
+              Save
+            </button>
 
-              {/* AVAILABLE */}
-              <div>
-                <div className="text-xs text-gray-400 mb-1">Available Staff</div>
+            <button
+              onClick={() => {
+                deleteShift(editing.id);
+                setEditing(null);
+              }}
+            >
+              Delete
+            </button>
 
-                {users
-                  .filter((u) => isAvailable(u.id, selectedDay))
-                  .map((u) => (
-                    <div
-                      key={u.id}
-                      className="p-2 rounded bg-green-500/10 border border-green-500/20 text-sm"
-                    >
-                      {formatName(u.name)}
-                    </div>
-                  ))}
-              </div>
-
-              {/* HOLIDAY */}
-              {isHoliday(selectedDay) && (
-                <div className="p-2 rounded bg-red-500/20 border border-red-500/30 text-red-300 text-sm">
-                  Holiday — no shifts expected
-                </div>
-              )}
-            </div>
+            <button onClick={() => setEditing(null)}>Cancel</button>
           </div>
         </div>
       )}
