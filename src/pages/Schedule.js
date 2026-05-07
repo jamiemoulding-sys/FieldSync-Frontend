@@ -206,6 +206,20 @@ export default function Schedule() {
 
                 const ds = d.format("YYYY-MM-DD");
 
+
+                function bulkAddAllUsers(day) {
+  const dateStr = day.format("YYYY-MM-DD");
+
+  users.forEach((u) => {
+    createShift({
+      user_id: u.id,
+      date: dateStr,
+      start_time: `${dateStr}T09:00:00`,
+      end_time: `${dateStr}T17:00:00`,
+    });
+  });
+}
+
                 return (
                   <div key={i} className="border p-2 min-h-[100px]">
                     <div className="text-xs text-gray-400">{d.format("DD")}</div>
