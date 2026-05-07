@@ -11,18 +11,15 @@ export default function Schedule() {
   const [view, setView] = useState("week");
   const [date, setDate] = useState(new Date());
 
-  const [showBulk, setShowBulk] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [dayModal, setDayModal] = useState(null);
 
-  const [bulk, setBulk] = useState({
-    users: [],
-    startDate: "",
-    endDate: "",
-    days: [1, 2, 3, 4, 5], // weekdays default
-    start: "09:00",
-    end: "17:00",
-  });
+  /* ================= HOLIDAYS ================= */
 
-  const holidays = [];
+  const holidays = [
+    "2026-05-08",
+    "2026-05-12",
+  ];
 
   /* ================= LOAD ================= */
 
@@ -40,7 +37,31 @@ export default function Schedule() {
   }
 
   async function createShift(data) {
+    if (holidays.includes(data.date)) {
+      alert("Cannot create shift on a holiday");
+      return;
+    }
+
+    // 🔴 collision detection
+    const overlap = shifts.some(
+      (s) =>
+        s.user_id === data.user_id &&
+        s.date === data.date &&
+        new Date(data.start_time) < new Date(s.end_time) &&
+        new Date(data.end_time) > new Date(s.start_time)
+    );
+
+    if (overlap) {
+      alert("User already has a shift during this time");
+      return;
+    }
+
     await scheduleAPI.create(data);
+    load();
+  }
+
+  async function updateShift(id, data) {
+    await scheduleAPI.update(id, data);
     load();
   }
 
@@ -59,6 +80,14 @@ export default function Schedule() {
     setDate(moment(date).add(1, view === "month" ? "month" : "week").toDate());
   }
 
+  /* ================= HELPERS ================= */
+
+  function formatName(name) {
+    if (!name) return "";
+    const [first, last] = name.split(" ");
+    return last ? `${first} ${last[0]}` : first;
+  }
+
   /* ================= DAYS ================= */
 
   const days = useMemo(() => {
@@ -68,43 +97,28 @@ export default function Schedule() {
     );
   }, [date]);
 
-  function formatName(name) {
-    if (!name) return "";
-    const [first, last] = name.split(" ");
-    return last ? `${first} ${last[0]}` : first;
+  /* ================= BULK ================= */
+
+  function bulkAddAllUsers(day) {
+    const dateStr = day.format("YYYY-MM-DD");
+
+    if (holidays.includes(dateStr)) {
+      alert("Holiday — skipping");
+      return;
+    }
+
+    users.forEach((u) => {
+      createShift({
+        user_id: u.id,
+        date: dateStr,
+        start_time: `${dateStr}T09:00:00`,
+        end_time: `${dateStr}T17:00:00`,
+      });
+    });
   }
 
-  /* ================= BULK CREATE ================= */
-
-  function runBulk() {
-    if (!bulk.startDate || !bulk.endDate) {
-      alert("Select date range");
-      return;
-    }
-
-    if (bulk.users.length === 0) {
-      alert("Select users");
-      return;
-    }
-
-    let current = moment(bulk.startDate);
-    const end = moment(bulk.endDate);
-
-    while (current.isSameOrBefore(end)) {
-      if (bulk.days.includes(current.isoWeekday())) {
-        bulk.users.forEach((userId) => {
-          createShift({
-            user_id: userId,
-            date: current.format("YYYY-MM-DD"),
-            start_time: `${current.format("YYYY-MM-DD")}T${bulk.start}:00`,
-            end_time: `${current.format("YYYY-MM-DD")}T${bulk.end}:00`,
-          });
-        });
-      }
-      current.add(1, "day");
-    }
-
-    setShowBulk(false);
+  function bulkAddWeek() {
+    days.forEach((d) => bulkAddAllUsers(d));
   }
 
   /* ================= UI ================= */
@@ -117,7 +131,7 @@ export default function Schedule() {
         {/* HEADER */}
         <div className="flex justify-between items-center px-6 py-4 bg-[#111827] border-b border-white/10">
 
-          <div>
+          <div className="text-lg font-semibold">
             {view === "week" && (
               <>
                 {moment(date).startOf("isoWeek").format("DD MMM")} -{" "}
@@ -128,15 +142,15 @@ export default function Schedule() {
           </div>
 
           <div className="flex gap-2">
-            <button onClick={() => setView("week")} className="btn-secondary">Week</button>
-            <button onClick={() => setView("month")} className="btn-secondary">Month</button>
+            <button onClick={() => setView("week")}>Week</button>
+            <button onClick={() => setView("month")}>Month</button>
 
             <button onClick={prev}>←</button>
             <button onClick={() => setDate(new Date())}>Today</button>
             <button onClick={next}>→</button>
 
-            <button onClick={() => setShowBulk(true)} className="btn-primary">
-              Bulk Add
+            <button onClick={bulkAddWeek} className="bg-indigo-600 px-3 py-1 rounded">
+              + Bulk Week
             </button>
           </div>
         </div>
@@ -144,15 +158,25 @@ export default function Schedule() {
         {/* CONTENT */}
         <div className="flex-1 overflow-auto p-6">
 
-          {/* WEEK */}
+          {/* ================= WEEK ================= */}
           {view === "week" && (
             <div className="border border-white/10 rounded overflow-hidden">
 
               <div className="grid grid-cols-8 bg-[#020617] border-b border-white/10">
                 <div className="p-2 text-xs text-gray-400">Employee</div>
+
                 {days.map((d, i) => (
                   <div key={i} className="p-2 text-xs text-center text-gray-400">
+
                     {d.format("ddd DD")}
+
+                    <button
+                      onClick={() => bulkAddAllUsers(d)}
+                      className="block text-[10px] bg-indigo-600 mt-1 px-2 rounded"
+                    >
+                      + All
+                    </button>
+
                   </div>
                 ))}
               </div>
@@ -164,23 +188,35 @@ export default function Schedule() {
 
                   {days.map((day, i) => {
                     const ds = day.format("YYYY-MM-DD");
+                    const isHoliday = holidays.includes(ds);
 
                     const dayShifts = shifts.filter(
                       s => s.date === ds && s.user_id === user.id
                     );
 
                     return (
-                      <div key={i} className="p-1 min-h-[60px] space-y-1">
+                      <div
+                        key={i}
+                        onClick={() => setDayModal(ds)}
+                        className={`p-1 min-h-[70px] space-y-1 cursor-pointer ${
+                          isHoliday ? "bg-red-500/10 border border-red-500/30" : ""
+                        }`}
+                      >
+
+                        {isHoliday && (
+                          <div className="text-[10px] text-red-400">
+                            Holiday
+                          </div>
+                        )}
 
                         {dayShifts.map(s => (
                           <div
                             key={s.id}
-                            className="bg-indigo-600 text-xs px-2 py-1 rounded cursor-pointer"
-                            onDoubleClick={() => {
-                              if (window.confirm("Delete shift?")) {
-                                deleteShift(s.id);
-                              }
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditing(s);
                             }}
+                            className="bg-indigo-600 text-xs px-2 py-1 rounded"
                           >
                             {formatName(user.name)}<br/>
                             {moment(s.start_time).format("HH:mm")} - {moment(s.end_time).format("HH:mm")}
@@ -197,7 +233,7 @@ export default function Schedule() {
             </div>
           )}
 
-          {/* MONTH */}
+          {/* ================= MONTH ================= */}
           {view === "month" && (
             <div className="grid grid-cols-7 gap-2">
               {Array.from({ length: 42 }).map((_, i) => {
@@ -206,31 +242,22 @@ export default function Schedule() {
 
                 const ds = d.format("YYYY-MM-DD");
 
-
-                function bulkAddAllUsers(day) {
-  const dateStr = day.format("YYYY-MM-DD");
-
-  users.forEach((u) => {
-    createShift({
-      user_id: u.id,
-      date: dateStr,
-      start_time: `${dateStr}T09:00:00`,
-      end_time: `${dateStr}T17:00:00`,
-    });
-  });
-}
-
                 return (
-                  <div key={i} className="border p-2 min-h-[100px]">
+                  <div
+                    key={i}
+                    onClick={() => setDayModal(ds)}
+                    className="border p-2 min-h-[100px] cursor-pointer"
+                  >
                     <div className="text-xs text-gray-400">{d.format("DD")}</div>
 
                     {shifts
                       .filter(s => s.date === ds)
-                      .slice(0, 3)
+                      .slice(0, 4)
                       .map(s => {
                         const user = users.find(u => u.id === s.user_id);
+
                         return (
-                          <div key={s.id} className="text-xs bg-indigo-600 mt-1 p-1 rounded">
+                          <div key={s.id} className="text-[10px] bg-indigo-600 mt-1 p-1 rounded">
                             {formatName(user?.name)} {moment(s.start_time).format("HH:mm")}
                           </div>
                         );
@@ -244,51 +271,82 @@ export default function Schedule() {
         </div>
       </div>
 
-      {/* BULK MODAL */}
-      {showBulk && (
+      {/* ================= EDIT MODAL ================= */}
+      {editing && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center">
+          <div className="bg-[#020617] p-6 space-y-3 rounded">
 
-          <div className="bg-[#020617] p-6 w-[350px] space-y-3 rounded">
+            <div>Edit Shift</div>
 
-            <div className="flex justify-between">
-              <div>Bulk Add</div>
-              <button onClick={() => setShowBulk(false)}>✕</button>
-            </div>
+            <input
+              type="time"
+              defaultValue={moment(editing.start_time).format("HH:mm")}
+              onChange={(e) =>
+                setEditing({
+                  ...editing,
+                  start_time: `${editing.date}T${e.target.value}:00`,
+                })
+              }
+            />
 
-            {/* USERS */}
-            <div className="max-h-[120px] overflow-auto border p-2">
-              {users.map(u => (
-                <label key={u.id} className="flex gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={bulk.users.includes(u.id)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setBulk({ ...bulk, users: [...bulk.users, u.id] });
-                      } else {
-                        setBulk({
-                          ...bulk,
-                          users: bulk.users.filter(id => id !== u.id),
-                        });
-                      }
-                    }}
-                  />
-                  {u.name}
-                </label>
-              ))}
-            </div>
+            <input
+              type="time"
+              defaultValue={moment(editing.end_time).format("HH:mm")}
+              onChange={(e) =>
+                setEditing({
+                  ...editing,
+                  end_time: `${editing.date}T${e.target.value}:00`,
+                })
+              }
+            />
 
-            {/* DATES */}
-            <input type="date" onChange={e => setBulk({ ...bulk, startDate: e.target.value })}/>
-            <input type="date" onChange={e => setBulk({ ...bulk, endDate: e.target.value })}/>
-
-            {/* TIMES */}
-            <input type="time" onChange={e => setBulk({ ...bulk, start: e.target.value })}/>
-            <input type="time" onChange={e => setBulk({ ...bulk, end: e.target.value })}/>
-
-            <button onClick={runBulk} className="bg-indigo-600 w-full p-2">
-              Create Shifts
+            <button
+              onClick={() => {
+                updateShift(editing.id, editing);
+                setEditing(null);
+              }}
+            >
+              Save
             </button>
+
+            <button
+              onClick={() => {
+                deleteShift(editing.id);
+                setEditing(null);
+              }}
+            >
+              Delete
+            </button>
+
+            <button onClick={() => setEditing(null)}>Cancel</button>
+
+          </div>
+        </div>
+      )}
+
+      {/* ================= DAY MODAL ================= */}
+      {dayModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center">
+          <div className="bg-[#020617] p-6 w-[400px] space-y-2 rounded">
+
+            <div className="text-lg">
+              {moment(dayModal).format("DD MMM YYYY")}
+            </div>
+
+            {shifts
+              .filter(s => s.date === dayModal)
+              .map(s => {
+                const user = users.find(u => u.id === s.user_id);
+
+                return (
+                  <div key={s.id} className="border p-2 rounded">
+                    {user?.name}<br/>
+                    {moment(s.start_time).format("HH:mm")} - {moment(s.end_time).format("HH:mm")}
+                  </div>
+                );
+              })}
+
+            <button onClick={() => setDayModal(null)}>Close</button>
 
           </div>
         </div>
