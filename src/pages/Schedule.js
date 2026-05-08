@@ -98,27 +98,42 @@ export default function Schedule() {
 
   /* ================= BULK ================= */
 
-  function bulkAddAllUsers(day) {
+  async function bulkAddWeek() {
+  const newShifts = [];
+
+  for (const day of days) {
     const dateStr = day.format("YYYY-MM-DD");
 
-    if (holidays.includes(dateStr)) {
-      alert("Holiday — skipping");
-      return;
-    }
+    if (holidays.includes(dateStr)) continue;
 
-    users.forEach((u) => {
-      createShift({
+    for (const u of users) {
+      // 🔒 prevent duplicates manually
+      const exists = shifts.some(
+        (s) =>
+          s.user_id === u.id &&
+          s.date === dateStr &&
+          moment(s.start_time).format("HH:mm") === "09:00" &&
+          moment(s.end_time).format("HH:mm") === "17:00"
+      );
+
+      if (exists) continue;
+
+      newShifts.push({
         user_id: u.id,
         date: dateStr,
         start_time: `${dateStr}T09:00:00`,
         end_time: `${dateStr}T17:00:00`,
       });
-    });
+    }
   }
 
-  function bulkAddWeek() {
-    days.forEach((d) => bulkAddAllUsers(d));
+  // 🚀 create all shifts WITHOUT collision check
+  for (const shift of newShifts) {
+    await scheduleAPI.create(shift);
   }
+
+  load(); // refresh once
+}
 
   /* ================= UI ================= */
 
