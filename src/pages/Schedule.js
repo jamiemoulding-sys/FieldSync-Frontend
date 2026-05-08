@@ -36,13 +36,12 @@ export default function Schedule() {
     setShifts(s || []);
   }
 
-  async function createShift(data) {
-    if (holidays.includes(data.date)) {
-      alert("Cannot create shift on a holiday");
-      return;
-    }
+  async function createShift(data, skipCheck = false) {
+  if (holidays.includes(data.date)) {
+    return; // silently skip holidays for bulk
+  }
 
-    // 🔴 collision detection
+  if (!skipCheck) {
     const overlap = shifts.some(
       (s) =>
         s.user_id === data.user_id &&
@@ -55,10 +54,10 @@ export default function Schedule() {
       alert("User already has a shift during this time");
       return;
     }
-
-    await scheduleAPI.create(data);
-    load();
   }
+
+  await scheduleAPI.create(data);
+}
 
   async function updateShift(id, data) {
     await scheduleAPI.update(id, data);
@@ -248,13 +247,43 @@ export default function Schedule() {
                     onClick={() => setDayModal(ds)}
                     className="border p-2 min-h-[100px] cursor-pointer"
                   >
-                    <div className="text-xs text-gray-400">{d.format("DD")}</div>
+                    const isHoliday = holidays.includes(ds);
+
+<div className={`text-xs ${isHoliday ? "text-red-400" : "text-gray-400"}`}>
+  {d.format("DD")}
+</div>
+
+{isHoliday && (
+  <div className="text-[10px] text-red-400">Holiday</div>
+)}
+
+
 
                     {shifts
                       .filter(s => s.date === ds)
                       .slice(0, 4)
                       .map(s => {
                         const user = users.find(u => u.id === s.user_id);
+
+                      <div className="bg-indigo-600 text-xs px-2 py-1 rounded relative">
+
+  <div>{formatName(user.name)}</div>
+
+  <div className="bg-indigo-600 hover:bg-indigo-500 transition px-3 py-1 rounded shadow">
+    {moment(s.start_time).format("HH:mm")} - {moment(s.end_time).format("HH:mm")}
+  </div>
+
+  <button
+    onClick={(e) => {
+      e.stopPropagation();
+      setEditing(s);
+    }}
+    className="absolute top-1 right-1 text-[10px] bg-black/30 px-1 rounded"
+  >
+    ✎
+  </button>
+
+</div>
 
                         return (
                           <div key={s.id} className="text-[10px] bg-indigo-600 mt-1 p-1 rounded">
