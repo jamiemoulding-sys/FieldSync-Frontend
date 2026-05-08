@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { reportAPI, userAPI } from "../services/api";
 import jsPDF from "jspdf";
+import moment from "moment";
 
 /* ================= HELPERS ================= */
 
