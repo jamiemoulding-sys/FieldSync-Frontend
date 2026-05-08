@@ -36,35 +36,77 @@ function calculate(user, shifts) {
 function generatePayslip(emp, company, fromDate, toDate, returnBlob = false) {
   const doc = new jsPDF();
 
+  let y = 20;
+
+  /* ===== HEADER ===== */
   doc.setFontSize(18);
-  doc.text(company?.name || "Company", 20, 20);
-  doc.text("PAYSLIP", 150, 20);
+  doc.text(company?.name || "Company Name", 20, y);
 
   doc.setFontSize(10);
-  doc.text(company?.address || "", 20, 28);
+  doc.text(company?.address || "", 20, y + 6);
 
-  doc.text(`Employee: ${emp.name}`, 20, 45);
-  doc.text(`Period: ${fromDate} → ${toDate}`, 20, 52);
+  doc.setFontSize(16);
+  doc.text("PAYSLIP", 150, y);
 
-  let y = 70;
+  y += 20;
 
+  /* ===== EMPLOYEE + PAY INFO BOXES ===== */
+  doc.rect(20, y, 80, 30);
+  doc.rect(110, y, 80, 30);
+
+  doc.setFontSize(10);
+  doc.text("Employee", 22, y + 6);
+  doc.text(emp.name, 22, y + 14);
+
+  doc.text("Company", 22, y + 22);
+  doc.text(company?.name || "", 22, y + 28);
+
+  doc.text("Pay Date", 112, y + 6);
+  doc.text(moment().format("DD/MM/YYYY"), 112, y + 14);
+
+  doc.text("Period", 112, y + 22);
+  doc.text(`${fromDate} → ${toDate}`, 112, y + 28);
+
+  y += 45;
+
+  /* ===== EARNINGS TABLE ===== */
   doc.setFontSize(12);
   doc.text("EARNINGS", 20, y);
 
-  y += 10;
-  doc.setFontSize(10);
-  doc.text("Gross", 20, y);
-  doc.text(money(emp.gross), 150, y);
+  y += 6;
 
-  y += 15;
-  doc.text("DEDUCTIONS", 20, y);
+  doc.setFontSize(10);
+  doc.text("Description", 20, y);
+  doc.text("Amount", 150, y);
+
+  y += 2;
+  doc.line(20, y, 190, y);
 
   y += 8;
+
+  doc.text("Standard Pay", 20, y);
+  doc.text(money(emp.gross), 150, y);
+
+  y += 10;
+
+  doc.setFontSize(11);
+  doc.text("TOTAL EARNINGS", 20, y);
+  doc.text(money(emp.gross), 150, y);
+
+  y += 20;
+
+  /* ===== DEDUCTIONS TABLE ===== */
+  doc.setFontSize(12);
+  doc.text("DEDUCTIONS", 20, y);
+
+  y += 6;
+
+  doc.setFontSize(10);
   doc.text("Tax", 20, y);
   doc.text(`-${money(emp.tax)}`, 150, y);
 
   y += 6;
-  doc.text("NI", 20, y);
+  doc.text("National Insurance", 20, y);
   doc.text(`-${money(emp.ni)}`, 150, y);
 
   y += 6;
@@ -72,13 +114,27 @@ function generatePayslip(emp, company, fromDate, toDate, returnBlob = false) {
   doc.text(`-${money(emp.pension)}`, 150, y);
 
   y += 12;
-  doc.setFontSize(12);
-  doc.text("NET PAY", 20, y);
-  doc.text(money(emp.net), 150, y);
 
-  if (returnBlob) {
-    return doc.output("blob");
-  }
+  doc.setFontSize(11);
+  doc.text("TOTAL DEDUCTIONS", 20, y);
+  doc.text(
+    `-${money(emp.tax + emp.ni + emp.pension)}`,
+    150,
+    y
+  );
+
+  y += 20;
+
+  /* ===== NET PAY BOX ===== */
+  doc.setFillColor(230, 230, 230);
+  doc.rect(20, y, 170, 15, "F");
+
+  doc.setFontSize(14);
+  doc.text("NET PAY", 25, y + 10);
+  doc.text(money(emp.net), 140, y + 10);
+
+  /* ===== SAVE / RETURN ===== */
+  if (returnBlob) return doc.output("blob");
 
   doc.save(`payslip_${emp.name}.pdf`);
 }
