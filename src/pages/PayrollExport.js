@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { reportAPI, userAPI, companyAPI } from "../services/api";
+import { reportAPI, userAPI } from "../services/api";
 import jsPDF from "jspdf";
 
 /* ================= HELPERS ================= */
@@ -88,7 +88,6 @@ function generatePayslip(emp, company, fromDate, toDate, returnBlob = false) {
 export default function PayrollExport() {
   const [rows, setRows] = useState([]);
   const [users, setUsers] = useState([]);
-  const [companies, setCompanies] = useState([]);
   const [stored, setStored] = useState([]);
 
   const [fromDate, setFromDate] = useState(
@@ -107,7 +106,6 @@ export default function PayrollExport() {
     const [timesheets, staff, comps, storedDocs] = await Promise.all([
       reportAPI.getTimesheets(),
       userAPI.getAll(),
-      companyAPI.getAll(),
       reportAPI.getPayslips?.() || [],
     ]);
 
@@ -129,7 +127,10 @@ export default function PayrollExport() {
       const userRows = filtered.filter((r) => r.user_id === u.id);
       const calc = calculate(u, userRows);
 
-      const company = companies.find((c) => c.id === u.company_id);
+      const company = u.company || {
+  name: u.company_name,
+  address: u.company_address,
+};
 
       return { ...u, ...calc, company };
     });
