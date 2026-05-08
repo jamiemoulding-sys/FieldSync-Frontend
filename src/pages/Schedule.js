@@ -185,7 +185,7 @@ export default function Schedule() {
                     {d.format("ddd DD")}
 
                     <button
-                      onClick={() => bulkAddAllUsers(d)}
+                      onClick={bulkAddWeek}
                       className="block text-[10px] bg-indigo-600 mt-1 px-2 rounded"
                     >
                       + All
