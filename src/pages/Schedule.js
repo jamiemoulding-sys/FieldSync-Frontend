@@ -236,64 +236,63 @@ export default function Schedule() {
           {view === "month" && (
             <div className="grid grid-cols-7 gap-2">
               {Array.from({ length: 42 }).map((_, i) => {
-                const start = moment(date).startOf("month").startOf("isoWeek");
-                const d = start.clone().add(i, "days");
+  const start = moment(date).startOf("month").startOf("isoWeek");
+  const d = start.clone().add(i, "days");
 
-                const ds = d.format("YYYY-MM-DD");
+  const ds = d.format("YYYY-MM-DD");
+  const isHoliday = holidays.includes(ds); // ✅ MUST be here
 
-                return (
-                  <div
-                    key={i}
-                    onClick={() => setDayModal(ds)}
-                    className="border p-2 min-h-[100px] cursor-pointer"
-                  >
-                    const isHoliday = holidays.includes(ds);
+  return (
+    <div
+      key={i}
+      onClick={() => setDayModal(ds)}
+      className="border p-2 min-h-[100px] cursor-pointer"
+    >
+      {/* DAY NUMBER */}
+      <div className={`text-xs ${isHoliday ? "text-red-400" : "text-gray-400"}`}>
+        {d.format("DD")}
+      </div>
 
-<div className={`text-xs ${isHoliday ? "text-red-400" : "text-gray-400"}`}>
-  {d.format("DD")}
-</div>
+      {/* HOLIDAY LABEL */}
+      {isHoliday && (
+        <div className="text-[10px] text-red-400">Holiday</div>
+      )}
 
-{isHoliday && (
-  <div className="text-[10px] text-red-400">Holiday</div>
-)}
+      {/* SHIFTS */}
+      {shifts
+        .filter((s) => s.date === ds)
+        .slice(0, 4)
+        .map((s) => {
+          const user = users.find((u) => u.id === s.user_id);
 
+          return (
+            <div
+              key={s.id}
+              className="bg-indigo-600 text-xs px-2 py-1 rounded relative mt-1 hover:bg-indigo-500 transition"
+            >
+              <div>{formatName(user?.name)}</div>
 
+              <div className="text-[10px]">
+                {moment(s.start_time).format("HH:mm")} -{" "}
+                {moment(s.end_time).format("HH:mm")}
+              </div>
 
-                    {shifts
-                      .filter(s => s.date === ds)
-                      .slice(0, 4)
-                      .map(s => {
-                        const user = users.find(u => u.id === s.user_id);
-
-                      <div className="bg-indigo-600 text-xs px-2 py-1 rounded relative">
-
-  <div>{formatName(user.name)}</div>
-
-  <div className="bg-indigo-600 hover:bg-indigo-500 transition px-3 py-1 rounded shadow">
-    {moment(s.start_time).format("HH:mm")} - {moment(s.end_time).format("HH:mm")}
-  </div>
-
-  <button
-    onClick={(e) => {
-      e.stopPropagation();
-      setEditing(s);
-    }}
-    className="absolute top-1 right-1 text-[10px] bg-black/30 px-1 rounded"
-  >
-    ✎
-  </button>
-
-</div>
-
-                        return (
-                          <div key={s.id} className="text-[10px] bg-indigo-600 mt-1 p-1 rounded">
-                            {formatName(user?.name)} {moment(s.start_time).format("HH:mm")}
-                          </div>
-                        );
-                      })}
-                  </div>
-                );
-              })}
+              {/* EDIT BUTTON */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditing(s);
+                }}
+                className="absolute top-1 right-1 text-[10px] bg-black/30 px-1 rounded"
+              >
+                ✎
+              </button>
+            </div>
+          );
+        })}
+    </div>
+  );
+})}
             </div>
           )}
 
