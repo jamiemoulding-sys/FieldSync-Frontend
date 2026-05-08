@@ -111,7 +111,6 @@ export default function PayrollExport() {
 
     setRows(timesheets || []);
     setUsers(staff || []);
-    setCompanies(comps || []);
     setStored(storedDocs || []);
   }
 
@@ -123,18 +122,25 @@ export default function PayrollExport() {
   }, [rows, fromDate, toDate]);
 
   const payroll = useMemo(() => {
-    return users.map((u) => {
-      const userRows = filtered.filter((r) => r.user_id === u.id);
-      const calc = calculate(u, userRows);
+  return users.map((u) => {
+    const userRows = filtered.filter(
+      (r) => r.user_id === u.id
+    );
 
-      const company = u.company || {
-  name: u.company_name,
-  address: u.company_address,
-};
+    const calc = calculate(u, userRows);
 
-      return { ...u, ...calc, company };
-    });
-  }, [users, filtered, companies]);
+    const company = u.company || {
+      name: u.company_name || "Company",
+      address: u.company_address || "",
+    };
+
+    return {
+      ...u,
+      ...calc,
+      company,
+    };
+  });
+}, [users, filtered]);
 
   /* ================= ACTIONS ================= */
 
