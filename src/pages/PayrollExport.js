@@ -1,15 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { reportAPI, userAPI } from "../services/api";
+import { reportAPI, userAPI, companyAPI } from "../services/api";
 import jsPDF from "jspdf";
 
 /* ================= HELPERS ================= */
 
 function hours(start, end, breakSec = 0) {
   if (!start || !end) return 0;
-  return (
-    (new Date(end) - new Date(start)) / 3600000 -
-    breakSec / 3600
-  );
+  return (new Date(end) - new Date(start)) / 3600000 - breakSec / 3600;
 }
 
 function money(v) {
@@ -22,11 +19,7 @@ function calculate(user, shifts) {
   let gross = 0;
 
   shifts.forEach((s) => {
-    const h = hours(
-      s.clock_in_time,
-      s.clock_out_time,
-      s.total_break_seconds
-    );
+    const h = hours(s.clock_in_time, s.clock_out_time, s.total_break_seconds);
     gross += h * Number(user.hourly_rate || 0);
   });
 
@@ -40,71 +33,52 @@ function calculate(user, shifts) {
 
 /* ================= PDF ================= */
 
-function generatePayslip(emp, company) {
+function generatePayslip(emp, company, fromDate, toDate, returnBlob = false) {
   const doc = new jsPDF();
 
-  const color = company?.primary_color || [30, 64, 175];
+  doc.setFontSize(18);
+  doc.text(company?.name || "Company", 20, 20);
+  doc.text("PAYSLIP", 150, 20);
 
-  // HEADER BAR
-  doc.setFillColor(...color);
-  doc.rect(0, 0, 210, 30, "F");
+  doc.setFontSize(10);
+  doc.text(company?.address || "", 20, 28);
 
-  // COMPANY NAME
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(16);
-  doc.text(company?.name || "Company", 20, 18);
+  doc.text(`Employee: ${emp.name}`, 20, 45);
+  doc.text(`Period: ${fromDate} → ${toDate}`, 20, 52);
 
-  // LOGO
-  if (company?.logo) {
-    const img = new Image();
-    img.src = company.logo;
-    doc.addImage(img, "PNG", 150, 5, 40, 20);
-  }
+  let y = 70;
 
-  doc.setTextColor(0, 0, 0);
-
-  // EMPLOYEE INFO
   doc.setFontSize(12);
-  doc.text(`Employee: ${emp.name}`, 20, 50);
-  doc.text(`Company: ${company?.name}`, 20, 60);
+  doc.text("EARNINGS", 20, y);
 
-  // EARNINGS
-  doc.setFontSize(13);
-  doc.text("Earnings", 20, 80);
+  y += 10;
+  doc.setFontSize(10);
+  doc.text("Gross", 20, y);
+  doc.text(money(emp.gross), 150, y);
 
-  doc.setFontSize(11);
-  doc.text("Gross", 20, 90);
-  doc.text(money(emp.gross), 150, 90);
+  y += 15;
+  doc.text("DEDUCTIONS", 20, y);
 
-  // DEDUCTIONS
-  doc.setFontSize(13);
-  doc.text("Deductions", 20, 110);
+  y += 8;
+  doc.text("Tax", 20, y);
+  doc.text(`-${money(emp.tax)}`, 150, y);
 
-  doc.setFontSize(11);
-  doc.text("Tax", 20, 120);
-  doc.text(`-${money(emp.tax)}`, 150, 120);
+  y += 6;
+  doc.text("NI", 20, y);
+  doc.text(`-${money(emp.ni)}`, 150, y);
 
-  doc.text("NI", 20, 130);
-  doc.text(`-${money(emp.ni)}`, 150, 130);
+  y += 6;
+  doc.text("Pension", 20, y);
+  doc.text(`-${money(emp.pension)}`, 150, y);
 
-  doc.text("Pension", 20, 140);
-  doc.text(`-${money(emp.pension)}`, 150, 140);
+  y += 12;
+  doc.setFontSize(12);
+  doc.text("NET PAY", 20, y);
+  doc.text(money(emp.net), 150, y);
 
-  // NET BOX
-  doc.setFillColor(220, 252, 231);
-  doc.rect(20, 155, 170, 20, "F");
-
-  doc.setFontSize(14);
-  doc.text("Net Pay", 25, 168);
-  doc.text(money(emp.net), 140, 168);
-
-  // FOOTER
-  doc.setFontSize(8);
-  doc.text(
-    company?.address || "",
-    20,
-    190
-  );
+  if (returnBlob) {
+    return doc.output("blob");
+  }
 
   doc.save(`payslip_${emp.name}.pdf`);
 }
@@ -115,11 +89,10 @@ export default function PayrollExport() {
   const [rows, setRows] = useState([]);
   const [users, setUsers] = useState([]);
   const [companies, setCompanies] = useState([]);
+  const [stored, setStored] = useState([]);
 
   const [fromDate, setFromDate] = useState(
-    new Date(Date.now() - 7 * 86400000)
-      .toISOString()
-      .split("T")[0]
+    new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0]
   );
 
   const [toDate, setToDate] = useState(
@@ -131,14 +104,17 @@ export default function PayrollExport() {
   }, []);
 
   async function load() {
-    const [timesheets, staff, comps] = await Promise.all([
+    const [timesheets, staff, comps, storedDocs] = await Promise.all([
       reportAPI.getTimesheets(),
       userAPI.getAll(),
+      companyAPI.getAll(),
+      reportAPI.getPayslips?.() || [],
     ]);
 
     setRows(timesheets || []);
     setUsers(staff || []);
     setCompanies(comps || []);
+    setStored(storedDocs || []);
   }
 
   const filtered = useMemo(() => {
@@ -150,50 +126,65 @@ export default function PayrollExport() {
 
   const payroll = useMemo(() => {
     return users.map((u) => {
-      const userRows = filtered.filter(
-        (r) => r.user_id === u.id
-      );
-
+      const userRows = filtered.filter((r) => r.user_id === u.id);
       const calc = calculate(u, userRows);
 
-      const company = companies.find(
-        (c) => c.id === u.company_id
-      );
+      const company = companies.find((c) => c.id === u.company_id);
 
-      return {
-        ...u,
-        ...calc,
-        company,
-      };
+      return { ...u, ...calc, company };
     });
   }, [users, filtered, companies]);
+
+  /* ================= ACTIONS ================= */
+
+  async function handleDownload(emp) {
+    generatePayslip(emp, emp.company, fromDate, toDate);
+  }
+
+  async function handleSave(emp) {
+    const blob = generatePayslip(emp, emp.company, fromDate, toDate, true);
+
+    const formData = new FormData();
+    formData.append("file", blob, `payslip_${emp.name}.pdf`);
+    formData.append("user_id", emp.id);
+
+    await reportAPI.savePayslip(formData);
+
+    alert("Payslip saved");
+    load();
+  }
+
+  async function handleSend(emp) {
+    await reportAPI.sendPayslip({
+      user_id: emp.id,
+      from: fromDate,
+      to: toDate,
+    });
+
+    alert("Payslip sent");
+  }
+
+  async function handleResend(doc) {
+    await reportAPI.resendPayslip(doc.id);
+    alert("Resent");
+  }
+
+  /* ================= UI ================= */
 
   return (
     <div className="p-6 space-y-6">
 
       <h1 className="text-2xl font-bold">
-        Multi-Company Payroll
+        Payroll Dashboard
       </h1>
 
-      {/* FILTERS */}
+      {/* FILTER */}
       <div className="flex gap-4">
-        <input
-          type="date"
-          value={fromDate}
-          onChange={(e) =>
-            setFromDate(e.target.value)
-          }
-        />
-        <input
-          type="date"
-          value={toDate}
-          onChange={(e) =>
-            setToDate(e.target.value)
-          }
-        />
+        <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+        <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
       </div>
 
-      {/* TABLE */}
+      {/* CURRENT PAYROLL */}
       <div className="border rounded-xl overflow-auto">
         <table className="w-full text-sm">
 
@@ -215,14 +206,17 @@ export default function PayrollExport() {
                 <td>{money(r.gross)}</td>
                 <td>{money(r.net)}</td>
 
-                <td>
-                  <button
-                    onClick={() =>
-                      generatePayslip(r, r.company)
-                    }
-                    className="bg-indigo-600 px-3 py-1 rounded"
-                  >
-                    Payslip
+                <td className="flex gap-2">
+                  <button onClick={() => handleDownload(r)} className="bg-indigo-600 px-2 py-1 rounded">
+                    Download
+                  </button>
+
+                  <button onClick={() => handleSave(r)} className="bg-blue-600 px-2 py-1 rounded">
+                    Save
+                  </button>
+
+                  <button onClick={() => handleSend(r)} className="bg-green-600 px-2 py-1 rounded">
+                    Send
                   </button>
                 </td>
               </tr>
@@ -230,6 +224,54 @@ export default function PayrollExport() {
           </tbody>
 
         </table>
+      </div>
+
+      {/* STORED PAYSLIPS */}
+      <div>
+        <h2 className="text-lg font-semibold mb-2">
+          Stored Payslips
+        </h2>
+
+        <div className="border rounded-xl overflow-auto">
+          <table className="w-full text-sm">
+
+            <thead className="bg-white/5">
+              <tr>
+                <th className="p-3 text-left">Employee</th>
+                <th>Date</th>
+                <th></th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {stored.map((doc) => (
+                <tr key={doc.id} className="border-t">
+                  <td className="p-3">{doc.user_name}</td>
+                  <td>{doc.created_at}</td>
+
+                  <td className="flex gap-2">
+                    <a
+                      href={doc.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="bg-indigo-600 px-2 py-1 rounded"
+                    >
+                      View
+                    </a>
+
+                    <button
+                      onClick={() => handleResend(doc)}
+                      className="bg-green-600 px-2 py-1 rounded"
+                    >
+                      Resend
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+
+          </table>
+        </div>
       </div>
 
     </div>
