@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import moment from "moment";
 import { scheduleAPI, userAPI } from "../services/api";
-
-/* ================= MAIN ================= */
+import AddShiftModal from "../components/AddShiftModal";
 
 export default function Schedule() {
   const [users, setUsers] = useState([]);
@@ -13,15 +12,17 @@ export default function Schedule() {
 
   const [editing, setEditing] = useState(null);
   const [dayModal, setDayModal] = useState(null);
+  const [showAdd, setShowAdd] = useState(false);
 
-  /* ================= HOLIDAYS ================= */
+  const [form, setForm] = useState({
+    start: "09:00",
+    end: "17:00",
+  });
 
   const holidays = [
-    "2026-05-08",
-    "2026-05-12",
+    { date: "2026-05-08", name: "Bank Holiday" },
+    { date: "2026-05-12", name: "Maintenance Day" },
   ];
-
-  /* ================= LOAD ================= */
 
   useEffect(() => {
     load();
@@ -36,12 +37,13 @@ export default function Schedule() {
     setShifts(s || []);
   }
 
-  async function createShift(data, skipCheck = false) {
-  if (holidays.includes(data.date)) {
-    return; // silently skip holidays for bulk
+  function isHoliday(dateStr) {
+    return holidays.find((h) => h.date === dateStr);
   }
 
-  if (!skipCheck) {
+  async function createShift(data) {
+    if (isHoliday(data.date)) return;
+
     const overlap = shifts.some(
       (s) =>
         s.user_id === data.user_id &&
@@ -54,10 +56,10 @@ export default function Schedule() {
       alert("User already has a shift during this time");
       return;
     }
-  }
 
-  await scheduleAPI.create(data);
-}
+    await scheduleAPI.create(data);
+    load();
+  }
 
   async function updateShift(id, data) {
     await scheduleAPI.update(id, data);
@@ -69,8 +71,6 @@ export default function Schedule() {
     load();
   }
 
-  /* ================= NAV ================= */
-
   function prev() {
     setDate(moment(date).subtract(1, view === "month" ? "month" : "week").toDate());
   }
@@ -79,15 +79,11 @@ export default function Schedule() {
     setDate(moment(date).add(1, view === "month" ? "month" : "week").toDate());
   }
 
-  /* ================= HELPERS ================= */
-
   function formatName(name) {
     if (!name) return "";
     const [first, last] = name.split(" ");
     return last ? `${first} ${last[0]}` : first;
   }
-
-  /* ================= DAYS ================= */
 
   const days = useMemo(() => {
     const start = moment(date).startOf("isoWeek");
@@ -96,231 +92,230 @@ export default function Schedule() {
     );
   }, [date]);
 
-  /* ================= BULK ================= */
-
-  async function bulkAddWeek() {
-  const newShifts = [];
-
-  for (const day of days) {
+  async function bulkAddDay(day) {
     const dateStr = day.format("YYYY-MM-DD");
 
-    if (holidays.includes(dateStr)) continue;
+    if (isHoliday(dateStr)) return;
+
+    const newShifts = [...shifts];
 
     for (const u of users) {
-      // 🔒 prevent duplicates manually
-      const exists = shifts.some(
-        (s) =>
-          s.user_id === u.id &&
-          s.date === dateStr &&
-          moment(s.start_time).format("HH:mm") === "09:00" &&
-          moment(s.end_time).format("HH:mm") === "17:00"
+      const exists = newShifts.some(
+        (s) => s.user_id === u.id && s.date === dateStr
       );
 
       if (exists) continue;
 
-      newShifts.push({
+      const newShift = {
         user_id: u.id,
         date: dateStr,
         start_time: `${dateStr}T09:00:00`,
         end_time: `${dateStr}T17:00:00`,
-      });
+      };
+
+      await scheduleAPI.create(newShift);
+      newShifts.push(newShift);
+    }
+
+    load();
+  }
+
+  async function bulkAddWeek() {
+    for (const d of days) {
+      await bulkAddDay(d);
     }
   }
 
-  // 🚀 create all shifts WITHOUT collision check
-  for (const shift of newShifts) {
-    await scheduleAPI.create(shift);
-  }
-
-  load(); // refresh once
-}
-
-  /* ================= UI ================= */
-
   return (
-    <div className="h-screen flex bg-[#0B1220] text-white">
+    <div className="h-screen flex flex-col bg-[#0B1220] text-white">
 
-      <div className="flex-1 flex flex-col">
-
-        {/* HEADER */}
-        <div className="flex justify-between items-center px-6 py-4 bg-[#111827] border-b border-white/10">
-
-          <div className="text-lg font-semibold">
-            {view === "week" && (
-              <>
-                {moment(date).startOf("isoWeek").format("DD MMM")} -{" "}
-                {moment(date).endOf("isoWeek").format("DD MMM YYYY")}
-              </>
-            )}
-            {view === "month" && moment(date).format("MMMM YYYY")}
-          </div>
-
-          <div className="flex gap-2">
-            <button onClick={() => setView("week")}>Week</button>
-            <button onClick={() => setView("month")}>Month</button>
-
-            <button onClick={prev}>←</button>
-            <button onClick={() => setDate(new Date())}>Today</button>
-            <button onClick={next}>→</button>
-
-            <button onClick={bulkAddWeek} className="bg-indigo-600 px-3 py-1 rounded">
-              + Bulk Week
-            </button>
-          </div>
+      {/* HEADER */}
+      <div className="flex justify-between items-center px-6 py-4 bg-[#111827] border-b border-white/10">
+        <div className="text-lg font-semibold">
+          {view === "week" &&
+            `${moment(date).startOf("isoWeek").format("DD MMM")} - ${moment(date).endOf("isoWeek").format("DD MMM YYYY")}`}
+          {view === "month" && moment(date).format("MMMM YYYY")}
         </div>
 
-        {/* CONTENT */}
-        <div className="flex-1 overflow-auto p-6">
+        <div className="flex gap-2">
+          <button onClick={() => setView("week")}>Week</button>
+          <button onClick={() => setView("month")}>Month</button>
 
-          {/* ================= WEEK ================= */}
-          {view === "week" && (
-            <div className="border border-white/10 rounded overflow-hidden">
+          <button onClick={prev}>←</button>
+          <button onClick={() => setDate(new Date())}>Today</button>
+          <button onClick={next}>→</button>
 
-              <div className="grid grid-cols-8 bg-[#020617] border-b border-white/10">
-                <div className="p-2 text-xs text-gray-400">Employee</div>
+          <button onClick={bulkAddWeek} className="bg-indigo-600 px-3 py-1 rounded">
+            + Bulk Week
+          </button>
 
-                {days.map((d, i) => (
-                  <div key={i} className="p-2 text-xs text-center text-gray-400">
+          <button onClick={() => setShowAdd(true)} className="bg-indigo-600 px-3 py-1 rounded">
+            + Shift
+          </button>
+        </div>
+      </div>
 
-                    {d.format("ddd DD")}
+      {/* CONTENT */}
+      <div className="flex-1 overflow-auto p-6">
 
-                    <button
-                      onClick={bulkAddWeek}
-                      className="block text-[10px] bg-indigo-600 mt-1 px-2 rounded"
-                    >
-                      + All
-                    </button>
+        {/* WEEK */}
+        {view === "week" && (
+          <div className="border border-white/10 rounded overflow-hidden">
 
-                  </div>
-                ))}
-              </div>
+            <div className="grid grid-cols-8 bg-[#020617] border-b border-white/10">
+              <div className="p-2 text-xs text-gray-400">Employee</div>
 
-              {users.map(user => (
-                <div key={user.id} className="grid grid-cols-8 border-b border-white/10">
-
-                  <div className="p-2">{user.name}</div>
-
-                  {days.map((day, i) => {
-                    const ds = day.format("YYYY-MM-DD");
-                    const isHoliday = holidays.includes(ds);
-
-                    const dayShifts = shifts.filter(
-                      s => s.date === ds && s.user_id === user.id
-                    );
-
-                    return (
-                      <div
-                        key={i}
-                        onClick={() => setDayModal(ds)}
-                        className={`p-1 min-h-[70px] space-y-1 cursor-pointer ${
-                          isHoliday ? "bg-red-500/10 border border-red-500/30" : ""
-                        }`}
-                      >
-
-                        {isHoliday && (
-                          <div className="text-[10px] text-red-400">
-                            Holiday
-                          </div>
-                        )}
-
-                        {dayShifts.map(s => (
-                          <div
-                            key={s.id}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditing(s);
-                            }}
-                            className="bg-indigo-600 text-xs px-2 py-1 rounded"
-                          >
-                            {formatName(user.name)}<br/>
-                            {moment(s.start_time).format("HH:mm")} - {moment(s.end_time).format("HH:mm")}
-                          </div>
-                        ))}
-
-                      </div>
-                    );
-                  })}
-
+              {days.map((d, i) => (
+                <div key={i} className="p-2 text-xs text-center text-gray-400">
+                  {d.format("ddd DD")}
+                  <button
+                    onClick={() => bulkAddDay(d)}
+                    className="block text-[10px] bg-indigo-600 mt-1 px-2 rounded"
+                  >
+                    + All
+                  </button>
                 </div>
               ))}
-
             </div>
-          )}
 
-          {/* ================= MONTH ================= */}
-          {view === "month" && (
-            <div className="grid grid-cols-7 gap-2">
-              {Array.from({ length: 42 }).map((_, i) => {
-  const start = moment(date).startOf("month").startOf("isoWeek");
-  const d = start.clone().add(i, "days");
+            {users.map(user => (
+              <div key={user.id} className="grid grid-cols-8 border-b border-white/10">
 
-  const ds = d.format("YYYY-MM-DD");
-  const isHoliday = holidays.includes(ds); // ✅ MUST be here
+                <div className="p-2">{user.name}</div>
 
-  return (
-    <div
-      key={i}
-      onClick={() => setDayModal(ds)}
-      className="border p-2 min-h-[100px] cursor-pointer"
-    >
-      {/* DAY NUMBER */}
-      <div className={`text-xs ${isHoliday ? "text-red-400" : "text-gray-400"}`}>
-        {d.format("DD")}
+                {days.map((day, i) => {
+                  const ds = day.format("YYYY-MM-DD");
+                  const holiday = isHoliday(ds);
+
+                  const dayShifts = shifts.filter(
+                    s => s.date === ds && s.user_id === user.id
+                  );
+
+                  return (
+                    <div
+                      key={i}
+                      onClick={() => setDayModal(ds)}
+                      className={`p-1 min-h-[70px] cursor-pointer ${
+                        holiday ? "bg-red-500/10" : ""
+                      }`}
+                    >
+                      {holiday && (
+                        <div className="text-[10px] text-red-400">
+                          {holiday.name}
+                        </div>
+                      )}
+
+                      {dayShifts.map(s => (
+                        <div
+                          key={s.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditing(s);
+                          }}
+                          className="bg-indigo-600 text-xs px-2 py-1 rounded mt-1"
+                        >
+                          {formatName(user.name)}
+                          <div className="text-[10px]">
+                            {moment(s.start_time).format("HH:mm")} - {moment(s.end_time).format("HH:mm")}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+
+              </div>
+            ))}
+
+          </div>
+        )}
+
+        {/* MONTH */}
+        {view === "month" && (
+          <div className="grid grid-cols-7 gap-2">
+            {Array.from({ length: 42 }).map((_, i) => {
+              const start = moment(date).startOf("month").startOf("isoWeek");
+              const d = start.clone().add(i, "days");
+              const ds = d.format("YYYY-MM-DD");
+              const holiday = isHoliday(ds);
+
+              return (
+                <div
+                  key={i}
+                  onClick={() => setDayModal(ds)}
+                  className="border p-2 min-h-[100px] cursor-pointer"
+                >
+                  <div className="text-xs">{d.format("DD")}</div>
+
+                  {holiday && (
+                    <div className="text-[10px] text-red-400">
+                      {holiday.name}
+                    </div>
+                  )}
+
+                  {shifts
+                    .filter(s => s.date === ds)
+                    .slice(0, 4)
+                    .map(s => {
+                      const user = users.find(u => u.id === s.user_id);
+
+                      return (
+                        <div key={s.id} className="text-[10px] bg-indigo-600 mt-1 p-1 rounded">
+                          {formatName(user?.name)} {moment(s.start_time).format("HH:mm")}
+                        </div>
+                      );
+                    })}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
       </div>
 
-      {/* HOLIDAY LABEL */}
-      {isHoliday && (
-        <div className="text-[10px] text-red-400">Holiday</div>
+      {/* ADD MODAL */}
+      {showAdd && (
+        <AddShiftModal
+          users={users}
+          form={form}
+          setForm={setForm}
+          createShift={createShift}
+          onClose={() => setShowAdd(false)}
+        />
       )}
 
-      {/* SHIFTS */}
-      {shifts
-        .filter((s) => s.date === ds)
-        .slice(0, 4)
-        .map((s) => {
-          const user = users.find((u) => u.id === s.user_id);
-
-          return (
-            <div
-              key={s.id}
-              className="bg-indigo-600 text-xs px-2 py-1 rounded relative mt-1 hover:bg-indigo-500 transition"
-            >
-              <div>{formatName(user?.name)}</div>
-
-              <div className="text-[10px]">
-                {moment(s.start_time).format("HH:mm")} -{" "}
-                {moment(s.end_time).format("HH:mm")}
-              </div>
-
-              {/* EDIT BUTTON */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setEditing(s);
-                }}
-                className="absolute top-1 right-1 text-[10px] bg-black/30 px-1 rounded"
-              >
-                ✎
-              </button>
+      {/* DAY MODAL */}
+      {dayModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center">
+          <div className="bg-[#020617] p-6 w-[400px] max-h-[80vh] overflow-y-auto rounded">
+            <div className="text-lg mb-2">
+              {moment(dayModal).format("DD MMM YYYY")}
             </div>
-          );
-        })}
-    </div>
-  );
-})}
-            </div>
-          )}
 
+            {shifts
+              .filter(s => s.date === dayModal)
+              .map(s => {
+                const user = users.find(u => u.id === s.user_id);
+
+                return (
+                  <div key={s.id} className="border p-2 rounded mb-2">
+                    {user?.name}
+                    <div className="text-xs">
+                      {moment(s.start_time).format("HH:mm")} - {moment(s.end_time).format("HH:mm")}
+                    </div>
+                  </div>
+                );
+              })}
+
+            <button onClick={() => setDayModal(null)}>Close</button>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* ================= EDIT MODAL ================= */}
+      {/* EDIT MODAL */}
       {editing && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center">
           <div className="bg-[#020617] p-6 space-y-3 rounded">
-
-            <div>Edit Shift</div>
-
             <input
               type="time"
               defaultValue={moment(editing.start_time).format("HH:mm")}
@@ -343,54 +338,15 @@ export default function Schedule() {
               }
             />
 
-            <button
-              onClick={() => {
-                updateShift(editing.id, editing);
-                setEditing(null);
-              }}
-            >
+            <button onClick={() => { updateShift(editing.id, editing); setEditing(null); }}>
               Save
             </button>
 
-            <button
-              onClick={() => {
-                deleteShift(editing.id);
-                setEditing(null);
-              }}
-            >
+            <button onClick={() => { deleteShift(editing.id); setEditing(null); }}>
               Delete
             </button>
 
             <button onClick={() => setEditing(null)}>Cancel</button>
-
-          </div>
-        </div>
-      )}
-
-      {/* ================= DAY MODAL ================= */}
-      {dayModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center">
-          <div className="bg-[#020617] p-6 w-[400px] space-y-2 rounded">
-
-            <div className="text-lg">
-              {moment(dayModal).format("DD MMM YYYY")}
-            </div>
-
-            {shifts
-              .filter(s => s.date === dayModal)
-              .map(s => {
-                const user = users.find(u => u.id === s.user_id);
-
-                return (
-                  <div key={s.id} className="border p-2 rounded">
-                    {user?.name}<br/>
-                    {moment(s.start_time).format("HH:mm")} - {moment(s.end_time).format("HH:mm")}
-                  </div>
-                );
-              })}
-
-            <button onClick={() => setDayModal(null)}>Close</button>
-
           </div>
         </div>
       )}

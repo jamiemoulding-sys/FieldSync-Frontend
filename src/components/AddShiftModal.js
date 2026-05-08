@@ -76,8 +76,11 @@ export default function AddShiftModal({
 
     await Promise.all(promises);
 
-    setLoading(false);
-    onClose();
+setLoading(false);
+onClose();
+
+// 🔥 ADD THIS
+window.location.reload();
   };
 
   return (
