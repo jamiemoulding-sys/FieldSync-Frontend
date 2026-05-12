@@ -927,28 +927,55 @@ async clockOut(sync = false) {
   SAVE CLOCK OUT
   ===================================== */
 
-  const { error } =
-    await supabase
+  try {
+    // Use backend clock-out API with GPS coordinates
+    const requestBody = {};
+    if (lat !== null && lng !== null) {
+      requestBody.location = {
+        latitude: lat,
+        longitude: lng
+      };
+    }
+
+    const response = await api.post('/shifts/clock-out', requestBody);
+
+    if (!response.data.success) {
+      throw new Error(response.data.error || 'Clock out failed');
+    }
+
+    // Preserve client-side total_hours calculation temporarily
+    const { error } = await supabase
       .from("shifts")
       .update({
-        clock_out_time:
-          end,
-
-        total_hours:
-          hours,
-
-        clock_out_lat:
-          lat,
-
-        clock_out_lng:
-          lng,
-
+        total_hours: hours,
+        clock_out_lat: lat,
+        clock_out_lng: lng,
         latitude: lat,
         longitude: lng,
       })
       .eq("id", active.id);
 
-  if (error) throw error;
+    if (error) throw error;
+
+  } catch (backendError) {
+    console.error('Backend clock-out failed, falling back to direct Supabase:', backendError);
+    
+    // Fallback to direct Supabase write for backward compatibility
+    const { error } =
+      await supabase
+        .from("shifts")
+        .update({
+          clock_out_time: end,
+          total_hours: hours,
+          clock_out_lat: lat,
+          clock_out_lng: lng,
+          latitude: lat,
+          longitude: lng,
+        })
+        .eq("id", active.id);
+
+    if (error) throw error;
+  }
 
   shiftAPI.clearOfflineShift();
 
