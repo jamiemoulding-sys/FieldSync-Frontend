@@ -14,6 +14,10 @@
 // ✅ Team testing ready
 
 import { useEffect, useState, useRef } from "react";
+import {
+  haversineDistanceMeters,
+  haversineDistanceMetersRounded,
+} from "@fieldsync/shared";
 import { shiftAPI, locationAPI } from "../services/api";
 
 import {
@@ -88,46 +92,6 @@ export default function WorkSession() {
     }
   }
 
-  /* ========================================= */
-  /* DISTANCE */
-  /* ========================================= */
-
-  function getDistanceMeters(
-    lat1,
-    lon1,
-    lat2,
-    lon2
-  ) {
-    const R = 6371000;
-
-    const dLat =
-      ((lat2 - lat1) * Math.PI) / 180;
-
-    const dLon =
-      ((lon2 - lon1) * Math.PI) / 180;
-
-    const a =
-      Math.sin(dLat / 2) *
-        Math.sin(dLat / 2) +
-      Math.cos(
-        (lat1 * Math.PI) / 180
-      ) *
-        Math.cos(
-          (lat2 * Math.PI) / 180
-        ) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-
-    const c =
-      2 *
-      Math.atan2(
-        Math.sqrt(a),
-        Math.sqrt(1 - a)
-      );
-
-    return Math.round(R * c);
-  }
-
 /* ========================================= */
 /* BATTERY SAVER GPS TRACKING FIXED */
 /* Replace your ENTIRE GPS TRACKING section */
@@ -170,42 +134,6 @@ function stopTracking() {
   }
 }
 
-function metersBetween(
-  lat1,
-  lon1,
-  lat2,
-  lon2
-) {
-  const R = 6371000;
-
-  const dLat =
-    ((lat2 - lat1) * Math.PI) / 180;
-
-  const dLon =
-    ((lon2 - lon1) * Math.PI) / 180;
-
-  const a =
-    Math.sin(dLat / 2) *
-      Math.sin(dLat / 2) +
-    Math.cos(
-      (lat1 * Math.PI) / 180
-    ) *
-      Math.cos(
-        (lat2 * Math.PI) / 180
-      ) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-
-  return (
-    R *
-    2 *
-    Math.atan2(
-      Math.sqrt(a),
-      Math.sqrt(1 - a)
-    )
-  );
-}
-
 async function savePoint(pos) {
   const lat = pos.coords.latitude;
   const lng = pos.coords.longitude;
@@ -214,7 +142,7 @@ async function savePoint(pos) {
     lastLatRef.current !== null &&
     lastLngRef.current !== null
   ) {
-    const moved = metersBetween(
+    const moved = haversineDistanceMeters(
       lastLatRef.current,
       lastLngRef.current,
       lat,
@@ -362,7 +290,7 @@ async function clockInSite() {
         const siteLat = Number(site.latitude);
         const siteLng = Number(site.longitude);
 
-        const distance = getDistanceMeters(
+        const distance = haversineDistanceMetersRounded(
           userLat,
           userLng,
           siteLat,

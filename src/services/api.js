@@ -986,15 +986,31 @@ async clockOut(sync = false) {
 
     if (!active) return true;
 
-    await supabase
-      .from("shifts")
-      .update({
-        break_started_at:
-          nowISO(),
-      })
-      .eq("id", active.id);
+    try {
+      // Use backend break API
+      const response = await api.post('/shifts/break/start', {
+        shift_id: active.id
+      });
 
-    return true;
+      if (!response.data.success) {
+        throw new Error(response.data.error || 'Break start failed');
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Backend break start failed, falling back to direct Supabase:', error);
+      
+      // Fallback to direct Supabase write for backward compatibility
+      await supabase
+        .from("shifts")
+        .update({
+          break_started_at:
+            nowISO(),
+        })
+        .eq("id", active.id);
+
+      return true;
+    }
   },
 
   async endBreak(sync = false) {
@@ -1020,30 +1036,46 @@ async clockOut(sync = false) {
     )
       return true;
 
-    const secs =
-      Math.floor(
-        (Date.now() -
-          new Date(
-            active.break_started_at
-          ).getTime()) /
-          1000
-      );
+    try {
+      // Use backend break API
+      const response = await api.post('/shifts/break/end', {
+        shift_id: active.id
+      });
 
-    const current =
-      active.total_break_seconds ||
-      0;
+      if (!response.data.success) {
+        throw new Error(response.data.error || 'Break end failed');
+      }
 
-    await supabase
-      .from("shifts")
-      .update({
-        break_started_at:
-          null,
-        total_break_seconds:
-          current + secs,
-      })
-      .eq("id", active.id);
+      return true;
+    } catch (error) {
+      console.error('Backend break end failed, falling back to direct Supabase:', error);
+      
+      // Fallback to direct Supabase write for backward compatibility
+      const secs =
+        Math.floor(
+          (Date.now() -
+            new Date(
+              active.break_started_at
+            ).getTime()) /
+            1000
+        );
 
-    return true;
+      const current =
+        active.total_break_seconds ||
+        0;
+
+      await supabase
+        .from("shifts")
+        .update({
+          break_started_at:
+            null,
+          total_break_seconds:
+            current + secs,
+        })
+        .eq("id", active.id);
+
+      return true;
+    }
   },
 
  /* =========================================
